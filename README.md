@@ -78,6 +78,22 @@ Edit the most recent commit's message without creating a new commit.
 ```bash
 git commit --amend -m "corrected commit message"
 ```
+##  📂 Directory Changes
+
+Go to a specific folder — this make your terminal to run in a specific folder.
+```bash
+cd <path>
+```
+
+Go to a next folder from current folder — this make your directory to go to next folder from current folder.
+```bash
+cd \<folder name>
+```
+
+Go to one folder back from current folder — this make your directory to go to previous folder from current folder.
+```bash
+cd ..
+```
 
 ---
 
