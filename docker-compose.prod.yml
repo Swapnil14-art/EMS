@@ -1,0 +1,131 @@
+services:
+  # ── Frontend ─────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-EMS}
+        NEXT_PUBLIC_COLLEGE_NAME: ${NEXT_PUBLIC_COLLEGE_NAME:-NMIMS Shirpur}
+    container_name: ems_frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - ems_net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  # ── Backend API ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./ems-backend
+    container_name: ems_backend
+    restart: unless-stopped
+    env_file: ./ems-backend/.env
+    # Volumes only for persistent storage, not code
+    volumes:
+      - ./ems-backend/storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ems_net
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 512M
+
+  # ── Database ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: ems_db
+    restart: unless-stopped
+    env_file: ./ems-backend/.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-ems_user} -d $${POSTGRES_DB:-ems_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ems_net
+
+  # ── Redis ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ems_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ems_net
+
+  # ── Celery Worker ────────────────────────────────────────────────────────
+  celery_worker:
+    build: 
+      context: ./ems-backend
+    container_name: ems_celery_worker
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    env_file: ./ems-backend/.env
+    volumes:
+      - ./ems-backend/storage:/app/storage
+    depends_on:
+      - redis
+      - db
+    networks:
+      - ems_net
+
+  # ── Celery Beat ──────────────────────────────────────────────────────────
+  celery_beat:
+    build: 
+      context: ./ems-backend
+    container_name: ems_celery_beat
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    env_file: ./ems-backend/.env
+    depends_on:
+      - redis
+      - db
+    networks:
+      - ems_net
+
+  # ── Nginx API Gateway ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ems_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ems-backend/storage:/app/storage:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/vhost.d:/etc/nginx/vhost.d
+      - ./nginx/html:/usr/share/nginx/html
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ems_net
+
+networks:
+  ems_net:
+    driver: bridge
+
+volumes:
+  postgres_data:

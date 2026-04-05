@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     AZURE_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
     AZURE_AUTHORITY: str = "https://login.microsoftonline.com/your-tenant-id"
 
+    # OCI Object Storage
+    OCI_CONFIG_PROFILE: str = "DEFAULT"
+    OCI_BUCKET_NAME: str = ""
+    OCI_NAMESPACE: str = ""
+    OCI_REGION: str = "ap-hyderabad-1"
+    # STORAGE_BACKEND: local | oci
+    STORAGE_BACKEND: str = "local"
+
     ALLOWED_DOMAINS: str = "nmims.in,nmims.edu"
 
     REDIS_URL: str = "redis://redis:6379/0"
@@ -38,6 +46,7 @@ class Settings(BaseSettings):
 
     STORAGE_ROOT: str = "storage"
     FRONTEND_URL: str = "http://localhost:3000"
+    CORS_ORIGINS: str = ""
     COLLEGE_NAME: str = "SVKM's NMIMS, Shirpur Campus"
 
     @property
