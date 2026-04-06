@@ -9,6 +9,8 @@ This guide helps you completely reset the database, apply migrations, and seed i
 Drop and recreate the database:
 
 ```bash
+cd ~/EMS
+docker-compose stop backend celery_worker celery_beat
 docker exec -it ems_db psql -U ems_user -d postgres -c "DROP DATABASE ems_db;"
 docker exec -it ems_db psql -U ems_user -d postgres -c "CREATE DATABASE ems_db;"
 ```
@@ -17,6 +19,7 @@ docker exec -it ems_db psql -U ems_user -d postgres -c "CREATE DATABASE ems_db;"
 Apply all database migrations:
 
 ```bash
+docker-compose start backend celery_worker celery_beat
 docker exec -it ems_backend alembic upgrade head
 ```
 
