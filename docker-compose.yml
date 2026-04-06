@@ -38,8 +38,7 @@ services:
         condition: service_healthy
     networks:
       - ems_net
-    extra_hosts:
-      - "sandbox.smtp.mailtrap.io:3.86.141.192"
+
 
   # ── Database ─────────────────────────────────────────────────────────────
   db:
