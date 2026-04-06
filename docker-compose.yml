@@ -1,0 +1,144 @@
+
+services:
+  # ── Frontend ─────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./Frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api}
+        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-EMS}
+        NEXT_PUBLIC_COLLEGE_NAME: ${NEXT_PUBLIC_COLLEGE_NAME:-NMIMS Shirpur}
+    container_name: ems_frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost/api}
+    depends_on:
+      - backend
+    networks:
+      - ems_net
+
+  # ── Backend API ──────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./ems-backend
+    container_name: ems_backend
+    restart: unless-stopped
+    env_file: ./ems-backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://ems_user:ems_pass@db:5432/ems_db
+      - DATABASE_URL_SYNC=postgresql://ems_user:ems_pass@db:5432/ems_db
+    volumes:
+      - ./ems-backend/storage:/app/storage
+      - ./ems-backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ems_net
+    extra_hosts:
+      - "sandbox.smtp.mailtrap.io:3.86.141.192"
+
+  # ── Database ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: ems_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ems_user
+      POSTGRES_PASSWORD: ems_pass
+      POSTGRES_DB: ems_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ems_user -d ems_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ems_net
+
+  # ── Redis ────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ems_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ems_net
+
+  # ── Celery Worker ────────────────────────────────────────────────────────
+  celery_worker:
+    build: 
+      context: ./ems-backend
+    container_name: ems_celery_worker
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
+    env_file: ./ems-backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://ems_user:ems_pass@db:5432/ems_db
+      - DATABASE_URL_SYNC=postgresql://ems_user:ems_pass@db:5432/ems_db
+    volumes:
+      - ./ems-backend/storage:/app/storage
+      - ./ems-backend:/app
+    depends_on:
+      - redis
+      - db
+    networks:
+      - ems_net
+    extra_hosts:
+      - "sandbox.smtp.mailtrap.io:3.86.141.192"
+
+  # ── Celery Beat ──────────────────────────────────────────────────────────
+  celery_beat:
+    build: 
+      context: ./ems-backend
+    container_name: ems_celery_beat
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    env_file: ./ems-backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://ems_user:ems_pass@db:5432/ems_db
+      - DATABASE_URL_SYNC=postgresql://ems_user:ems_pass@db:5432/ems_db
+    volumes:
+      - ./ems-backend:/app
+    depends_on:
+      - redis
+      - db
+    networks:
+      - ems_net
+    extra_hosts:
+      - "sandbox.smtp.mailtrap.io:3.86.141.192"
+
+  # ── Nginx API Gateway ────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: ems_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ems-backend/storage:/app/storage:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ems_net
+      
+networks:
+  ems_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
