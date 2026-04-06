@@ -24,5 +24,6 @@ docker exec -it ems_backend alembic upgrade head
 Run the seed script to populate initial data:
 
 ```bash
-docker exec -it ems_backend python <seed_script_name>.py
+docker exec -it ems_backend python seed_super_admin.py
+docker exec -it ems_backend python seed_all_test_data.py
 ```
