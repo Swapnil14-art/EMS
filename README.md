@@ -27,3 +27,10 @@ Run the seed script to populate initial data:
 docker exec -it ems_backend python seed_super_admin.py
 docker exec -it ems_backend python seed_all_test_data.py
 ```
+
+```bash
+ cd ~/EMS
+docker-compose down
+docker rmi ems_backend
+docker-compose up -d --build
+```
