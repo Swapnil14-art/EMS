@@ -1,0 +1,130 @@
+:root {
+  /* Base Colors (RGB Format for opacity support) */
+  --color-primary: 37 99 235;
+  /* Main brand color used for primary buttons and highlights */
+  --color-secondary: 71 85 105;
+  /* Secondary brand color used for borders and ghost buttons */
+  --color-background: 248 250 255;
+  /* Main page background color */
+  --color-surface: 255 255 255;
+  /* Surface color used for cards, modals, and dropdowns */
+  --color-text: 15 23 42;
+  /* Default primary text color */
+  --color-muted: 148 163 184;
+  /* Muted color used for secondary text and borders */
+  --color-danger: 220 38 38;
+  /* Danger color used for errors and destructive actions */
+
+  /* Typography */
+  --text-primary: rgb(var(--color-text));
+  /* Main reading text color */
+  --text-secondary: rgb(var(--color-secondary));
+  /* Secondary text like subtitles */
+  --text-muted: rgb(var(--color-muted));
+  /* Muted text for placeholders or minor details */
+  --text-danger: rgb(var(--color-danger));
+  /* Red text for error messages */
+
+  /* Backgrounds */
+  --page-bg: rgb(var(--color-background));
+  /* Default background for the whole application */
+
+  /* Buttons */
+  --btn-primary-bg: rgb(var(--color-primary));
+  /* Background color for primary buttons */
+  --btn-primary-text: rgb(var(--color-surface));
+  /* Text color for primary buttons */
+  --btn-secondary-bg: rgb(var(--color-surface));
+  /* Background color for secondary/outline buttons */
+  --btn-secondary-border: rgb(var(--color-muted));
+  /* Border color for secondary/outline buttons */
+  --btn-secondary-text: rgb(var(--color-text));
+  /* Text color for secondary/outline buttons */
+  --btn-secondary-hover-bg: rgb(var(--color-background));
+  /* Hover background for secondary buttons */
+  --btn-ghost-text: rgb(var(--color-secondary));
+  /* Text color for ghost/transparent buttons */
+  --btn-ghost-hover-bg: rgb(var(--color-muted));
+  /* Hover background for ghost buttons */
+  --btn-danger-bg: rgb(var(--color-danger));
+  /* Background for destructive buttons */
+  --btn-danger-text: rgb(var(--color-surface));
+  /* Text color for destructive buttons */
+
+  /* Cards */
+  --card-bg: rgb(var(--color-surface));
+  /* Background color for card containers */
+  --card-border: rgb(var(--color-muted));
+  /* Border color for card containers */
+
+  /* Inputs */
+  --input-bg: rgb(var(--color-surface));
+  /* Background color for form inputs */
+  --input-border: rgb(var(--color-secondary));
+  /* Border color for form inputs */
+  --input-text: rgb(var(--color-text));
+  /* Text color typed inside form inputs */
+  --input-placeholder: rgb(var(--color-muted));
+  /* Placeholder text color in inputs */
+  --input-focus-ring: rgb(var(--color-primary));
+  /* Color of the focus ring around active inputs */
+  --input-error-border: rgb(var(--color-danger));
+  /* Border color when an input has an error */
+
+  /* Navigation / Sidebar */
+  --nav-bg: rgb(var(--color-surface));
+  /* Background color of the navigation bar/sidebar */
+  --nav-item-text: rgb(var(--color-secondary));
+  /* Text color for inactive navigation items */
+  --nav-item-hover-bg: rgb(var(--color-surface));
+  /* Background color when hovering over a nav item */
+  --nav-item-hover-text: rgb(var(--color-primary));
+  /* Text color when hovering over a nav item */
+  --nav-item-active-bg: rgb(var(--color-surface));
+  /* Background color for the currently active nav item */
+  --nav-item-active-text: rgb(var(--color-primary));
+  /* Text color for the currently active nav item */
+
+  /* Tables */
+  --table-header-bg: rgb(var(--color-background));
+  /* Background color for table header rows */
+  --table-header-text: rgb(var(--color-muted));
+  /* Text color for table column titles */
+  --table-bg: rgb(var(--color-surface));
+  /* Background color for normal table rows */
+  --table-text: rgb(var(--color-text));
+  /* Text color for table cell contents */
+  --table-border: rgb(var(--color-muted));
+  /* Border color between table rows/cells */
+  --table-row-hover: rgb(var(--color-surface));
+  /* Background color when hovering over a table row */
+
+  /* Alerts */
+  --alert-info-bg: rgb(var(--color-primary));
+  /* Background color for informative alerts */
+  --alert-info-border: rgb(var(--color-primary));
+  /* Border color for informative alerts */
+  --alert-info-text: rgb(var(--color-text));
+  /* Text color inside informative alerts */
+
+  --alert-success-bg: rgb(var(--color-primary));
+  /* Background color for success alerts */
+  --alert-success-border: rgb(var(--color-primary));
+  /* Border color for success alerts */
+  --alert-success-text: rgb(var(--color-text));
+  /* Text color inside success alerts */
+
+  --alert-warning-bg: rgb(var(--color-secondary));
+  /* Background color for warning alerts */
+  --alert-warning-border: rgb(var(--color-secondary));
+  /* Border color for warning alerts */
+  --alert-warning-text: rgb(var(--color-secondary));
+  /* Text color inside warning alerts */
+
+  --alert-error-bg: rgb(var(--color-danger));
+  /* Background color for error alerts */
+  --alert-error-border: rgb(var(--color-danger));
+  /* Border color for error alerts */
+  --alert-error-text: rgb(var(--color-danger));
+  /* Text color inside error alerts */
+}
