@@ -388,3 +388,30 @@ def notify_event_details_updated(event: Any, registered_students: List[Any]):
     body = _build_email_html(content_html)
     emails = [s.email for s in registered_students]
     send_bulk_email.delay(emails, subject, body, event.id, "event_details_updated")
+
+
+def notify_collab_chain_restarted(event: Any, coordinators: List[Any], edited_by_name: str):
+    """Notify all collaborating coordinators that the approval chain has restarted due to an edit."""
+    subject = f"[EMS] Approval Chain Restarted: {event.title}"
+    content_html = f"""
+    <h2>Collaborative Event — Approval Chain Restarted</h2>
+    <p>Dear Coordinator,</p>
+    <p>The collaborative event <b>{event.title}</b> has been edited by <b>{edited_by_name}</b>. 
+    As a result, the approval chain has been <strong>restarted from the beginning</strong>.</p>
+    
+    <table>
+      <tr><td>Event Title</td><td>{event.title}</td></tr>
+      <tr><td>Date &amp; Time</td><td>{event.start_datetime.strftime('%d %B %Y, %I:%M %p')}</td></tr>
+      <tr><td>Edited By</td><td>{edited_by_name}</td></tr>
+    </table>
+    
+    <div class="alert alert-warning">
+        <p style="margin: 0;">Your re-approval is required before this event can proceed through the approval chain again.</p>
+    </div>
+    <div class="center-align">
+        <a href="{settings.FRONTEND_URL}/admin/events/{event.id}" class="btn">Review &amp; Re-Approve</a>
+    </div>
+    """
+    body = _build_email_html(content_html)
+    for coord in coordinators:
+        send_email.delay(coord.email, subject, body, event.id, "collab_chain_restarted")

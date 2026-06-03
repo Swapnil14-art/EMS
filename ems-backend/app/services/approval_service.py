@@ -5,7 +5,7 @@ Called from the approvals router.
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete as sa_delete
 
 from app.models.event import Event, EventCollaboratingClub
 from app.models.event_approval import EventApproval
@@ -58,10 +58,25 @@ async def process_approval_action(
                 status_code=400,
                 detail="Event is not pending Associate Dean review.",
             )
+        # Prevent duplicate approval — check if this dean already approved this event
+        existing_approval = await db.execute(
+            select(EventApproval).where(
+                EventApproval.event_id == event.id,
+                EventApproval.approver_id == approver.id,
+                EventApproval.sequence_order == 2,  # associate_dean sequence
+            )
+        )
+        if existing_approval.scalar_one_or_none():
+            raise HTTPException(
+                status_code=400,
+                detail="You have already reviewed this event. Waiting for other reviewers.",
+            )
         await _record_approval(
             db, event, approver, action, remarks,
             venue_clash_override, venue_clash_override_reason, sequence_order=2,
         )
+        # Flush so the new approval row is visible to the subsequent query
+        await db.flush()
         if action == "approved":
             # For collaborative events, check if ALL required deans have approved
             all_deans_done = True
@@ -97,9 +112,15 @@ async def process_approval_action(
         )
         if action == "approved":
             event.status = "approved"
-            creator = await db.get(User, event.created_by)
-            if creator:
-                notify_event_approved_by_director(event, creator)
+            # Notify ALL involved coordinators (creator + collaborators)
+            all_coordinators = await _get_all_collab_coordinators(db, event)
+            if all_coordinators:
+                for coord in all_coordinators:
+                    notify_event_approved_by_director(event, coord)
+            else:
+                creator = await db.get(User, event.created_by)
+                if creator:
+                    notify_event_approved_by_director(event, creator)
         elif action == "rejected":
             event.status = "rejected"
             await _notify_organizers(event, db, action, remarks, approver.role)
@@ -143,8 +164,12 @@ async def _record_approval(
 
 
 async def _notify_organizers(event, db, action, remarks, by_role):
-    creator = await db.get(User, event.created_by)
-    recipients = [creator] if creator else []
+    """Notify all organizers: creator + all collaborating club coordinators."""
+    if event.is_collaborative:
+        recipients = await _get_all_collab_coordinators(db, event)
+    else:
+        creator = await db.get(User, event.created_by)
+        recipients = [creator] if creator else []
     if action == "rejected":
         notify_event_rejected(event, recipients, remarks, by_role)
     elif action == "suggested_changes":
@@ -219,7 +244,8 @@ async def _handle_parallel_coordinator_approval(
 
 async def _check_all_deans_approved(db, event) -> bool:
     """For collaborative events, check if ALL required department deans have approved.
-    Returns True if every involved department has at least one dean approval."""
+    Returns True if every involved department has at least one dean approval.
+    Only the RESPECTIVE deans (departments of involved clubs) are required."""
     from app.models.club import Club
 
     # Collect all required department IDs
@@ -263,3 +289,51 @@ async def _check_all_deans_approved(db, event) -> bool:
 
     # All required departments must be covered
     return dept_ids.issubset(approved_dept_ids)
+
+
+async def _get_all_collab_coordinators(db, event) -> list:
+    """Get all coordinator Users for a collaborative event:
+    creator + coordinators of all collaborating clubs.
+    Returns deduplicated list of User objects."""
+    from app.models.club import Club
+
+    user_ids = set()
+    users = []
+
+    # Add creator
+    if event.created_by:
+        user_ids.add(event.created_by)
+
+    # Add creator's club coordinator (if different from creator)
+    if event.club_id:
+        creator_club = await db.get(Club, event.club_id)
+        if creator_club and creator_club.coordinator_id:
+            user_ids.add(creator_club.coordinator_id)
+
+    # Add all collaborating club coordinators
+    collab_result = await db.execute(
+        select(EventCollaboratingClub).where(EventCollaboratingClub.event_id == event.id)
+    )
+    collab_clubs = collab_result.scalars().all()
+    for collab in collab_clubs:
+        if collab.club_id:
+            club = await db.get(Club, collab.club_id)
+            if club and club.coordinator_id:
+                user_ids.add(club.coordinator_id)
+
+    # Fetch all User objects
+    if user_ids:
+        result = await db.execute(
+            select(User).where(User.id.in_(user_ids), User.status == "active")
+        )
+        users = result.scalars().all()
+
+    return users
+
+
+async def clear_approval_records(db, event_id: int):
+    """Clear all EventApproval records for an event.
+    Called when the approval chain restarts (e.g., after an edit)."""
+    await db.execute(
+        sa_delete(EventApproval).where(EventApproval.event_id == event_id)
+    )

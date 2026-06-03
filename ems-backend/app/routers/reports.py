@@ -21,9 +21,7 @@ router = APIRouter()
 async def submit_report(
     event_id: int,
     body: ReportSubmit,
-    current_user: User = Depends(require_roles(
-        "club_coordinator", "super_admin"
-    )),
+    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit a post-event report. Transitions event: completed → archived."""
@@ -55,42 +53,50 @@ async def submit_report(
         select(EventReport).where(EventReport.event_id == event_id)
     )
     existing_report = existing.scalar_one_or_none()
-    
-    # If report exists and has summary, it's already fully submitted
+
     if existing_report and existing_report.event_summary:
         raise HTTPException(status_code=409, detail="Report already submitted for this event")
 
+    # Build field dict from body
+    fields = dict(
+        submitted_by=current_user.id,
+        event_summary=body.event_summary,
+        actual_budget=body.actual_budget,
+        outcomes=body.outcomes,
+        issues=body.issues,
+        feedback=body.feedback,
+        student_count=body.student_count,
+        faculty_count=body.faculty_count,
+        external_count=body.external_count,
+        program_type=body.program_type,
+        mode_of_delivery=body.mode_of_delivery,
+        objective=body.objective,
+        learning_benefit=body.learning_benefit,
+        guest_speakers=[s.model_dump() for s in body.guest_speakers] if body.guest_speakers else None,
+        faculty_coordinators=body.faculty_coordinators,
+        student_coordinators=body.student_coordinators,
+        social_pamphlet=body.social_pamphlet.model_dump() if body.social_pamphlet else None,
+        social_video=body.social_video.model_dump() if body.social_video else None,
+        speaker_background=body.speaker_background,
+        session_report=body.session_report,
+        key_outcomes=body.key_outcomes,
+        conclusion=body.conclusion,
+    )
+
     if existing_report:
-        existing_report.submitted_by = current_user.id
-        existing_report.event_summary = body.event_summary
-        existing_report.actual_budget = body.actual_budget
-        existing_report.participant_count = body.participant_count
-        existing_report.outcomes = body.outcomes
-        existing_report.issues = body.issues
-        existing_report.feedback = body.feedback
+        for k, v in fields.items():
+            setattr(existing_report, k, v)
         report = existing_report
     else:
-        report = EventReport(
-            event_id=event_id,
-            submitted_by=current_user.id,
-            event_summary=body.event_summary,
-            actual_budget=body.actual_budget,
-            participant_count=body.participant_count,
-            outcomes=body.outcomes,
-            issues=body.issues,
-            feedback=body.feedback,
-        )
+        report = EventReport(event_id=event_id, **fields)
         db.add(report)
-        
+
     await db.flush()
 
-    # Transition event to archived
     event.status = "archived"
-
     await db.commit()
     await db.refresh(report)
 
-    # Trigger async docx generation
     from app.tasks.report_tasks import generate_report_task
     generate_report_task.delay(event_id, report.id)
 
@@ -104,7 +110,7 @@ async def upload_report_photos(
     current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Upload event photos for the post-event report."""
+    """Upload event photos for the post-event report (4–8 required)."""
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -115,6 +121,39 @@ async def upload_report_photos(
         uploaded.append(path)
 
     return {"message": f"Uploaded {len(uploaded)} photo(s)", "paths": uploaded}
+
+
+@router.post("/{event_id}/upload-flier")
+async def upload_flier(
+    event_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload the event flier (1 compulsory)."""
+    event = await db.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    path = await save_file(file, event_id, "report/flier", file_type="photo")
+
+    result = await db.execute(select(EventReport).where(EventReport.event_id == event_id))
+    report = result.scalar_one_or_none()
+    if report:
+        report.flier_path = path
+    else:
+        report = EventReport(
+            event_id=event_id,
+            submitted_by=current_user.id,
+            event_summary="",
+            actual_budget=0,
+            outcomes="",
+            flier_path=path,
+        )
+        db.add(report)
+
+    await db.commit()
+    return {"message": "Flier uploaded", "path": path}
 
 
 @router.post("/{event_id}/upload-attendance")
@@ -131,10 +170,7 @@ async def upload_attendance(
 
     path = await save_file(file, event_id, "report", file_type="document")
 
-    # Update report if it exists, otherwise create a minimal one
-    result = await db.execute(
-        select(EventReport).where(EventReport.event_id == event_id)
-    )
+    result = await db.execute(select(EventReport).where(EventReport.event_id == event_id))
     report = result.scalar_one_or_none()
     if report:
         report.attendance_doc_path = path
@@ -144,14 +180,12 @@ async def upload_attendance(
             submitted_by=current_user.id,
             event_summary="",
             actual_budget=0,
-            participant_count=0,
             outcomes="",
             attendance_doc_path=path,
         )
         db.add(report)
-        
-    await db.commit()
 
+    await db.commit()
     return {"message": "Attendance document uploaded", "path": path}
 
 
@@ -164,15 +198,12 @@ async def download_report(
     db: AsyncSession = Depends(get_db),
 ):
     """Download the generated .docx report."""
-    result = await db.execute(
-        select(EventReport).where(EventReport.event_id == event_id)
-    )
+    result = await db.execute(select(EventReport).where(EventReport.event_id == event_id))
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="No report found for this event")
 
     if not report.generated_report_path or not os.path.exists(report.generated_report_path):
-        # Try to regenerate
         event = await db.get(
             Event, event_id,
             options=[
@@ -204,9 +235,7 @@ async def get_report(
     )),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(EventReport).where(EventReport.event_id == event_id)
-    )
+    result = await db.execute(select(EventReport).where(EventReport.event_id == event_id))
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -220,7 +249,7 @@ async def upload_premade_report(
     current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Alternative to structured report: upload a pre-made .docx report directly."""
+    """Alternative: upload a pre-made .docx report directly."""
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -233,29 +262,22 @@ async def upload_premade_report(
 
     path = await save_file(file, event_id, "report", file_type="document")
 
-    # Check existing report record
-    result = await db.execute(
-        select(EventReport).where(EventReport.event_id == event_id)
-    )
+    result = await db.execute(select(EventReport).where(EventReport.event_id == event_id))
     report = result.scalar_one_or_none()
 
     if report:
         report.generated_report_path = path
     else:
-        # Create minimal report record
         report = EventReport(
             event_id=event_id,
             submitted_by=current_user.id,
             event_summary="Pre-made report uploaded",
             actual_budget=0,
-            participant_count=0,
             outcomes="See uploaded document",
             generated_report_path=path,
         )
         db.add(report)
-    
-    # Ensure event is archived
-    event.status = "archived"
 
+    event.status = "archived"
     await db.commit()
     return {"message": "Report document uploaded", "path": path}

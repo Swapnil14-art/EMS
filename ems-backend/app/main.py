@@ -49,7 +49,10 @@ def create_app() -> FastAPI:
 
     # Static file serving
     os.makedirs(settings.STORAGE_ROOT, exist_ok=True)
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    os.makedirs(static_dir, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=settings.STORAGE_ROOT), name="uploads")
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     # Routers
     app.include_router(auth_router, prefix="/auth", tags=["Authentication"])

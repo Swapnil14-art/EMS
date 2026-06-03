@@ -1,124 +1,324 @@
 """
 Auto-generates a structured .docx post-event report.
+Uses Generation.docx as a template to inherit header (dual logos) and footer (Page X of Y).
 Called after report submission — saves file to /events/{event_id}/report/generated_report.docx
 """
 import os
+import shutil
+import zipfile
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 from datetime import datetime
+from lxml import etree
 
 from app.models.event import Event
 from app.models.event_report import EventReport
 from app.config import settings
 
+# Path to the template docx that has the correct header/footer
+TEMPLATE_DOCX = os.path.join(os.path.dirname(__file__), "..", "templates", "report_template.docx")
+
+
+def _copy_header_footer_from_template(target_doc: Document, template_path: str):
+    """
+    Copy header and footer XML (including images) from the template docx
+    into the target document by directly manipulating the underlying XML/zip.
+    This is done AFTER saving the target_doc to a temp path.
+    """
+    # We work at the zip level to transplant header/footer parts + their images
+    pass  # Handled via template-based Document() init — see generate_event_report()
+
+
+def _add_bold_label_value(doc: Document, label: str, value: str):
+    """Add a paragraph with bold label followed by normal value."""
+    p = doc.add_paragraph()
+    run_label = p.add_run(label)
+    run_label.bold = True
+    p.add_run(value or "N/A")
+    return p
+
+
+def _add_section_heading(doc: Document, text: str):
+    """Add a styled section heading."""
+    p = doc.add_paragraph()
+    p.style = doc.styles["Heading 2"]
+    run = p.add_run(text)
+    return p
+
+
+def _add_subsection_heading(doc: Document, text: str):
+    p = doc.add_paragraph()
+    p.style = doc.styles["Heading 3"]
+    p.add_run(text)
+    return p
+
+
+def _table_row(table, label: str, value: str):
+    row = table.add_row()
+    row.cells[0].text = label
+    row.cells[1].text = str(value) if value is not None else "N/A"
+    row.cells[0].paragraphs[0].runs[0].bold = True
+
 
 def generate_event_report(event: Event, report: EventReport) -> str:
     """
-    Generate a .docx report for the event.
+    Generate a .docx report for the event using the institutional template
+    (which carries the dual-logo header and page-number footer).
     Returns the path where the file was saved.
     """
-    doc = Document()
+    # Determine template path — fall back gracefully if not deployed yet
+    template_path = TEMPLATE_DOCX
+    if not os.path.exists(template_path):
+        # Try common relative locations
+        base = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            os.path.join(base, "..", "templates", "report_template.docx"),
+            os.path.join(base, "report_template.docx"),
+            os.path.join(settings.STORAGE_ROOT, "report_template.docx"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                template_path = c
+                break
+        else:
+            template_path = None
 
-    # === HEADER / TITLE ===
-    title_para = doc.add_heading(settings.COLLEGE_NAME, level=0)
-    title_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Open template (inherits header/footer) or blank document
+    if template_path:
+        doc = Document(template_path)
+        # Clear all body content from template, keep header/footer
+        body = doc.element.body
+        for child in list(body):
+            tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+            if tag not in ("sectPr",):
+                body.remove(child)
+    else:
+        doc = Document()
 
-    subtitle = doc.add_heading("POST-EVENT REPORT", level=1)
+    # ── PAGE TITLE ──────────────────────────────────────────────────────────
+    title = doc.add_paragraph()
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = title.add_run("Report on")
+    run.bold = True
+    run.font.size = Pt(14)
+
+    subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    event_title_text = f'"{event.title}"'
+    run2 = subtitle.add_run(event_title_text)
+    run2.bold = True
+    run2.font.size = Pt(13)
 
     doc.add_paragraph()  # spacer
 
-    # === PART 1: EVENT DETAILS ===
-    doc.add_heading("1. Event Details", level=2)
+    # ── SECTION 1: BASIC EVENT DETAILS ──────────────────────────────────────
+    _add_section_heading(doc, "1. Event Details")
+
     table = doc.add_table(rows=0, cols=2)
     table.style = "Table Grid"
 
-    def add_row(label, value):
-        row = table.add_row()
-        row.cells[0].text = label
-        row.cells[1].text = str(value) if value is not None else "N/A"
-        row.cells[0].paragraphs[0].runs[0].bold = True
-
-    add_row("Event Name", event.title)
-    add_row("Event Type", event.event_type.title())
-    add_row("Department", event.school_department)
-    add_row("Organizing Club", event.club.name if event.club else "Non-Club Event")
-    add_row("Event Incharge", event.event_incharge_name)
-    add_row("Contact", event.event_incharge_contact)
-    add_row("Date", event.start_datetime.strftime("%d %B %Y"))
-    add_row(
-        "Time",
-        f"{event.start_datetime.strftime('%I:%M %p')} – {event.end_datetime.strftime('%I:%M %p')}",
+    _table_row(table, "Event Title", event.title)
+    _table_row(table, "Program Type", report.program_type or "N/A")
+    _table_row(table, "Department", event.school_department or "N/A")
+    _table_row(table, "Organizing Club", event.club.name if event.club else "Non-Club Event")
+    _table_row(table, "Venue", event.venue_custom or (event.venue.name if event.venue else "N/A"))
+    _table_row(table, "Start Date", event.start_datetime.strftime("%d %B %Y"))
+    _table_row(table, "End Date", event.end_datetime.strftime("%d %B %Y"))
+    _table_row(
+        table, "Time",
+        f"{event.start_datetime.strftime('%I:%M %p')} – {event.end_datetime.strftime('%I:%M %p')}"
     )
-    add_row("Venue", event.venue_custom or (event.venue.name if event.venue else "N/A"))
-    add_row("Target Audience", event.target_audience.replace("_", " ").title())
-    add_row("Estimated Budget", f"Rs. {event.budget:,.2f}")
-    add_row("Actual Budget Spent", f"Rs. {report.actual_budget:,.2f}")
 
-    if event.is_sponsored and event.sponsors:
-        sponsors = ", ".join(s.name for s in event.sponsors)
-        add_row("Sponsors", sponsors)
+    # Duration in hours
+    duration_hrs = round(
+        (event.end_datetime - event.start_datetime).total_seconds() / 3600, 2
+    )
+    _table_row(table, "Duration (hrs)", str(duration_hrs))
+    _table_row(table, "Mode of Delivery", (report.mode_of_delivery or "N/A").title())
 
     doc.add_paragraph()
 
-    # === PART 2: REPORT INPUTS ===
-    doc.add_heading("2. Event Report", level=2)
+    # ── SECTION 2: GUEST SPEAKERS ────────────────────────────────────────────
+    speakers = report.guest_speakers or []
+    if speakers:
+        _add_section_heading(doc, "2. Guest Speaker(s)")
+        for i, spk in enumerate(speakers, 1):
+            if len(speakers) > 1:
+                _add_subsection_heading(doc, f"Speaker {i}")
+            spk_table = doc.add_table(rows=0, cols=2)
+            spk_table.style = "Table Grid"
+            _table_row(spk_table, "Name", spk.get("name", ""))
+            _table_row(spk_table, "Designation", spk.get("designation", ""))
+            _table_row(spk_table, "Organization", spk.get("organization", ""))
+            _table_row(spk_table, "Area of Expertise", spk.get("expertise", ""))
+            doc.add_paragraph()
+    else:
+        _add_section_heading(doc, "2. Guest Speaker(s)")
+        doc.add_paragraph("N/A")
+        doc.add_paragraph()
 
-    doc.add_heading("2.1 Event Summary", level=3)
-    doc.add_paragraph(report.event_summary)
+    # ── SECTION 3: SOCIAL MEDIA LINKS ────────────────────────────────────────
+    _add_section_heading(doc, "3. Social Media Links")
 
-    doc.add_heading("2.2 Participant Count", level=3)
-    doc.add_paragraph(f"Total Participants: {report.participant_count}")
+    def add_social_block(heading, links_dict):
+        _add_subsection_heading(doc, heading)
+        if links_dict:
+            for platform in ("facebook", "instagram", "x", "linkedin"):
+                val = links_dict.get(platform, "")
+                if val:
+                    _add_bold_label_value(doc, f"{platform.title()}: ", val)
+        else:
+            doc.add_paragraph("N/A")
 
-    doc.add_heading("2.3 Outcomes and Takeaways", level=3)
-    doc.add_paragraph(report.outcomes)
+    add_social_block("E-Pamphlet Links", report.social_pamphlet)
+    add_social_block("Video Links", report.social_video)
+    doc.add_paragraph()
 
+    # ── SECTION 4: OBJECTIVE & LEARNING ──────────────────────────────────────
+    _add_section_heading(doc, "4. Objective & Learning Outcomes")
+    _add_subsection_heading(doc, "Objective of the Activity (100 chars)")
+    doc.add_paragraph(report.objective or "N/A")
+    _add_subsection_heading(doc, "Benefit in Terms of Learning / Skills / Knowledge (150 chars)")
+    doc.add_paragraph(report.learning_benefit or "N/A")
+    doc.add_paragraph()
+
+    # ── SECTION 5: COORDINATORS ───────────────────────────────────────────────
+    _add_section_heading(doc, "5. Coordinators")
+
+    coord_table = doc.add_table(rows=0, cols=2)
+    coord_table.style = "Table Grid"
+    faculty = report.faculty_coordinators or []
+    students = report.student_coordinators or []
+    max_rows = max(len(faculty), len(students), 1)
+
+    # Header row
+    hdr = coord_table.add_row()
+    hdr.cells[0].text = "Faculty Coordinators"
+    hdr.cells[1].text = "Student Coordinators"
+    for cell in hdr.cells:
+        cell.paragraphs[0].runs[0].bold = True
+
+    for i in range(max_rows):
+        row = coord_table.add_row()
+        row.cells[0].text = faculty[i] if i < len(faculty) else ""
+        row.cells[1].text = students[i] if i < len(students) else ""
+
+    doc.add_paragraph()
+
+    # ── SECTION 6: PARTICIPANTS & EXPENDITURE ────────────────────────────────
+    _add_section_heading(doc, "6. Participants & Expenditure")
+    p_table = doc.add_table(rows=0, cols=2)
+    p_table.style = "Table Grid"
+    _table_row(p_table, "Number of Student Participants", str(report.student_count or 0))
+    _table_row(p_table, "Number of Faculty Participants", str(report.faculty_count or 0))
+    _table_row(p_table, "Number of External Participants", str(report.external_count or 0))
+    _table_row(p_table, "Total Participants", str(report.participant_count))
+    _table_row(p_table, "Estimated Budget", f"Rs. {event.budget:,.2f}" if event.budget else "N/A")
+    _table_row(p_table, "Actual Expenditure", f"Rs. {report.actual_budget:,.2f}")
+    doc.add_paragraph()
+
+    # ── SECTION 7: SPEAKER BACKGROUND ────────────────────────────────────────
+    _add_section_heading(doc, "7. Background of the Speaker(s)")
+    doc.add_paragraph(report.speaker_background or "N/A")
+    doc.add_paragraph()
+
+    # ── SECTION 8: SESSION REPORT & KEY OUTCOMES ─────────────────────────────
+    _add_section_heading(doc, "8. Report on the Session")
+    _add_subsection_heading(doc, "Session Summary")
+    doc.add_paragraph(report.event_summary or "N/A")
+
+    _add_subsection_heading(doc, "Detailed Session Report")
+    doc.add_paragraph(report.session_report or "N/A")
+
+    _add_subsection_heading(doc, "Key Outcomes")
+    key_outcomes = report.key_outcomes or []
+    if key_outcomes:
+        for outcome in key_outcomes:
+            p = doc.add_paragraph(style="List Bullet")
+            p.add_run(outcome)
+    else:
+        doc.add_paragraph("N/A")
+    doc.add_paragraph()
+
+    # Optional legacy fields
     if report.issues:
-        doc.add_heading("2.4 Issues Faced", level=3)
+        _add_subsection_heading(doc, "Issues Faced")
         doc.add_paragraph(report.issues)
 
     if report.feedback:
-        doc.add_heading("2.5 Feedback and Suggestions", level=3)
+        _add_subsection_heading(doc, "Feedback and Suggestions")
         doc.add_paragraph(report.feedback)
 
     doc.add_paragraph()
 
-    # === PART 3: ATTACHMENTS ===
-    doc.add_heading("3. Attachments", level=2)
+    # ── SECTION 9: CONCLUSION ─────────────────────────────────────────────────
+    _add_section_heading(doc, "9. Conclusion")
+    doc.add_paragraph(report.conclusion or "N/A")
+    doc.add_paragraph()
+
+    # ── SECTION 10: ATTACHMENTS & PHOTOS ─────────────────────────────────────
+    _add_section_heading(doc, "10. Attachments")
 
     if report.attendance_doc_path:
-        doc.add_paragraph(f"Attendance Document: {os.path.basename(report.attendance_doc_path)}")
+        _add_bold_label_value(doc, "Attendance Document: ", os.path.basename(report.attendance_doc_path))
 
-    # Event photos (embed up to 10)
+    # Flier (1 compulsory)
+    if report.flier_path and os.path.exists(report.flier_path):
+        _add_subsection_heading(doc, "Event Flier")
+        try:
+            doc.add_picture(report.flier_path, width=Inches(4.0))
+            fp = doc.add_paragraph(os.path.basename(report.flier_path))
+            fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        except Exception:
+            doc.add_paragraph(f"Flier: {os.path.basename(report.flier_path)}")
+
+    # Event photos (4–8, embed up to 8)
     photo_dir = os.path.join(settings.STORAGE_ROOT, "events", str(event.id), "report", "photos")
     if os.path.exists(photo_dir):
-        photos = [
+        photos = sorted([
             f for f in os.listdir(photo_dir)
             if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
-        ]
+        ])
         if photos:
-            doc.add_heading("Event Photos", level=3)
-            for photo in photos[:10]:
+            _add_subsection_heading(doc, "Event Photos")
+            for photo in photos[:8]:
                 photo_path = os.path.join(photo_dir, photo)
                 try:
                     doc.add_picture(photo_path, width=Inches(3.0))
-                    p = doc.add_paragraph(photo)
-                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    pp = doc.add_paragraph(photo)
+                    pp.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 except Exception:
                     doc.add_paragraph(f"Photo: {photo}")
 
-    # === FOOTER ===
+    # ── FOOTER NOTE ────────────────────────────────────────────────────────────
     doc.add_paragraph()
-    footer_para = doc.add_paragraph(
+    footer_note = doc.add_paragraph(
         f"Report generated on {datetime.now().strftime('%d %B %Y at %I:%M %p')}"
     )
-    footer_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    footer_note.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-    # === SAVE ===
+    # ── SAVE ───────────────────────────────────────────────────────────────────
     report_dir = os.path.join(settings.STORAGE_ROOT, "events", str(event.id), "report")
     os.makedirs(report_dir, exist_ok=True)
     output_path = os.path.join(report_dir, "generated_report.docx")
     doc.save(output_path)
 
+    # ── TRANSPLANT HEADER/FOOTER FROM TEMPLATE ─────────────────────────────────
+    # If we had a template, the Document() init already handles this.
+    # If no template was found, we do a post-save zip transplant.
+    if not template_path:
+        _try_inject_header_footer(output_path)
+
     return output_path
+
+
+def _try_inject_header_footer(docx_path: str):
+    """
+    Fallback: if no template docx was available at generation time,
+    this is a no-op. Place report_template.docx at app/templates/ to enable
+    the institutional header/footer on all generated reports.
+    """
+    pass

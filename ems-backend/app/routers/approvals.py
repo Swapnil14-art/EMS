@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import selectinload
 from typing import List
 
@@ -25,7 +25,17 @@ async def pending_approvals(
     """Return events pending the current user's action."""
     if current_user.role == "associate_dean":
         target_status = "pending_associate_dean"
-        query = select(Event).where(Event.status == target_status)
+        
+        # Exclude events this dean has already voted on
+        already_voted = select(EventApproval.event_id).where(
+            EventApproval.approver_id == current_user.id,
+            EventApproval.sequence_order == 2,  # associate_dean sequence
+        )
+        
+        query = select(Event).where(
+            Event.status == target_status,
+            Event.id.not_in(already_voted),
+        )
         if current_user.department_id:
             from app.models.club import Club
             dept_clubs = select(Club.id).where(Club.department_id == current_user.department_id)
@@ -81,15 +91,41 @@ async def pending_approvals(
             ])
         )
 
-    result = await db.execute(query.order_by(Event.created_at.asc()))
+    result = await db.execute(
+        query
+        .options(
+            selectinload(Event.venue),
+            selectinload(Event.club),
+            selectinload(Event.collaborating_clubs),
+        )
+        .order_by(Event.created_at.asc())
+    )
     events = result.scalars().all()
+
+    # Batch-load creator names
+    creator_ids = list({e.created_by for e in events if e.created_by})
+    creators_map = {}
+    if creator_ids:
+        from app.models.user import User as UserModel
+        cr_result = await db.execute(
+            select(UserModel).where(UserModel.id.in_(creator_ids))
+        )
+        creators_map = {u.id: u for u in cr_result.scalars().all()}
+
     return [
         {
             "id": e.id,
             "title": e.title,
             "status": e.status,
             "club_id": e.club_id,
+            "event_type": e.event_type,
+            "is_collaborative": e.is_collaborative,
+            "is_sponsored": e.is_sponsored,
             "start_datetime": e.start_datetime,
+            "end_datetime": e.end_datetime,
+            "venue": {"name": e.venue.name} if e.venue else None,
+            "venue_custom": e.venue_custom,
+            "creator": {"name": creators_map[e.created_by].name} if e.created_by in creators_map else None,
             "created_by": e.created_by,
             "created_at": e.created_at,
         }
@@ -136,6 +172,36 @@ async def approval_action(
 
     return {"message": f"Action '{body.action}' recorded", "event_status": event.status}
 
+
+@router.get("/history")
+async def all_approval_history(
+    page: int = 1,
+    size: int = 20,
+    current_user: User = Depends(require_roles(
+        "super_admin", "director", "associate_dean", "club_coordinator"
+    )),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the full approval history across all events for the current user."""
+    query = select(EventApproval)
+    
+    if current_user.role != "super_admin":
+        query = query.where(EventApproval.approver_id == current_user.id)
+        
+    query = query.where(EventApproval.action != "pending")
+    
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    query = query.order_by(EventApproval.actioned_at.desc())
+    query = query.offset((page - 1) * size).limit(size)
+    
+    result = await db.execute(query)
+    items = result.scalars().all()
+    
+    data = [ApprovalOut.model_validate(item).model_dump() for item in items]
+    return {"data": data, "total": total}
 
 @router.get("/{event_id}/history", response_model=List[ApprovalOut])
 async def approval_history(

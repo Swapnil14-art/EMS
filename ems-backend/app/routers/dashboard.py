@@ -178,11 +178,21 @@ async def associate_dean_dashboard(
     current_user: User = Depends(require_roles("associate_dean", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Department-wide stats for associate dean."""
+    """Department-wide stats for associate dean — includes events where dept clubs are collaborators."""
+    from app.models.event import EventCollaboratingClub
+    from sqlalchemy import or_
+
     base_filter = True
     if current_user.department_id:
         dept_clubs = select(Club.id).where(Club.department_id == current_user.department_id)
-        base_filter = Event.club_id.in_(dept_clubs.scalar_subquery())
+        # Events where dept clubs are primary club OR collaborating club
+        collab_match = select(EventCollaboratingClub.event_id).where(
+            EventCollaboratingClub.club_id.in_(dept_clubs.scalar_subquery())
+        )
+        base_filter = or_(
+            Event.club_id.in_(dept_clubs.scalar_subquery()),
+            Event.id.in_(collab_match.scalar_subquery()),
+        )
     else:
         base_filter = Event.id > 0 # dummy filter if no dep
 
