@@ -150,7 +150,8 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             <Field label="Target Audience" value={event.target_audience} />
             <Field label="Event Incharge" value={event.event_incharge_name} />
             <Field label="Contact" value={event.event_incharge_contact} />
-            {event.is_club_event && event.club?.name && <Field label="Club" value={event.club.name} />}
+            {event.is_club_event && event.club?.name && <Field label="Organizing Club" value={event.club.name} />}
+            {event.is_club_event && event.club?.coordinators && event.club.coordinators.length > 0 && <Field label="Club Coordinator Email" value={event.club.coordinators.map((c: any) => c.email).join(', ')} />}
             <Field label="Est. Budget" value={event.budget ? `₹ ${event.budget.toLocaleString()}` : undefined} />
           </div>
         </div>
@@ -237,7 +238,12 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                   <div className="flex flex-wrap gap-2 mt-1">
                     {(event as any).collaborating_clubs && (event as any).collaborating_clubs.length > 0 ? (
                       (event as any).collaborating_clubs.map((c: any) => (
-                        <span key={c.id} className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{c.name}</span>
+                        <span key={c.id} className="inline-flex flex-col items-start badge bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg">
+                          <span className="font-bold">{c.name}</span>
+                          {c.coordinators && c.coordinators.length > 0 && (
+                            <span className="text-xs font-medium opacity-80 mt-0.5">{c.coordinators.map((coord: any) => coord.email).join(', ')}</span>
+                          )}
+                        </span>
                       ))
                     ) : (
                       <span className="text-sm text-gray-500 font-medium">None specified</span>

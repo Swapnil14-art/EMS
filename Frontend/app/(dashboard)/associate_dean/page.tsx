@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Bell, Shield, Calendar, BookOpen, ChevronRight, CheckCircle2, MapPin, BarChart3, User } from 'lucide-react';
+import { Bell, Shield, Calendar, BookOpen, ChevronRight, CheckCircle2, MapPin, BarChart3, User, XCircle } from 'lucide-react';
 import { StatCard, StatCardSkeleton } from '@/components/shared/StatCard';
 import PendingApprovalsPage from '@/components/events/PendingApprovalsPage';
 import { approvalService, dashboardService } from '@/lib/services';
@@ -36,22 +36,9 @@ export default function AssociateDeanDashboard() {
         {loading ? Array.from({length:4}).map((_,i)=><StatCardSkeleton key={i}/>) : <>
           <StatCard title="Pending Approvals" value={pending?.length || 0} icon={<Bell className="w-6 h-6"/>} color="red"/>
           <StatCard title="Approved" value={stats?.events_by_status?.['approved'] || 0} icon={<CheckCircle2 className="w-6 h-6"/>} color="green"/>
-          <StatCard title="Override Requests" value="—" icon={<Shield className="w-6 h-6"/>} color="amber"/>
+          <StatCard title="Rejected" value={stats?.events_by_status?.['rejected'] || 0} icon={<XCircle className="w-6 h-6"/>} color="amber"/>
           <StatCard title="School Events" value={stats?.total_events || 0} icon={<Calendar className="w-6 h-6"/>} color="blue"/>
         </>}
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          {label:'Venues',href:'/associate_dean/venues',icon:<MapPin className="w-5 h-5"/>,color:'text-teal-600 bg-teal-50'},
-          {label:'Override Requests',href:'/associate_dean/overrides',icon:<Shield className="w-5 h-5"/>,color:'text-amber-600 bg-amber-50'},
-          {label:'History',href:'/associate_dean/history',icon:<BarChart3 className="w-5 h-5"/>,color:'text-[rgb(var(--color-primary))] bg-[var(--card-bg)]'},
-          {label:'Clubs',href:'/associate_dean/clubs',icon:<BookOpen className="w-5 h-5"/>,color:'text-[var(--text-secondary)] bg-[var(--card-bg)]'},
-        ].map(q=>(
-          <Link key={q.href} href={q.href} className="card-hover p-4 flex flex-col items-center gap-2 text-center group">
-            <div className={"w-10 h-10 rounded-2xl flex items-center justify-center "+q.color}>{q.icon}</div>
-            <span className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[rgb(var(--color-primary))]">{q.label}</span>
-          </Link>
-        ))}
       </div>
       <div>
         <h2 className="section-title mb-4">Pending Approvals</h2>

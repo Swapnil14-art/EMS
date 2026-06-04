@@ -14,7 +14,7 @@ export default function ApprovalHistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    approvalService.getAllHistory()
+    approvalService.getAllHistory(page, 20)
       .then(r => { setHistory(r.data || []); setTotal(r.total || 0); })
       .catch(() => setHistory([]))
       .finally(() => setLoading(false));

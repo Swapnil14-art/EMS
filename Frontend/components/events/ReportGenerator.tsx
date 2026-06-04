@@ -1,9 +1,9 @@
 'use client';
-import { useState, useRef, useCallback, useId } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   FileText, Image as ImageIcon, Upload, Download, Send, Eye,
-  X, AlertTriangle, Plus, GripVertical, Trash2, Link,
-  AlignLeft, List, ChevronDown, ChevronUp, Type,
+  X, AlertTriangle, Plus, Trash2, Link, ChevronDown, User,
+  Users, BookOpen, Target, MessageSquare, List, Mic,
 } from 'lucide-react';
 import { Button, Alert } from '@/components/ui';
 import { reportService } from '@/lib/services';
@@ -24,284 +24,251 @@ interface PhotoFile {
   id: string;
 }
 
-type SectionType = 'paragraph' | 'bullets' | 'links';
-
-interface ReportSection {
-  id: string;
-  title: string;           // bold section title
-  type: SectionType;       // how the content is rendered
-  content: string;         // paragraph text OR bullet lines (one per line)
-  links: { label: string; url: string }[]; // for link-type sections
+interface FlierFile {
+  file: File;
+  preview: string;
 }
+
+interface CollaboratorLogo {
+  file: File;
+  preview: string;
+  id: string;
+}
+
+interface GuestSpeaker {
+  name: string;
+  designation: string;
+  organization: string;
+  expertise: string;
+}
+
+interface SocialLinks {
+  facebook: string;
+  instagram: string;
+  x: string;
+  linkedin: string;
+}
+
+interface CompetitionWinner {
+  game: string;
+  studentWinners: string[];
+  facultyWinners: string[];
+}
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = 8;
 const MIN_PHOTOS = 4;
+const MAX_COLLABORATOR_LOGOS = 3;
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ACCEPTED_TYPES = ['image/jpeg', 'image/jpg', 'image/png'];
 
-const LOGO_PATH = '/logo1.jpg'; // served from Frontend/public/logo1.jpg
+const LOGO_PATH_LEFT = '/nmimsreportlogo.png';
+const LOGO_PATH_RIGHT = '/iicreportlogo.png';
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const PROGRAM_TYPES = [
+  'Level 1-Expert Talk',
+  'Level 1-Exposure Visit',
+  'Level 1-Mentoring Session',
+  'Level 1-Exhibition',
+  'Level 2-Conference',
+  'Level 2-Exposure Visit',
+  'Level 2-Seminar',
+  'Level 2-Workshop',
+  'Level 2-Competition',
+  'Level 3-Bootcamp',
+  'Level 3-Competition/Hackathon',
+  'Level 3-Demo Day',
+  'Level 3-Exhibition',
+  'Level 3-Workshop',
+  'Level 3-Exposure Visit',
+  'Level 4-Challenges',
+  'Level 4-Competition/Hackathon',
+  'Level 4-Tech Fest',
+  'Level 4-Bootcamp',
+  'Level 4-Workshop',
+  'Level 4-Exhibition/Demo Day',
+];
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-const makeSection = (overrides?: Partial<ReportSection>): ReportSection => ({
-  id: uid(),
-  title: '',
-  type: 'paragraph',
-  content: '',
-  links: [{ label: '', url: '' }],
-  ...overrides,
-});
+const emptySpeaker = (): GuestSpeaker => ({ name: '', designation: '', organization: '', expertise: '' });
+const emptyLinks = (): SocialLinks => ({ facebook: '', instagram: '', x: '', linkedin: '' });
 
-// Default sections matching the sample report
-const DEFAULT_SECTIONS: ReportSection[] = [
-  makeSection({ title: 'Name and designation of the Guest Speakers', type: 'paragraph' }),
-  makeSection({ title: 'Program Type', type: 'paragraph' }),
-  makeSection({ title: 'Program Theme', type: 'paragraph' }),
-  makeSection({ title: 'Objective of the activity', type: 'paragraph' }),
-  makeSection({ title: 'Benefit in terms of learning, skills, knowledge obtained', type: 'paragraph' }),
-  makeSection({ title: 'Background of the Speaker(s)', type: 'paragraph' }),
-  makeSection({ title: 'Report on the session with the key outcomes', type: 'paragraph' }),
-  makeSection({ title: 'Key Outcomes of the Event', type: 'bullets' }),
-  makeSection({ title: 'Conclusion', type: 'paragraph' }),
-];
+// ─── Small UI helpers ─────────────────────────────────────────────────────────
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SectionTypeButton({
-  active, onClick, icon, label,
-}: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${
-        active
-          ? 'bg-blue-600 text-white border-blue-600'
-          : 'bg-white text-[var(--text-secondary)] border-[var(--input-border)] hover:border-blue-400'
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
+    <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5 uppercase tracking-wide">
+      {children}
+      {required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
   );
 }
 
-function SectionEditor({
-  section,
-  index,
-  total,
-  onChange,
-  onRemove,
-  onMove,
-}: {
-  section: ReportSection;
-  index: number;
-  total: number;
-  onChange: (updated: ReportSection) => void;
-  onRemove: () => void;
-  onMove: (dir: -1 | 1) => void;
+function Field({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`space-y-1 ${className}`}>{children}</div>;
+}
+
+function Input({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className={`w-full text-sm border border-[var(--input-border)] rounded-xl px-3 py-2 focus:outline-none focus:border-blue-400 bg-white transition-colors ${props.className ?? ''}`}
+    />
+  );
+}
+
+function Textarea({ ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      {...props}
+      className={`w-full text-sm border border-[var(--input-border)] rounded-xl px-3 py-2.5 focus:outline-none focus:border-blue-400 bg-white transition-colors resize-none ${props.className ?? ''}`}
+    />
+  );
+}
+
+function Select({ ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      className={`w-full text-sm border border-[var(--input-border)] rounded-xl px-3 py-2 focus:outline-none focus:border-blue-400 bg-white transition-colors appearance-none ${props.className ?? ''}`}
+    />
+  );
+}
+
+function SectionCard({ title, icon, children, defaultOpen = true }: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
-  const set = (patch: Partial<ReportSection>) => onChange({ ...section, ...patch });
-
-  const updateLink = (i: number, key: 'label' | 'url', val: string) => {
-    const links = section.links.map((l, li) => li === i ? { ...l, [key]: val } : l);
-    set({ links });
-  };
-  const addLink = () => set({ links: [...section.links, { label: '', url: '' }] });
-  const removeLink = (i: number) => set({ links: section.links.filter((_, li) => li !== i) });
-
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="group relative rounded-2xl border border-[var(--card-border)] bg-white shadow-sm transition-shadow hover:shadow-md">
-      {/* Header bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-4 py-2.5 border-b border-[var(--card-border)] bg-slate-50/70 rounded-t-2xl">
-        <div className="flex items-center flex-1 min-w-[200px] gap-2 w-full sm:w-auto">
-          <GripVertical className="w-4 h-4 text-slate-300 shrink-0" />
-          <input
-            className="flex-1 text-sm font-semibold bg-transparent border-0 focus:outline-none placeholder:font-normal placeholder:text-slate-400"
-            placeholder="Section title (will be bold in report)…"
-            value={section.title}
-            onChange={e => set({ title: e.target.value })}
-          />
+    <div className="rounded-2xl border border-[var(--card-border)] bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50/70 hover:bg-slate-100/70 transition-colors"
+      >
+        <div className="flex items-center gap-2.5 text-sm font-semibold text-[var(--text-primary)]">
+          <span className="text-blue-600">{icon}</span>
+          {title}
         </div>
-
-        {/* Action toggles (Type & Move) */}
-        <div className="flex items-center justify-between w-full sm:w-auto gap-2">
-          {/* Type toggles */}
-          <div className="flex overflow-x-auto whitespace-nowrap items-center gap-1 shrink-0 pb-1 sm:pb-0">
-            <SectionTypeButton active={section.type === 'paragraph'} onClick={() => set({ type: 'paragraph' })} icon={<AlignLeft className="w-3 h-3" />} label="Para" />
-            <SectionTypeButton active={section.type === 'bullets'} onClick={() => set({ type: 'bullets' })} icon={<List className="w-3 h-3" />} label="Points" />
-            <SectionTypeButton active={section.type === 'links'} onClick={() => set({ type: 'links' })} icon={<Link className="w-3 h-3" />} label="Links" />
-          </div>
-
-          {/* Move / remove */}
-          <div className="flex items-center gap-1 shrink-0 sm:opacity-0 group-hover:opacity-100 transition-opacity ml-auto sm:ml-0">
-            <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="p-1 rounded hover:bg-slate-200 disabled:opacity-30">
-            <ChevronUp className="w-3.5 h-3.5" />
-          </button>
-          <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="p-1 rounded hover:bg-slate-200 disabled:opacity-30">
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-          <button type="button" onClick={onRemove} className="p-1 rounded hover:bg-red-50 text-red-500">
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-
-      {/* Content area */}
-      <div className="px-4 py-3">
-        {section.type === 'paragraph' && (
-          <textarea
-            className="w-full text-sm text-[var(--text-secondary)] resize-none focus:outline-none min-h-[80px] bg-transparent"
-            placeholder="Write paragraph content…"
-            value={section.content}
-            onChange={e => set({ content: e.target.value })}
-          />
-        )}
-
-        {section.type === 'bullets' && (
-          <div className="space-y-1">
-            <textarea
-              className="w-full text-sm text-[var(--text-secondary)] resize-none focus:outline-none min-h-[80px] bg-transparent"
-              placeholder={"Enter each bullet point on a new line:\n• Point one\n• Point two"}
-              value={section.content}
-              onChange={e => set({ content: e.target.value })}
-            />
-            <p className="text-[10px] text-slate-400">Each line becomes a bullet point in the report.</p>
-          </div>
-        )}
-
-        {section.type === 'links' && (
-          <div className="space-y-2">
-            {section.links.map((lnk, li) => (
-              <div key={li} className="flex items-center gap-2">
-                <input
-                  className="w-32 shrink-0 text-xs border border-[var(--input-border)] rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
-                  placeholder="Label (e.g. LinkedIn)"
-                  value={lnk.label}
-                  onChange={e => updateLink(li, 'label', e.target.value)}
-                />
-                <input
-                  className="flex-1 text-xs border border-[var(--input-border)] rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
-                  placeholder="https://…"
-                  value={lnk.url}
-                  onChange={e => updateLink(li, 'url', e.target.value)}
-                />
-                <button type="button" onClick={() => removeLink(li)} className="p-1 text-red-400 hover:text-red-600">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            <button type="button" onClick={addLink} className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1">
-              <Plus className="w-3 h-3" /> Add link
-            </button>
-          </div>
-        )}
-      </div>
+        <ChevronDown className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="px-5 py-4 space-y-4">{children}</div>}
     </div>
   );
 }
 
-// ─── Preview Section ──────────────────────────────────────────────────────────
-
-function PreviewSection({ section }: { section: ReportSection }) {
-  if (!section.title && !section.content && section.links.every(l => !l.url)) return null;
+function CharCount({ value, max }: { value: string; max: number }) {
+  const len = value.length;
+  const over = len > max;
   return (
-    <div className="mb-4">
-      {section.title && (
-        <p className="text-sm font-bold text-slate-800 mb-1">{section.title}</p>
-      )}
-      {section.type === 'paragraph' && (
-        <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{section.content}</p>
-      )}
-      {section.type === 'bullets' && (
-        <ul className="space-y-1">
-          {section.content.split('\n').filter(Boolean).map((line, i) => (
-            <li key={i} className="flex gap-2 text-sm text-slate-700">
-              <span className="text-blue-600 shrink-0 mt-0.5">•</span>
-              <span>{line.replace(/^[-•*]\s*/, '')}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {section.type === 'links' && (
-        <ul className="space-y-1">
-          {section.links.filter(l => l.url).map((lnk, i) => (
-            <li key={i} className="flex gap-2 text-sm">
-              {lnk.label && <span className="text-slate-600 shrink-0">{lnk.label}:</span>}
-              <a href={lnk.url} className="text-blue-600 underline break-all" target="_blank" rel="noopener noreferrer">{lnk.url}</a>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <span className={`text-[10px] ${over ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
+      {len}/{max}
+    </span>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ReportGenerator({ event, onComplete }: ReportGeneratorProps) {
-  const [sections, setSections] = useState<ReportSection[]>(DEFAULT_SECTIONS);
+  // ── Form state ─────────────────────────────────────────────────────────────
+  const [programType, setProgramType] = useState('');
+  const [modeOfDelivery, setModeOfDelivery] = useState<'offline' | 'online' | ''>('');
+  const [objective, setObjective] = useState('');
+  const [learningBenefit, setLearningBenefit] = useState('');
+  const [speakers, setSpeakers] = useState<GuestSpeaker[]>([emptySpeaker()]);
+  const [facultyCoordinators, setFacultyCoordinators] = useState<string[]>(['']);
+  const [studentCoordinators, setStudentCoordinators] = useState<string[]>(['']);
+  const [socialPamphlet, setSocialPamphlet] = useState<SocialLinks>(emptyLinks());
+  const [socialVideo, setSocialVideo] = useState<SocialLinks>(emptyLinks());
+  const [studentCount, setStudentCount] = useState('');
+  const [facultyCount, setFacultyCount] = useState('');
+  const [externalCount, setExternalCount] = useState('');
+  const [actualBudget, setActualBudget] = useState('');
+  const [speakerBackground, setSpeakerBackground] = useState('');
+  const [eventSummary, setEventSummary] = useState('');
+  const [sessionReport, setSessionReport] = useState('');
+  const [keyOutcomes, setKeyOutcomes] = useState<string[]>(['']);
+  const [conclusion, setConclusion] = useState('');
+  const [issues, setIssues] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [includeWinners, setIncludeWinners] = useState(false);
+  const [competitions, setCompetitions] = useState<CompetitionWinner[]>([
+    { game: '', studentWinners: [''], facultyWinners: [''] }
+  ]);
+
+  // ── File state ─────────────────────────────────────────────────────────────
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
+  const [flier, setFlier] = useState<FlierFile | null>(null);
+  const [collaboratorLogos, setCollaboratorLogos] = useState<CollaboratorLogo[]>([]);
+
+  // ── UI state ───────────────────────────────────────────────────────────────
   const [showPreview, setShowPreview] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const photoRef = useRef<HTMLInputElement>(null);
+  const flierRef = useRef<HTMLInputElement>(null);
+  const collaboratorLogoRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // ── Section handlers ──────────────────────────────────────────────────────
+  // ── Speaker handlers ───────────────────────────────────────────────────────
+  const updateSpeaker = (i: number, field: keyof GuestSpeaker, val: string) =>
+    setSpeakers(prev => prev.map((s, si) => si === i ? { ...s, [field]: val } : s));
+  const addSpeaker = () => setSpeakers(prev => [...prev, emptySpeaker()]);
+  const removeSpeaker = (i: number) => setSpeakers(prev => prev.filter((_, si) => si !== i));
 
-  const updateSection = useCallback((id: string, updated: ReportSection) => {
-    setSections(prev => prev.map(s => s.id === id ? updated : s));
-  }, []);
+  // ── Coordinator handlers ───────────────────────────────────────────────────
+  const updateCoord = (list: string[], set: (v: string[]) => void, i: number, val: string) =>
+    set(list.map((c, ci) => ci === i ? val : c));
+  const addCoord = (list: string[], set: (v: string[]) => void) => set([...list, '']);
+  const removeCoord = (list: string[], set: (v: string[]) => void, i: number) =>
+    set(list.filter((_, ci) => ci !== i));
 
-  const removeSection = useCallback((id: string) => {
-    setSections(prev => prev.filter(s => s.id !== id));
-  }, []);
+  // ── Key outcomes handlers ─────────────────────────────────────────────────
+  const updateOutcome = (i: number, val: string) =>
+    setKeyOutcomes(prev => prev.map((o, oi) => oi === i ? val : o));
+  const addOutcome = () => setKeyOutcomes(prev => [...prev, '']);
+  const removeOutcome = (i: number) => setKeyOutcomes(prev => prev.filter((_, oi) => oi !== i));
 
-  const moveSection = useCallback((id: string, dir: -1 | 1) => {
-    setSections(prev => {
-      const idx = prev.findIndex(s => s.id === id);
-      if (idx + dir < 0 || idx + dir >= prev.length) return prev;
-      const next = [...prev];
-      [next[idx], next[idx + dir]] = [next[idx + dir], next[idx]];
-      return next;
-    });
-  }, []);
+  // ── Winners handlers ──────────────────────────────────────────────────────
+  const updateCompetition = (idx: number, field: keyof CompetitionWinner, value: any) =>
+    setCompetitions(prev => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
+  const addCompetition = () =>
+    setCompetitions(prev => [...prev, { game: '', studentWinners: [''], facultyWinners: [''] }]);
+  const removeCompetition = (idx: number) =>
+    setCompetitions(prev => prev.filter((_, i) => i !== idx));
 
-  const addSection = useCallback((atIndex?: number) => {
-    const s = makeSection();
-    setSections(prev => {
-      if (atIndex !== undefined) {
-        const next = [...prev];
-        next.splice(atIndex + 1, 0, s);
-        return next;
-      }
-      return [...prev, s];
-    });
-  }, []);
+  const updateWinner = (compIdx: number, type: 'studentWinners' | 'facultyWinners', winIdx: number, value: string) =>
+    setCompetitions(prev => prev.map((c, i) => {
+      if (i !== compIdx) return c;
+      const list = [...c[type]];
+      list[winIdx] = value;
+      return { ...c, [type]: list };
+    }));
+  const addWinner = (compIdx: number, type: 'studentWinners' | 'facultyWinners') =>
+    setCompetitions(prev => prev.map((c, i) => i === compIdx ? { ...c, [type]: [...c[type], ''] } : c));
+  const removeWinner = (compIdx: number, type: 'studentWinners' | 'facultyWinners', winIdx: number) =>
+    setCompetitions(prev => prev.map((c, i) => {
+      if (i !== compIdx) return c;
+      return { ...c, [type]: c[type].filter((_, wi) => wi !== winIdx) };
+    }));
 
-  // ── Photo handlers ────────────────────────────────────────────────────────
 
+  // ── Photo handlers ─────────────────────────────────────────────────────────
   const handlePhotoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const newPhotos: PhotoFile[] = [];
     for (const file of files) {
-      if (photos.length + newPhotos.length >= MAX_PHOTOS) {
-        toast.error(`Maximum ${MAX_PHOTOS} photos allowed`); break;
-      }
-      if (!ACCEPTED_TYPES.includes(file.type)) {
-        toast.error(`${file.name}: Only JPG and PNG accepted`); continue;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        toast.error(`${file.name}: Exceeds ${MAX_FILE_SIZE_MB}MB`); continue;
-      }
+      if (photos.length + newPhotos.length >= MAX_PHOTOS) { toast.error(`Max ${MAX_PHOTOS} photos`); break; }
+      if (!ACCEPTED_TYPES.includes(file.type)) { toast.error(`${file.name}: JPG/PNG only`); continue; }
+      if (file.size > MAX_FILE_SIZE) { toast.error(`${file.name}: Exceeds ${MAX_FILE_SIZE_MB}MB`); continue; }
       newPhotos.push({ file, preview: URL.createObjectURL(file), id: uid() });
     }
     setPhotos(prev => [...prev, ...newPhotos]);
@@ -316,12 +283,79 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
     });
   }, []);
 
-  // ── Validation ────────────────────────────────────────────────────────────
+  const handleFlierSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ACCEPTED_TYPES.includes(file.type)) { toast.error('JPG/PNG only'); return; }
+    if (file.size > MAX_FILE_SIZE) { toast.error(`Exceeds ${MAX_FILE_SIZE_MB}MB`); return; }
+    if (flier) URL.revokeObjectURL(flier.preview);
+    setFlier({ file, preview: URL.createObjectURL(file) });
+    if (e.target) e.target.value = '';
+  }, [flier]);
 
-  const canPreview = photos.length >= MIN_PHOTOS && sections.some(s => s.title || s.content);
+  const handleCollaboratorLogoSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const newLogos: CollaboratorLogo[] = [];
+    for (const file of files) {
+      if (collaboratorLogos.length + newLogos.length >= MAX_COLLABORATOR_LOGOS) {
+        toast.error(`Max ${MAX_COLLABORATOR_LOGOS} collaborator logos allowed`);
+        break;
+      }
+      if (!ACCEPTED_TYPES.includes(file.type)) { toast.error(`${file.name}: JPG/PNG only`); continue; }
+      if (file.size > MAX_FILE_SIZE) { toast.error(`${file.name}: Exceeds ${MAX_FILE_SIZE_MB}MB`); continue; }
+      newLogos.push({ file, preview: URL.createObjectURL(file), id: uid() });
+    }
+    setCollaboratorLogos(prev => [...prev, ...newLogos]);
+    if (e.target) e.target.value = '';
+  }, [collaboratorLogos.length]);
 
-  // ── File helpers ──────────────────────────────────────────────────────────
+  const removeCollaboratorLogo = useCallback((id: string) => {
+    setCollaboratorLogos(prev => {
+      const logo = prev.find(x => x.id === id);
+      if (logo) URL.revokeObjectURL(logo.preview);
+      return prev.filter(x => x.id !== id);
+    });
+  }, []);
 
+  // ── Validation ─────────────────────────────────────────────────────────────
+  const canPreview =
+    photos.length >= MIN_PHOTOS &&
+    !!flier &&
+    !!eventSummary.trim() &&
+    !!actualBudget;
+
+  // ── Build payload ──────────────────────────────────────────────────────────
+  const buildPayload = () => ({
+    event_summary: eventSummary,
+    actual_budget: parseFloat(actualBudget) || 0,
+    outcomes: keyOutcomes.filter(Boolean).join('\n'),
+    issues: issues || null,
+    feedback: feedback || null,
+    student_count: parseInt(studentCount) || 0,
+    faculty_count: parseInt(facultyCount) || 0,
+    external_count: parseInt(externalCount) || 0,
+    program_type: programType || null,
+    mode_of_delivery: modeOfDelivery || null,
+    objective: objective || null,
+    learning_benefit: learningBenefit || null,
+    guest_speakers: speakers.filter(s => s.name),
+    faculty_coordinators: facultyCoordinators.filter(Boolean),
+    student_coordinators: studentCoordinators.filter(Boolean),
+    social_pamphlet: Object.values(socialPamphlet).some(Boolean) ? socialPamphlet : null,
+    social_video: Object.values(socialVideo).some(Boolean) ? socialVideo : null,
+    speaker_background: speakerBackground || null,
+    session_report: sessionReport || null,
+    key_outcomes: keyOutcomes.filter(Boolean),
+    conclusion: conclusion || null,
+    // Add winners to session_report if included, for backend fallback if any
+    ...(includeWinners && competitions.some(c => c.game) ? {
+      session_report: (sessionReport || '') + '\n\nWinners:\n' + competitions.filter(c => c.game).map(c => 
+        `- ${c.game}: Students(${c.studentWinners.filter(Boolean).length}), Faculty(${c.facultyWinners.filter(Boolean).length})`
+      ).join('\n')
+    } : {}),
+  });
+
+  // ── File helpers ───────────────────────────────────────────────────────────
   const fileToArrayBuffer = (file: File): Promise<ArrayBuffer> =>
     new Promise((res, rej) => {
       const r = new FileReader();
@@ -338,98 +372,327 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
     } catch { return null; }
   };
 
-  // ── DOCX Generation ───────────────────────────────────────────────────────
-
+  // ── DOCX Generation ────────────────────────────────────────────────────────
   const generateDocx = async (): Promise<Blob> => {
     const {
       Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun,
       Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType,
-      ShadingType, ExternalHyperlink, LevelFormat,
+      ShadingType, ExternalHyperlink, Footer, PageNumber, Header, LevelFormat,
     } = await import('docx');
 
-    const logoBuf = await fetchAsArrayBuffer(LOGO_PATH);
-    const photoBufs = await Promise.all(photos.map(p => fileToArrayBuffer(p.file)));
+    // Helper to determine docx image type from file MIME or filename
+    const getImageType = (file?: File | null, filename?: string): 'jpg' | 'png' | 'gif' | 'bmp' => {
+      const mime = file?.type || '';
+      const name = (file?.name || filename || '').toLowerCase();
+      if (mime === 'image/png' || name.endsWith('.png')) return 'png';
+      if (mime === 'image/gif' || name.endsWith('.gif')) return 'gif';
+      if (mime === 'image/bmp' || name.endsWith('.bmp')) return 'bmp';
+      return 'jpg'; // default for jpeg/jpg
+    };
 
-    // Borders
+    const logoBufLeft = await fetchAsArrayBuffer(LOGO_PATH_LEFT);
+    const logoBufRight = await fetchAsArrayBuffer(LOGO_PATH_RIGHT);
+    const collaboratorLogoBufs = await Promise.all(collaboratorLogos.map(l => fileToArrayBuffer(l.file)));
+    const collaboratorLogoTypes = collaboratorLogos.map(l => getImageType(l.file));
+    const photoBufs = await Promise.all(photos.map(p => fileToArrayBuffer(p.file)));
+    const photoTypes = photos.map(p => getImageType(p.file));
+    const flierBuf = flier ? await fileToArrayBuffer(flier.file) : null;
+    const flierType = flier ? getImageType(flier.file) : 'jpg';
+
     const thinBorder = {
       top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
       bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
       left: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
       right: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
     };
+    const noBorder = {
+      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    };
 
-    const detailRows = [
-      ['Event Title', event.title],
-      ['Date & Time', `${formatDateTime(event.start_datetime)} – ${formatDateTime(event.end_datetime)}`],
-      ['Venue', event.venue?.name || event.venue_custom || '—'],
-      ['School', event.school_department || '—'],
-      ['Event Type', event.event_type || '—'],
-      ['Incharge', event.event_incharge_name || '—'],
-    ];
+    const tr = (label: string, value: string) =>
+      new TableRow({
+        children: [
+          new TableCell({
+            width: { size: 2808, type: WidthType.DXA },
+            borders: thinBorder,
+            shading: { fill: 'EFF6FF', type: ShadingType.CLEAR },
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 24, font: 'Times New Roman' })] })],
+          }),
+          new TableCell({
+            width: { size: 6552, type: WidthType.DXA },
+            borders: thinBorder,
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            children: [new Paragraph({ children: [new TextRun({ text: value || '—', size: 24, font: 'Times New Roman' })] })],
+          }),
+        ],
+      });
 
-    // Build section paragraphs
-    const sectionChildren: any[] = [];
-    for (const sec of sections) {
-      if (!sec.title && !sec.content && sec.links.every(l => !l.url)) continue;
+    const h2 = (text: string) =>
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, size: 24, font: 'Times New Roman' })],
+        spacing: { before: 300, after: 100 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'DBEAFE', space: 2 } },
+      });
 
-      if (sec.title) {
-        sectionChildren.push(
+    const body2 = (text: string) =>
+      new Paragraph({ children: [new TextRun({ text, size: 24, font: 'Times New Roman' })], spacing: { after: 80 } });
+
+    const field = (label: string, value: string) =>
+      new Paragraph({
+        children: [
+          new TextRun({ text: `${label}: `, bold: true, size: 24, font: 'Times New Roman' }),
+          new TextRun({ text: value || 'N/A', size: 24, font: 'Times New Roman' }),
+        ],
+        spacing: { after: 60 },
+        indent: { left: 720 },
+      });
+
+    const spacer = () => new Paragraph({ text: '' });
+
+    // Duration
+    const durationHrs = Math.round(
+      (new Date(event.end_datetime).getTime() - new Date(event.start_datetime).getTime()) / 3600000 * 100
+    ) / 100;
+
+    // Social links block helper
+    const socialBlock = (links: SocialLinks) => {
+      const platformOrder: (keyof SocialLinks)[] = ['facebook', 'instagram', 'x', 'linkedin'];
+      const items = platformOrder
+        .map((platform): [keyof SocialLinks, string] => [platform, links[platform]])
+        .filter(([, v]) => v);
+      
+      return items.map(([platform, url], index) =>
+        new Paragraph({
+          children: [
+            new TextRun({ text: `${index + 1}. `, bold: true, size: 24, font: 'Times New Roman' }),
+            new TextRun({ text: `${platform.charAt(0).toUpperCase() + platform.slice(1)}: `, bold: true, size: 24, font: 'Times New Roman' }),
+            new ExternalHyperlink({
+              link: url,
+              children: [new TextRun({ text: url, size: 24, font: 'Times New Roman', underline: {} })],
+            }),
+          ],
+          spacing: { after: 60 },
+          indent: { left: 720 },
+        })
+      );
+    };
+
+    const children: any[] = [
+      // ── Title block ───────────────────────────────────────────────────────
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: 'REPORT ON', bold: true, size: 24, font: 'Times New Roman' })],
+        spacing: { before: 200, after: 60 },
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: `"${event.title}"`, bold: true, size: 24, font: 'Times New Roman' })],
+        spacing: { after: 120 },
+      }),
+
+      spacer(),
+
+      // ── Event Details ─────────────────────────────────────────────────
+      h2('Event Details'),
+      field('Event Title', event.title),
+      field('Program Type', programType || 'N/A'),
+      field('Department', event.school_department || 'N/A'),
+      field('Venue', event.venue?.name || event.venue_custom || 'N/A'),
+      field('Start Date', formatDateTime(event.start_datetime).split(',')[0]),
+      field('End Date', formatDateTime(event.end_datetime).split(',')[0]),
+      field('Time', `${formatDateTime(event.start_datetime)} – ${formatDateTime(event.end_datetime)}`),
+      field('Duration (hrs)', String(durationHrs)),
+      field('Mode of Delivery', modeOfDelivery ? modeOfDelivery.charAt(0).toUpperCase() + modeOfDelivery.slice(1) : 'N/A'),
+
+      spacer(),
+
+      // ── Guest Speakers ────────────────────────────────────────────────
+      h2('Guest Speaker(s)'),
+      ...speakers.filter(s => s.name).flatMap((spk, i) => [
+        ...(speakers.filter(s => s.name).length > 1
+          ? [new Paragraph({ children: [new TextRun({ text: `Speaker ${i + 1}`, bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } })]
+          : []),
+        field('Name', spk.name),
+        field('Designation', spk.designation || 'N/A'),
+        field('Organization', spk.organization || 'N/A'),
+        field('Area of Expertise', spk.expertise || 'N/A'),
+        spacer(),
+      ]),
+
+      // ── Social Media ──────────────────────────────────────────────────
+      h2('Social Media Links'),
+      ...(Object.values(socialPamphlet).some(Boolean) ? [
+        new Paragraph({ children: [new TextRun({ text: 'Link of social media post of e-pamphlet:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 60 } }),
+        ...socialBlock(socialPamphlet),
+      ] : [body2('Link of social media post of e-pamphlet: N/A')]),
+      spacer(),
+      ...(Object.values(socialVideo).some(Boolean) ? [
+        new Paragraph({ children: [new TextRun({ text: 'Link for social media post of video:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 60 } }),
+        ...socialBlock(socialVideo),
+        spacer(),
+      ] : [body2('Link for social media post of video: N/A')]),
+
+      spacer(),
+
+      // ── Objective & Learning ──────────────────────────────────────────
+      h2('Objective & Learning Outcomes'),
+      new Paragraph({ children: [new TextRun({ text: 'Objective of the Activity (100 chars):', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 60 } }),
+      body2(objective || 'N/A'),
+      new Paragraph({ children: [new TextRun({ text: 'Benefit in Terms of Learning / Skills / Knowledge (150 chars):', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
+      body2(learningBenefit || 'N/A'),
+
+      spacer(),
+
+      // ── Coordinators ──────────────────────────────────────────────────
+      h2('Coordinators'),
+      new Paragraph({ children: [new TextRun({ text: 'Faculty Coordinators:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 40 } }),
+      ...(facultyCoordinators.filter(Boolean).length > 0
+        ? facultyCoordinators.filter(Boolean).map(name =>
+            new Paragraph({
+              children: [new TextRun({ text: name, size: 24, font: 'Times New Roman' })],
+              indent: { left: 720 },
+              spacing: { after: 40 },
+            })
+          )
+        : [new Paragraph({ children: [new TextRun({ text: 'N/A', size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 40 } })]
+      ),
+      new Paragraph({ children: [new TextRun({ text: 'Student Coordinators:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 40 } }),
+      ...(studentCoordinators.filter(Boolean).length > 0
+        ? studentCoordinators.filter(Boolean).map(name =>
+            new Paragraph({
+              children: [new TextRun({ text: name, size: 24, font: 'Times New Roman' })],
+              indent: { left: 720 },
+              spacing: { after: 40 },
+            })
+          )
+        : [new Paragraph({ children: [new TextRun({ text: 'N/A', size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 40 } })]
+      ),
+
+      spacer(),
+
+      // ── Participants & Expenditure ────────────────────────────────────
+      h2('Participants & Expenditure'),
+      field('Student Participants', studentCount || '0'),
+      field('Faculty Participants', facultyCount || '0'),
+      field('External Participants', externalCount || '0'),
+      field('Total Participants', String((parseInt(studentCount) || 0) + (parseInt(facultyCount) || 0) + (parseInt(externalCount) || 0))),
+      field('Estimated Budget', event.budget ? `Rs. ${Number(event.budget).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'N/A'),
+      field('Actual Expenditure', actualBudget ? `Rs. ${parseFloat(actualBudget).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'N/A'),
+
+      spacer(),
+
+      // ── Speaker Background ────────────────────────────────────────────
+      h2('Background of the Speaker(s)'),
+      body2(speakerBackground || 'N/A'),
+
+      spacer(),
+
+      // ── Session Report ─────────────────────────────────────────────────
+      h2('Report on the Session'),
+      new Paragraph({ children: [new TextRun({ text: 'Event Summary:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 60 } }),
+      body2(eventSummary || 'N/A'),
+      new Paragraph({ children: [new TextRun({ text: 'Detailed Session Report:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
+      body2(sessionReport || 'N/A'),
+      new Paragraph({ children: [new TextRun({ text: 'Key Outcomes of the Event:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
+      ...keyOutcomes.filter(Boolean).map(o =>
+        new Paragraph({
+          numbering: { reference: 'report-bullets', level: 0 },
+          children: [new TextRun({ text: o, size: 24, font: 'Times New Roman' })],
+        })
+      ),
+
+      spacer(),
+
+      // ── Conclusion ─────────────────────────────────────────────────────
+      h2('Conclusion'),
+      body2(conclusion || 'N/A'),
+
+      spacer(),
+
+      // ── Winners ──────────────────────────────────────────────────────────
+      ...(includeWinners && competitions.some(c => c.game) ? [
+        new Paragraph({ children: [new TextRun({ text: 'Winners of the competitions:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 240 } }),
+        ...competitions.filter(c => c.game).flatMap((comp, ci) => [
+          new Paragraph({ children: [new TextRun({ text: `The ${comp.game} award was presented to:`, size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+          ...(comp.studentWinners.filter(Boolean).length > 0 ? [
+            new Paragraph({ children: [new TextRun({ text: 'Student winners', size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+            ...comp.studentWinners.filter(Boolean).map((win, wi) =>
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${wi + 1}.\t`, size: 24, font: 'Times New Roman' }),
+                  new TextRun({ text: win, size: 24, font: 'Times New Roman' }),
+                ],
+                spacing: { after: 120 }
+              })
+            ),
+          ] : []),
+          ...(comp.facultyWinners.filter(Boolean).length > 0 ? [
+            new Paragraph({ children: [new TextRun({ text: 'Faculty winners', size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+            ...comp.facultyWinners.filter(Boolean).map((win, wi) =>
+              new Paragraph({
+                children: [
+                   new TextRun({ text: `${wi + 1}.\t`, size: 24, font: 'Times New Roman' }),
+                   new TextRun({ text: win, size: 24, font: 'Times New Roman' }),
+                ],
+                spacing: { after: 120 }
+              })
+            ),
+          ] : []),
+          spacer(),
+        ]),
+      ] : []),
+
+      // ── Attachments ───────────────────────────────────────────────────
+      h2('Attachments'),
+
+      // Flier
+      ...(flierBuf ? [
+        new Paragraph({ children: [new TextRun({ text: 'Event Flier:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 240 },
+          children: [new ImageRun({ data: flierBuf, transformation: { width: 400, height: 300 }, type: flierType })],
+        }),
+      ] : []),
+
+      // Photos
+      ...(photoBufs.length > 0 ? [
+        new Paragraph({
+          children: [new TextRun({ text: `Glimpses of the Event (${photoBufs.length} photographs):`, bold: true, size: 24, font: 'Times New Roman' })],
+          spacing: { before: 120, after: 120 },
+        }),
+        ...photoBufs.map((buf, idx) =>
           new Paragraph({
-            children: [new TextRun({ text: sec.title, bold: true, size: 22, font: 'Calibri' })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 240 },
+            children: [new ImageRun({ data: buf, transformation: { width: 540, height: 360 }, type: photoTypes[idx] || 'jpg' })],
           })
-        );
-      }
-
-      if (sec.type === 'paragraph') {
-        const lines = sec.content.split('\n');
-        for (const line of lines) {
-          sectionChildren.push(new Paragraph({ children: [new TextRun({ text: line, size: 22, font: 'Calibri' })] }));
-        }
-      } else if (sec.type === 'bullets') {
-        const lines = sec.content.split('\n').filter(Boolean);
-        for (const line of lines) {
-          const clean = line.replace(/^[-•*]\s*/, '');
-          sectionChildren.push(
-            new Paragraph({
-              numbering: { reference: 'bullets', level: 0 },
-              children: [new TextRun({ text: clean, size: 22, font: 'Calibri' })],
-            })
-          );
-        }
-      } else if (sec.type === 'links') {
-        for (const lnk of sec.links.filter(l => l.url)) {
-          const labelRun = lnk.label
-            ? [new TextRun({ text: `${lnk.label}: `, size: 22, font: 'Calibri' })]
-            : [];
-          sectionChildren.push(
-            new Paragraph({
-              children: [
-                ...labelRun,
-                new ExternalHyperlink({
-                  link: lnk.url,
-                  children: [new TextRun({ text: lnk.url, size: 22, font: 'Calibri', color: '2563EB', underline: {} })],
-                }),
-              ],
-            })
-          );
-        }
-      }
-
-      sectionChildren.push(new Paragraph({ text: '' }));
-    }
+        ),
+      ] : []),
+    ];
 
     const doc = new Document({
       numbering: {
         config: [
           {
-            reference: 'bullets',
-            levels: [{
-              level: 0,
-              format: LevelFormat.BULLET,
-              text: '•',
-              alignment: AlignmentType.LEFT,
-              style: { paragraph: { indent: { left: 720, hanging: 360 } } },
-            }],
+            reference: 'report-bullets',
+            levels: [
+              {
+                level: 0,
+                format: LevelFormat.BULLET,
+                text: '\u2022',
+                alignment: AlignmentType.LEFT,
+                style: {
+                  paragraph: {
+                    indent: { left: 720, hanging: 360 },
+                  },
+                },
+              },
+            ],
           },
         ],
       },
@@ -440,152 +703,83 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
             margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
           },
         },
-        children: [
-          // ── Header: logo + title block ──────────────────────────────────
-          new Table({
-            width: { size: 9360, type: WidthType.DXA },
-            columnWidths: [1440, 7920],
-            borders: {
-              top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-              bottom: { style: BorderStyle.SINGLE, size: 6, color: '1E3A5F' },
-              left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-              right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-              insideHorizontal: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-              insideVertical: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-            },
-            rows: [
-              new TableRow({
-                children: [
-                  // Logo cell
-                  new TableCell({
-                    width: { size: 1440, type: WidthType.DXA },
-                    borders: {
-                      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                    },
-                    margins: { top: 80, bottom: 80, left: 0, right: 120 },
+        children,
+        headers: {
+          default: new Header({
+            children: collaboratorLogoBufs.length === 0
+              ? [
+                  // Simple layout without collaborator logos
+                  new Paragraph({
                     children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        children: logoBuf
-                          ? [new ImageRun({ data: logoBuf, transformation: { width: 80, height: 80 }, type: 'jpg' })]
-                          : [new TextRun({ text: '' })],
-                      }),
+                      logoBufLeft
+                        ? new ImageRun({ data: logoBufLeft, transformation: { width: 120, height: 55 }, type: 'png' })
+                        : new TextRun(''),
+                      new TextRun({ text: '\t', }),
+                      logoBufRight
+                        ? new ImageRun({ data: logoBufRight, transformation: { width: 120, height: 55 }, type: 'png' })
+                        : new TextRun(''),
+                    ],
+                    tabStops: [
+                      {
+                        type: 'right',
+                        position: 8500,
+                      },
                     ],
                   }),
-                  // Title cell
-                  new TableCell({
-                    width: { size: 7920, type: WidthType.DXA },
-                    borders: {
-                      top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                      bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                      left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                      right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-                    },
-                    margins: { top: 80, bottom: 80, left: 120, right: 0 },
+                ]
+              : [
+                  // Layout with collaborator logos - logos in corners, collaborator logos in center
+                  new Paragraph({
                     children: [
-                      new Paragraph({
-                        alignment: AlignmentType.LEFT,
-                        children: [new TextRun({ text: 'Report on', bold: false, size: 22, font: 'Calibri' })],
-                      }),
-                      new Paragraph({
-                        alignment: AlignmentType.LEFT,
-                        children: [new TextRun({ text: 'NISP Cell Event', bold: true, size: 26, font: 'Calibri' })],
-                      }),
-                      new Paragraph({
-                        alignment: AlignmentType.LEFT,
-                        children: [new TextRun({ text: `"${event.title}"`, bold: true, size: 26, font: 'Calibri', color: '1E3A5F' })],
-                      }),
+                      logoBufLeft
+                        ? new ImageRun({ data: logoBufLeft, transformation: { width: 80, height: 40 }, type: 'png' })
+                        : new TextRun(''),
+                      new TextRun({ text: '\t', }),
+                      ...collaboratorLogoBufs.map((buf, idx) =>
+                        new ImageRun({ data: buf, transformation: { width: 80, height: 40 }, type: collaboratorLogoTypes[idx] || 'png' })
+                      ),
+                      new TextRun({ text: '\t', }),
+                      logoBufRight
+                        ? new ImageRun({ data: logoBufRight, transformation: { width: 80, height: 40 }, type: 'png' })
+                        : new TextRun(''),
                     ],
+                    tabStops: [
+                      {
+                        type: 'center',
+                        position: 6120,
+                      },
+                      {
+                        type: 'right',
+                        position: 8500,
+                      },
+                    ],
+                  }),
+                ],
+          }),
+        },
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({
+                    children: [PageNumber.CURRENT],
+                    size: 24,
+                    font: 'Times New Roman',
                   }),
                 ],
               }),
             ],
           }),
-
-          new Paragraph({ text: '' }),
-
-          // ── Event Details Table ────────────────────────────────────────
-          new Table({
-            width: { size: 9360, type: WidthType.DXA },
-            columnWidths: [2808, 6552],
-            rows: detailRows.map(([label, value]) =>
-              new TableRow({
-                children: [
-                  new TableCell({
-                    width: { size: 2808, type: WidthType.DXA },
-                    borders: thinBorder,
-                    shading: { fill: 'EFF6FF', type: ShadingType.CLEAR },
-                    margins: { top: 80, bottom: 80, left: 120, right: 120 },
-                    children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 20, font: 'Calibri' })] })],
-                  }),
-                  new TableCell({
-                    width: { size: 6552, type: WidthType.DXA },
-                    borders: thinBorder,
-                    margins: { top: 80, bottom: 80, left: 120, right: 120 },
-                    children: [new Paragraph({ children: [new TextRun({ text: value, size: 20, font: 'Calibri' })] })],
-                  }),
-                ],
-              })
-            ),
-          }),
-
-          new Paragraph({ text: '' }),
-
-          // ── Dynamic sections ───────────────────────────────────────────
-          ...sectionChildren,
-
-          // ── Photo gallery ──────────────────────────────────────────────
-          ...(photoBufs.length > 0 ? [
-            new Paragraph({
-              children: [new TextRun({ text: `Glimpses of the event (${photoBufs.length} photographs)`, bold: true, size: 22, font: 'Calibri' })],
-            }),
-            new Paragraph({ text: '' }),
-            ...photoBufs.map(buf =>
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 240 },
-                children: [new ImageRun({ data: buf, transformation: { width: 580, height: 386 }, type: 'jpg' })],
-              })
-            ),
-          ] : []),
-        ],
+        },
       }],
     });
 
     return await Packer.toBlob(doc);
   };
 
-  // ── PDF via html2canvas ───────────────────────────────────────────────────
-
-  const generatePdf = async (): Promise<Blob> => {
-    const { default: jsPDF } = await import('jspdf');
-    const { default: html2canvas } = await import('html2canvas');
-    const el = previewRef.current;
-    if (!el) throw new Error('Preview not rendered');
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    let pos = 0;
-    if (pdfHeight <= pageHeight) {
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    } else {
-      while (pos < pdfHeight) {
-        pdf.addImage(imgData, 'JPEG', 0, -pos, pdfWidth, pdfHeight);
-        pos += pageHeight;
-        if (pos < pdfHeight) pdf.addPage();
-      }
-    }
-    return pdf.output('blob');
-  };
-
-  // ── Download ──────────────────────────────────────────────────────────────
-
+  // ── Download ───────────────────────────────────────────────────────────────
   const downloadFile = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -603,25 +797,20 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
     finally { setGenerating(false); }
   };
 
-  const handleDownloadPdf = async () => {
-    if (!showPreview) { toast.error('Generate preview first'); return; }
-    setGenerating(true);
-    try {
-      const blob = await generatePdf();
-      downloadFile(blob, `${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_Report.pdf`);
-      toast.success('PDF downloaded');
-    } catch (err) { console.error(err); toast.error('Failed to generate PDF'); }
-    finally { setGenerating(false); }
-  };
-
   const handleSubmit = async () => {
+    if (!flier) { toast.error('Please upload the event flier'); return; }
+    if (photos.length < MIN_PHOTOS) { toast.error(`Upload at least ${MIN_PHOTOS} event photos`); return; }
+    if (objective.length > 100) { toast.error('Objective must be ≤ 100 characters'); return; }
+    if (learningBenefit.length > 150) { toast.error('Learning benefit must be ≤ 150 characters'); return; }
+
     setSubmitting(true);
     try {
-      const blob = await generateDocx();
-      const file = new File([blob], `${event.title.replace(/[^a-zA-Z0-9]/g, '_')}_Report.docx`, {
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      });
-      await reportService.uploadDoc(event.id, file);
+      // 1. Upload flier
+      await reportService.uploadFlier(event.id, flier.file);
+      // 2. Upload photos
+      await reportService.uploadPhotos(event.id, photos.map(p => p.file));
+      // 3. Submit structured report
+      await reportService.submitReport(event.id, buildPayload());
       toast.success('Report submitted! Event archived.');
       onComplete();
     } catch (err: any) {
@@ -629,17 +818,46 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
     } finally { setSubmitting(false); }
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
 
-      {/* ── Auto-filled event details ──────────────────────────────────────── */}
+      {/* Collaborator Logos */}
+      <SectionCard title="Collaborator Logos (Header)" icon={<ImageIcon className="w-4 h-4" />} defaultOpen={true}>
+        <p className="text-xs text-[var(--text-muted)] -mt-1 mb-3">Upload up to {MAX_COLLABORATOR_LOGOS} additional collaborator logos. These will appear in the report header in a single line.</p>
+        <div className="grid grid-cols-4 gap-3">
+          {collaboratorLogos.map((logo, idx) => (
+            <div key={logo.id} className="relative group rounded-xl overflow-hidden border border-[var(--card-border)] aspect-[2/1]">
+              <img src={logo.preview} alt={`Collaborator Logo ${idx + 1}`} className="w-full h-full object-contain bg-white" />
+              <button
+                type="button"
+                onClick={() => removeCollaboratorLogo(logo.id)}
+                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          {collaboratorLogos.length < MAX_COLLABORATOR_LOGOS && (
+            <button
+              type="button"
+              onClick={() => collaboratorLogoRef.current?.click()}
+              className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[var(--input-border)] aspect-[2/1] hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+            >
+              <Upload className="w-5 h-5 text-[var(--text-muted)]" />
+              <span className="text-[10px] text-[var(--text-muted)]">Add Logo</span>
+            </button>
+          )}
+        </div>
+        <input ref={collaboratorLogoRef} type="file" className="hidden" accept=".jpg,.jpeg,.png" multiple onChange={handleCollaboratorLogoSelect} />
+      </SectionCard>
+
+      {/* Auto-filled event details */}
       <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50/80 to-indigo-50/50 border border-blue-100">
         <h3 className="text-sm font-display font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
           <FileText className="w-4 h-4 text-blue-600" />
           Event Details
-          <span className="text-xs font-normal text-[var(--text-muted)]">(auto-filled from database)</span>
+          <span className="text-xs font-normal text-[var(--text-muted)]">(auto-filled)</span>
         </h3>
         <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           <div><span className="font-medium text-[var(--text-secondary)]">Title:</span> <span className="text-[var(--text-primary)]">{event.title}</span></div>
@@ -647,64 +865,340 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
           <div><span className="font-medium text-[var(--text-secondary)]">Start:</span> <span className="text-[var(--text-primary)]">{formatDateTime(event.start_datetime)}</span></div>
           <div><span className="font-medium text-[var(--text-secondary)]">End:</span> <span className="text-[var(--text-primary)]">{formatDateTime(event.end_datetime)}</span></div>
           <div><span className="font-medium text-[var(--text-secondary)]">Venue:</span> <span className="text-[var(--text-primary)]">{event.venue?.name || event.venue_custom || '—'}</span></div>
-          <div><span className="font-medium text-[var(--text-secondary)]">School:</span> <span className="text-[var(--text-primary)]">{event.school_department || '—'}</span></div>
+          <div><span className="font-medium text-[var(--text-secondary)]">Dept:</span> <span className="text-[var(--text-primary)]">{event.school_department || '—'}</span></div>
         </div>
       </div>
 
-      {/* ── Report Sections Builder ────────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-display font-bold text-[var(--text-primary)]">Report Sections</h3>
-          <span className="text-xs text-[var(--text-muted)]">Drag to reorder · click type to switch</span>
+      {/* ── Program Info ─────────────────────────────────────────────────────── */}
+      <SectionCard title="Program Info" icon={<BookOpen className="w-4 h-4" />}>
+        <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <Label>Program Type</Label>
+            <div className="relative">
+              <Select value={programType} onChange={e => setProgramType(e.target.value)}>
+                <option value="">— Select —</option>
+                {PROGRAM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </Select>
+              <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+          </Field>
+          <Field>
+            <Label>Mode of Delivery</Label>
+            <div className="relative">
+              <Select value={modeOfDelivery} onChange={e => setModeOfDelivery(e.target.value as any)}>
+                <option value="">— Select —</option>
+                <option value="offline">Offline</option>
+                <option value="online">Online</option>
+              </Select>
+              <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+          </Field>
         </div>
+        <Field>
+          <div className="flex items-center justify-between mb-1.5">
+            <Label>Objective of the Activity (100 Characters)</Label>
+            <CharCount value={objective} max={100} />
+          </div>
+          <Textarea
+            rows={2}
+            placeholder="100 characters strict…"
+            value={objective}
+            onChange={e => setObjective(e.target.value)}
+            maxLength={100}
+          />
+        </Field>
+        <Field>
+          <div className="flex items-center justify-between mb-1.5">
+            <Label>Benefit in Terms of Learning / Skills / Knowledge (150 Characters)</Label>
+            <CharCount value={learningBenefit} max={150} />
+          </div>
+          <Textarea
+            rows={2}
+            placeholder="150 characters strict…"
+            value={learningBenefit}
+            onChange={e => setLearningBenefit(e.target.value)}
+            maxLength={150}
+          />
+        </Field>
+      </SectionCard>
 
-        <div className="space-y-3">
-          {sections.map((sec, idx) => (
-            <div key={sec.id}>
-              <SectionEditor
-                section={sec}
-                index={idx}
-                total={sections.length}
-                onChange={updated => updateSection(sec.id, updated)}
-                onRemove={() => removeSection(sec.id)}
-                onMove={dir => moveSection(sec.id, dir)}
-              />
-              {/* Insert section button between cards */}
-              <button
-                type="button"
-                onClick={() => addSection(idx)}
-                className="w-full mt-2 py-1.5 flex items-center justify-center gap-1 text-xs text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 rounded-xl border border-dashed border-transparent hover:border-blue-200 transition-all"
-              >
-                <Plus className="w-3 h-3" /> Insert section here
-              </button>
+      {/* ── Guest Speakers ────────────────────────────────────────────────────── */}
+      <SectionCard title="Guest Speaker(s)" icon={<Mic className="w-4 h-4" />}>
+        {speakers.map((spk, i) => (
+          <div key={i} className="p-4 rounded-xl border border-[var(--card-border)] bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Speaker {i + 1}</span>
+              {speakers.length > 1 && (
+                <button type="button" onClick={() => removeSpeaker(i)} className="text-red-400 hover:text-red-600">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field><Label required>Name</Label><Input placeholder="Full name" value={spk.name} onChange={e => updateSpeaker(i, 'name', e.target.value)} /></Field>
+              <Field><Label>Designation</Label><Input placeholder="e.g. CEO, Professor" value={spk.designation} onChange={e => updateSpeaker(i, 'designation', e.target.value)} /></Field>
+              <Field><Label>Organization</Label><Input placeholder="Company / Institution" value={spk.organization} onChange={e => updateSpeaker(i, 'organization', e.target.value)} /></Field>
+              <Field><Label>Area of Expertise</Label><Input placeholder="e.g. AI, Finance" value={spk.expertise} onChange={e => updateSpeaker(i, 'expertise', e.target.value)} /></Field>
+            </div>
+          </div>
+        ))}
+        <button type="button" onClick={addSpeaker} className="w-full py-2.5 flex items-center justify-center gap-2 text-sm text-blue-600 rounded-xl border-2 border-dashed border-blue-200 hover:bg-blue-50 transition-colors">
+          <Plus className="w-4 h-4" /> Add Speaker
+        </button>
+        <Field>
+          <Label>Background of the Speaker(s)</Label>
+          <Textarea rows={4} placeholder="Detailed background, achievements, credentials…" value={speakerBackground} onChange={e => setSpeakerBackground(e.target.value)} />
+        </Field>
+      </SectionCard>
+
+      {/* ── Social Media Links ────────────────────────────────────────────────── */}
+      <SectionCard title="Social Media Links" icon={<Link className="w-4 h-4" />} defaultOpen={false}>
+        <p className="text-xs text-[var(--text-muted)] -mt-1">Leave blank if not applicable.</p>
+        {([
+          ['E-Pamphlet Links', socialPamphlet, setSocialPamphlet],
+          ['Video Post Links', socialVideo, setSocialVideo],
+        ] as const).map(([label, state, setter]) => (
+          <div key={label}>
+            <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2">{label}</p>
+            <div className="grid grid-cols-2 gap-3">
+              {(['facebook', 'instagram', 'x', 'linkedin'] as const).map(platform => (
+                <Field key={platform}>
+                  <Label>{platform === 'x' ? 'X.com' : platform.charAt(0).toUpperCase() + platform.slice(1)}</Label>
+                  <Input
+                    placeholder="https://…"
+                    value={state[platform]}
+                    onChange={e => setter(prev => ({ ...prev, [platform]: e.target.value }))}
+                  />
+                </Field>
+              ))}
+            </div>
+          </div>
+        ))}
+      </SectionCard>
+
+      {/* ── Coordinators ─────────────────────────────────────────────────────── */}
+      <SectionCard title="Coordinators" icon={<Users className="w-4 h-4" />} defaultOpen={false}>
+        <div className="grid grid-cols-2 gap-6">
+          {([
+            ['Faculty Coordinators', facultyCoordinators, setFacultyCoordinators],
+            ['Student Coordinators', studentCoordinators, setStudentCoordinators],
+          ] as const).map(([label, list, setter]) => (
+            <div key={label}>
+              <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2">{label}</p>
+              <div className="space-y-2">
+                {list.map((name, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Full name"
+                      value={name}
+                      onChange={e => updateCoord(list, setter, i, e.target.value)}
+                    />
+                    {list.length > 1 && (
+                      <button type="button" onClick={() => removeCoord(list, setter, i)} className="text-red-400 hover:text-red-600 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button type="button" onClick={() => addCoord(list, setter)} className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1">
+                  <Plus className="w-3 h-3" /> Add
+                </button>
+              </div>
             </div>
           ))}
         </div>
+      </SectionCard>
 
-        <button
-          type="button"
-          onClick={() => addSection()}
-          className="mt-3 w-full py-3 flex items-center justify-center gap-2 text-sm font-medium text-blue-600 rounded-2xl border-2 border-dashed border-blue-200 hover:bg-blue-50 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add Section
-        </button>
+      {/* ── Participants & Budget ─────────────────────────────────────────────── */}
+      <SectionCard title="Participants & Expenditure" icon={<User className="w-4 h-4" />}>
+        <div className="grid grid-cols-3 gap-3">
+          <Field><Label>Student Participants</Label><Input type="number" min="0" placeholder="0" value={studentCount} onChange={e => setStudentCount(e.target.value)} /></Field>
+          <Field><Label>Faculty Participants</Label><Input type="number" min="0" placeholder="0" value={facultyCount} onChange={e => setFacultyCount(e.target.value)} /></Field>
+          <Field><Label>External Participants</Label><Input type="number" min="0" placeholder="0" value={externalCount} onChange={e => setExternalCount(e.target.value)} /></Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-sm">
+            <span className="text-[var(--text-muted)]">Total: </span>
+            <span className="font-bold text-blue-700">
+              {(parseInt(studentCount) || 0) + (parseInt(facultyCount) || 0) + (parseInt(externalCount) || 0)}
+            </span>
+          </div>
+          <Field>
+            <Label required>Actual Expenditure (Rs.)</Label>
+            <Input type="number" min="0" step="0.01" placeholder="0.00" value={actualBudget} onChange={e => setActualBudget(e.target.value)} />
+          </Field>
+        </div>
+      </SectionCard>
+
+      {/* ── Session Report ────────────────────────────────────────────────────── */}
+      <SectionCard title="Session Report" icon={<AlignLeft className="w-4 h-4" />}>
+        <Field>
+          <Label required>Event Summary</Label>
+          <Textarea rows={3} placeholder="Brief summary of the event…" value={eventSummary} onChange={e => setEventSummary(e.target.value)} />
+        </Field>
+        <Field>
+          <Label>Detailed Session Report</Label>
+          <Textarea rows={5} placeholder="Comprehensive report with key outcomes…" value={sessionReport} onChange={e => setSessionReport(e.target.value)} />
+        </Field>
+        <Field>
+          <Label>Key Outcomes of the Event</Label>
+          <div className="space-y-2">
+            {keyOutcomes.map((o, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <span className="text-blue-500 text-xs font-bold shrink-0">•</span>
+                <Input placeholder={`Outcome ${i + 1}`} value={o} onChange={e => updateOutcome(i, e.target.value)} />
+                {keyOutcomes.length > 1 && (
+                  <button type="button" onClick={() => removeOutcome(i)} className="text-red-400 hover:text-red-600 shrink-0">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button type="button" onClick={addOutcome} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              <Plus className="w-3 h-3" /> Add outcome
+            </button>
+          </div>
+        </Field>
+        <Field>
+          <Label>Conclusion</Label>
+          <Textarea rows={3} placeholder="Concluding remarks…" value={conclusion} onChange={e => setConclusion(e.target.value)} />
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field>
+            <Label>Issues Faced</Label>
+            <Textarea rows={2} placeholder="Any issues encountered…" value={issues} onChange={e => setIssues(e.target.value)} />
+          </Field>
+          <Field>
+            <Label>Feedback & Suggestions</Label>
+            <Textarea rows={2} placeholder="Feedback received…" value={feedback} onChange={e => setFeedback(e.target.value)} />
+          </Field>
+        </div>
+      </SectionCard>
+
+      {/* ── Winners Panel ─────────────────────────────────────────────────────── */}
+      <SectionCard title="Winners" icon={<Target className="w-4 h-4" />} defaultOpen={false}>
+        <div className="flex items-center gap-3 mb-4">
+          <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-[var(--text-primary)]">
+            <input type="checkbox" className="w-4 h-4 text-blue-600 rounded cursor-pointer" checked={includeWinners} onChange={e => setIncludeWinners(e.target.checked)} />
+            Include Winners Section in Report
+          </label>
+        </div>
+        
+        {includeWinners && (
+          <div className="space-y-6">
+            {competitions.map((comp, ci) => (
+              <div key={ci} className="p-4 rounded-xl border border-[var(--card-border)] bg-slate-50/50 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-[var(--text-primary)]">Competition {ci + 1}</span>
+                  {competitions.length > 1 && (
+                    <button type="button" onClick={() => removeCompetition(ci)} className="text-red-400 hover:text-red-600 text-xs font-semibold px-2">
+                      <Trash2 className="w-3.5 h-3.5 inline mr-1" /> Remove
+                    </button>
+                  )}
+                </div>
+                
+                <Field>
+                  <Label required>Game / Competition Name</Label>
+                  <Input placeholder="e.g. Best Traditional Attire" value={comp.game} onChange={e => updateCompetition(ci, 'game', e.target.value)} />
+                </Field>
+
+                <div className="grid grid-cols-2 gap-6 pt-2">
+                  {/* Student Winners */}
+                  <div>
+                    <Label>Student Winners</Label>
+                    <div className="space-y-2 mt-1.5">
+                      {comp.studentWinners.map((win, wi) => (
+                        <div key={wi} className="flex gap-2 items-center">
+                          <span className="text-xs font-bold text-slate-400 w-4">{wi + 1}.</span>
+                          <Input placeholder="Student details..." value={win} onChange={e => updateWinner(ci, 'studentWinners', wi, e.target.value)} />
+                          {comp.studentWinners.length > 1 && (
+                            <button type="button" onClick={() => removeWinner(ci, 'studentWinners', wi)} className="text-red-400 hover:text-red-600 shrink-0">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => addWinner(ci, 'studentWinners')} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Student
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Faculty Winners */}
+                  <div>
+                    <Label>Faculty Winners</Label>
+                    <div className="space-y-2 mt-1.5">
+                      {comp.facultyWinners.map((win, wi) => (
+                        <div key={wi} className="flex gap-2 items-center">
+                          <span className="text-xs font-bold text-slate-400 w-4">{wi + 1}.</span>
+                          <Input placeholder="Faculty details..." value={win} onChange={e => updateWinner(ci, 'facultyWinners', wi, e.target.value)} />
+                          {comp.facultyWinners.length > 1 && (
+                            <button type="button" onClick={() => removeWinner(ci, 'facultyWinners', wi)} className="text-red-400 hover:text-red-600 shrink-0">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => addWinner(ci, 'facultyWinners')} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Faculty
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            <button type="button" onClick={addCompetition} className="w-full py-2.5 flex items-center justify-center gap-2 text-sm font-semibold text-blue-600 rounded-xl border-2 border-dashed border-blue-200 hover:bg-blue-50 transition-colors">
+              <Plus className="w-4 h-4" /> Add Another Game/Competition
+            </button>
+          </div>
+        )}
+      </SectionCard>
+
+      {/* ── Flier Upload ──────────────────────────────────────────────────────── */}
+      <div>
+        <label className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] mb-2">
+          <ImageIcon className="w-4 h-4" />
+          Event Flier
+          <span className="text-red-500">*</span>
+          <span className="text-[var(--text-muted)] font-normal text-xs">— 1 compulsory</span>
+        </label>
+        {flier ? (
+          <div className="relative w-40 rounded-xl overflow-hidden border border-[var(--card-border)] group">
+            <img src={flier.preview} alt="Flier" className="w-full aspect-[3/4] object-cover" />
+            <button
+              type="button"
+              onClick={() => { URL.revokeObjectURL(flier.preview); setFlier(null); }}
+              className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => flierRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-2 w-40 aspect-[3/4] rounded-xl border-2 border-dashed border-[var(--input-border)] hover:border-blue-400 hover:bg-blue-50/50 transition-colors"
+          >
+            <Upload className="w-6 h-6 text-[var(--text-muted)]" />
+            <span className="text-xs text-[var(--text-muted)]">Upload Flier</span>
+          </button>
+        )}
+        <input ref={flierRef} type="file" className="hidden" accept=".jpg,.jpeg,.png" onChange={handleFlierSelect} />
       </div>
 
-      {/* ── Photo Upload ───────────────────────────────────────────────────── */}
+      {/* ── Photo Upload ──────────────────────────────────────────────────────── */}
       <div>
         <label className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] mb-2">
           <ImageIcon className="w-4 h-4" />
           Event Photos ({photos.length}/{MAX_PHOTOS})
-          <span className="text-[var(--text-muted)] font-normal text-xs">— min {MIN_PHOTOS} required · first photo = banner</span>
+          <span className="text-red-500">*</span>
+          <span className="text-[var(--text-muted)] font-normal text-xs">— {MIN_PHOTOS}–{MAX_PHOTOS} required</span>
         </label>
-
         <div className="grid grid-cols-5 gap-3">
           {photos.map((photo, idx) => (
-            <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-[var(--card-border)] aspect-square bg-[var(--page-bg)]">
+            <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-[var(--card-border)] aspect-square">
               <img src={photo.preview} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
-              {idx === 0 && (
-                <span className="absolute top-1 left-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md">P1</span>
-              )}
               <button
                 type="button"
                 onClick={() => removePhoto(photo.id)}
@@ -726,7 +1220,6 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
           )}
         </div>
         <input ref={photoRef} type="file" className="hidden" accept=".jpg,.jpeg,.png" multiple onChange={handlePhotoSelect} />
-
         {photos.length > 0 && photos.length < MIN_PHOTOS && (
           <p className="flex items-center gap-1.5 text-xs text-amber-600 mt-2">
             <AlertTriangle className="w-3.5 h-3.5" />
@@ -735,23 +1228,17 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
         )}
       </div>
 
-      {/* ── Preview Button ─────────────────────────────────────────────────── */}
-      <Button
-        disabled={!canPreview}
-        onClick={() => setShowPreview(true)}
-        className="w-full justify-center py-3"
-        icon={<Eye className="w-4 h-4" />}
-      >
+      {/* ── Preview Button ────────────────────────────────────────────────────── */}
+      <Button disabled={!canPreview} onClick={() => setShowPreview(true)} className="w-full justify-center py-3" icon={<Eye className="w-4 h-4" />}>
         Generate Preview
       </Button>
-
       {!canPreview && (
         <p className="text-xs text-center text-[var(--text-muted)] -mt-3">
-          Add at least {MIN_PHOTOS} photos and fill in at least one section to preview.
+          Fill Event Summary, Actual Budget, upload flier + {MIN_PHOTOS} photos to preview.
         </p>
       )}
 
-      {/* ── Document Preview ───────────────────────────────────────────────── */}
+      {/* ── Preview ───────────────────────────────────────────────────────────── */}
       {showPreview && (
         <div className="space-y-4 animate-fade-in">
           <div className="flex items-center gap-2 pt-2">
@@ -760,72 +1247,167 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
             <div className="h-px flex-1 bg-[var(--card-border)]" />
           </div>
 
-          <div ref={previewRef} className="bg-white rounded-2xl border border-[var(--card-border)] shadow-card overflow-hidden">
-            {/* Header: logo + title */}
-            <div className="flex items-center gap-4 px-8 py-5 border-b-4 border-[#1E3A5F]">
+          <div ref={previewRef} className="bg-white rounded-2xl border border-[var(--card-border)] shadow-card overflow-hidden text-sm">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b-4 border-[#1E3A5F]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={LOGO_PATH} alt="Logo" className="w-16 h-16 object-contain shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              <div>
-                <p className="text-xs text-slate-500">Report on</p>
-                <p className="text-base font-bold text-slate-800">NISP Cell Event</p>
-                <p className="text-base font-bold text-[#1E3A5F]">"{event.title}"</p>
+              <img src={LOGO_PATH_LEFT} alt="NMIMS Logo" className="w-12 h-6 object-contain shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <div className="flex items-center gap-2">
+                {collaboratorLogos.map((logo, idx) => (
+                  <img key={logo.id} src={logo.preview} alt={`Collaborator ${idx + 1}`} className="w-12 h-6 object-contain shrink-0" />
+                ))}
               </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO_PATH_RIGHT} alt="ICC Logo" className="w-12 h-6 object-contain shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            </div>
+
+            {/* Title */}
+            <div className="text-center py-4">
+              <p className="font-bold text-lg text-black font-serif">REPORT ON</p>
+              <p className="font-bold text-base text-black font-serif">"{event.title}"</p>
             </div>
 
             <div className="px-8 py-6 space-y-5">
-              {/* Details table */}
-              <table className="w-full text-sm border-collapse">
-                <tbody>
-                  {[
-                    ['Event Title', event.title],
-                    ['Date & Time', `${formatDateTime(event.start_datetime)} – ${formatDateTime(event.end_datetime)}`],
-                    ['Venue', event.venue?.name || event.venue_custom || '—'],
-                    ['School', event.school_department || '—'],
-                    ['Event Type', event.event_type || '—'],
-                    ['Incharge', event.event_incharge_name || '—'],
-                  ].map(([label, value]) => (
-                    <tr key={label} className="border border-slate-200">
-                      <td className="w-1/3 px-3 py-2 font-semibold bg-blue-50 text-slate-700">{label}</td>
-                      <td className="px-3 py-2 text-slate-700">{value}</td>
-                    </tr>
+              {/* Event Details */}
+              <PreviewSection title="Event Details">
+              <PreviewTable rows={[
+                ['Event Title', event.title],
+                ['Program Type', programType],
+                ['Venue', event.venue?.name || event.venue_custom || '—'],
+                ['Start', formatDateTime(event.start_datetime)],
+                ['End', formatDateTime(event.end_datetime)],
+                ['Mode', modeOfDelivery || '—'],
+              ]} />
+              </PreviewSection>
+
+              {/* Guest Speakers */}
+              {speakers.filter(s => s.name).length > 0 && (
+                <PreviewSection title="Guest Speaker(s)">
+                  {speakers.filter(s => s.name).map((spk, i) => (
+                    <div key={i} className="mb-2">
+                      {speakers.filter(s => s.name).length > 1 && <p className="font-semibold text-black font-serif text-xs mb-1">Speaker {i + 1}</p>}
+                      <PreviewTable rows={[['Name', spk.name], ['Designation', spk.designation], ['Org', spk.organization], ['Expertise', spk.expertise]]} />
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </PreviewSection>
+              )}
 
-              {/* Dynamic sections */}
-              <div className="space-y-4 pt-2">
-                {sections.map(sec => <PreviewSection key={sec.id} section={sec} />)}
-              </div>
+              {/* Objective & Learning */}
+              <PreviewSection title="Objective & Learning Outcomes">
+                <p className="text-black font-serif text-xs whitespace-pre-wrap">{objective || '—'}</p>
+              </PreviewSection>
 
-              {/* Photo gallery */}
+              {/* Social Media Links */}
+              {(Object.values(socialPamphlet).some(Boolean) || Object.values(socialVideo).some(Boolean)) && (
+                <PreviewSection title="Social Media Links">
+                  {Object.values(socialPamphlet).some(Boolean) && (
+                    <div className="mb-3">
+                      <p className="font-semibold text-black font-serif text-xs mb-1">Link of social media post of e-pamphlet:</p>
+                      {(['facebook', 'instagram', 'x', 'linkedin'] as const).map((platform, index) => {
+                        const url = socialPamphlet[platform];
+                        return url ? (
+                          <p key={platform} className="text-black font-serif text-xs pl-4">
+                            {index + 1}. {platform.charAt(0).toUpperCase() + platform.slice(1)}: <a href={url} className="text-blue-600 underline break-all">{url}</a>
+                          </p>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                  {Object.values(socialVideo).some(Boolean) && (
+                    <div>
+                      <p className="font-semibold text-black font-serif text-xs mb-1 mt-2">Link for social media post of video:</p>
+                      {(['facebook', 'instagram', 'x', 'linkedin'] as const).map((platform, index) => {
+                        const url = socialVideo[platform];
+                        return url ? (
+                          <p key={platform} className="text-black font-serif text-xs pl-4">
+                            {index + 1}. {platform.charAt(0).toUpperCase() + platform.slice(1)}: <a href={url} className="text-blue-600 underline break-all">{url}</a>
+                          </p>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
+                </PreviewSection>
+              )}
+
+              {/* Participants & Expenditure */}
+              <PreviewSection title="Participants & Expenditure">
+                <PreviewTable rows={[
+                  ['Students', studentCount || '0'],
+                  ['Faculty', facultyCount || '0'],
+                  ['External', externalCount || '0'],
+                  ['Total', String((parseInt(studentCount) || 0) + (parseInt(facultyCount) || 0) + (parseInt(externalCount) || 0))],
+                  ['Actual Expenditure', actualBudget ? `Rs. ${parseFloat(actualBudget).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'],
+                ]} />
+              </PreviewSection>
+
+              {/* Session Report */}
+              <PreviewSection title="Report on the Session">
+                <p className="text-black font-serif text-xs whitespace-pre-wrap">{eventSummary}</p>
+              </PreviewSection>
+
+              {keyOutcomes.filter(Boolean).length > 0 && (
+                <PreviewSection title="Key Outcomes">
+                  <ul className="space-y-1">
+                    {keyOutcomes.filter(Boolean).map((o, i) => (
+                      <li key={i} className="flex gap-2"><span className="text-black shrink-0">•</span><span className="text-black font-serif text-xs">{o}</span></li>
+                    ))}
+                  </ul>
+                </PreviewSection>
+              )}
+
+              {conclusion && <PreviewSection title="Conclusion"><p className="text-black font-serif text-xs whitespace-pre-wrap">{conclusion}</p></PreviewSection>}
+
+              {/* Winners */}
+              {includeWinners && competitions.some(c => c.game) && (
+                <PreviewSection title="Winners">
+                  {competitions.filter(c => c.game).map((comp, ci) => (
+                    <div key={ci} className="mb-3">
+                      <p className="font-semibold text-black font-serif text-xs mb-1">The {comp.game} award was presented to:</p>
+                      {comp.studentWinners.filter(Boolean).length > 0 && (
+                        <div className="mb-1">
+                          <p className="font-semibold text-black font-serif text-xs">Student winners:</p>
+                          {comp.studentWinners.filter(Boolean).map((win, wi) => (
+                            <p key={wi} className="text-black font-serif text-xs pl-4">{wi + 1}. {win}</p>
+                          ))}
+                        </div>
+                      )}
+                      {comp.facultyWinners.filter(Boolean).length > 0 && (
+                        <div>
+                          <p className="font-semibold text-black font-serif text-xs">Faculty winners:</p>
+                          {comp.facultyWinners.filter(Boolean).map((win, wi) => (
+                            <p key={wi} className="text-black font-serif text-xs pl-4">{wi + 1}. {win}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </PreviewSection>
+              )}
+
+              {/* Flier */}
+              {flier && (
+                <PreviewSection title="Event Flier">
+                  <img src={flier.preview} alt="Flier" className="max-w-[200px] rounded-lg border" />
+                </PreviewSection>
+              )}
+
+              {/* Photos */}
               {photos.length > 0 && (
-                <div>
-                  <p className="text-sm font-bold text-slate-800 mb-3">
-                    Glimpses of the event ({photos.length} photographs)
-                  </p>
-                  <div className="space-y-3">
-                    {photos.map((photo, idx) => (
-                      <img
-                        key={photo.id}
-                        src={photo.preview}
-                        alt={`Event photo ${idx + 1}`}
-                        className="w-full rounded-lg object-cover"
-                        style={{ maxHeight: 320 }}
-                      />
+                <PreviewSection title={`Event Photos (${photos.length})`}>
+                  <div className="grid grid-cols-2 gap-3">
+                    {photos.map((p, i) => (
+                      <img key={p.id} src={p.preview} alt={`Photo ${i + 1}`} className="w-full rounded-lg object-cover" style={{ maxHeight: 200 }} />
                     ))}
                   </div>
-                </div>
+                </PreviewSection>
               )}
             </div>
           </div>
 
-          {/* ── Export Actions ─────────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Actions */}
+          <div className="grid grid-cols-2 gap-3">
             <Button variant="secondary" onClick={handleDownloadDocx} loading={generating} icon={<Download className="w-4 h-4" />} className="justify-center py-3">
-              Word (.docx)
-            </Button>
-            <Button variant="secondary" onClick={handleDownloadPdf} loading={generating} icon={<Download className="w-4 h-4" />} className="justify-center py-3">
-              PDF
+              Download Word (.docx)
             </Button>
             <Button onClick={handleSubmit} loading={submitting} icon={<Send className="w-4 h-4" />} className="justify-center py-3">
               Submit Report
@@ -834,10 +1416,41 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
 
           <Alert type="warning">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Submitting will <strong>archive</strong> the event permanently. Downloads do not affect event status.</span>
+            <span>Submitting will <strong>archive</strong> the event permanently.</span>
           </Alert>
         </div>
       )}
     </div>
   );
 }
+
+// ─── Preview helpers ──────────────────────────────────────────────────────────
+
+function PreviewSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-sm font-bold text-black font-serif border-b border-slate-100 pb-1 mb-2">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function PreviewTable({ rows }: { rows: [string, string][] }) {
+  return (
+    <div className="space-y-1">
+      {rows.filter(([, v]) => v).map(([label, value]) => (
+        <div key={label} className="flex pl-6">
+          <span className="font-semibold text-black font-serif text-xs">{label}: </span>
+          <span className="text-black font-serif text-xs">{value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Alias for the icon used inside session card
+const AlignLeft = ({ className }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <line x1="17" y1="10" x2="3" y2="10" /><line x1="21" y1="6" x2="3" y2="6" /><line x1="21" y1="14" x2="3" y2="14" /><line x1="13" y1="18" x2="3" y2="18" />
+  </svg>
+);

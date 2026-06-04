@@ -30,7 +30,7 @@ const schema = z.object({
   departments_involved: z.array(z.string()).min(1, 'Select at least one department'),
   event_incharge_name: z.string().min(2, 'Incharge name required'),
   event_incharge_contact: z.string().min(10, 'Valid contact required'),
-  target_audience: z.string().min(1, 'Select audience'),
+  target_audience: z.string().optional(),
   is_club_event: z.boolean(),
   is_collaborative: z.boolean(),
   collaborating_club_ids: z.array(z.number()).optional(),
@@ -162,11 +162,11 @@ const EVENT_TYPES = [
   { value: 'workshop', label: 'Workshop' }, { value: 'hackathon', label: 'Hackathon' },
   { value: 'awareness', label: 'Awareness' }, { value: 'other', label: 'Other' },
 ];
-const AUDIENCES = [
-  { value: 'college_wide', label: 'College-wide' },
-  { value: 'engineering', label: 'Engineering' },
+const DEPARTMENTS_INVOLVED_OPTIONS = [
   { value: 'agriculture', label: 'Agriculture' },
-  { value: 'pharma', label: 'Pharma' },
+  { value: 'engineering', label: 'Engineering' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'college_wide', label: 'College Wide' },
 ];
 
 function SectionProgress({ current, total }: { current: number; total: number }) {
@@ -249,7 +249,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
   const watchDecoration = watch('decoration');
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
-    1: ['title', 'event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'target_audience', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
+    1: ['title', 'event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
     2: ['start_datetime', 'end_datetime'],
     3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [], 7: [],
   };
@@ -273,6 +273,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       
       const payloadData = { 
         ...data, 
+        target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
         school_department: user?.department?.name || "Multiple",
@@ -323,6 +324,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
 
       const payloadData = {
         ...data,
+        target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
         school_department: user?.department?.name || "Multiple",
@@ -368,10 +370,6 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       } finally { setSubmitting(false); }
       return;
     }
-    if (!posterFile) {
-      toast.error("An Event Poster is required before submitting for approval.");
-      return;
-    }
     setBufferedData(data);
     setIsTermsOpen(true);
   };
@@ -385,6 +383,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
 
       const payloadData = {
         ...bufferedData,
+        target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
         school_department: user?.department?.name || "Multiple",
@@ -469,27 +468,24 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
               <Controller name="event_type" control={control} render={({ field }) => (
                 <Select label="Event Type" options={EVENT_TYPES} placeholder="Select type" error={errors.event_type?.message} {...field} />
               )} />
-              <Controller name="target_audience" control={control} render={({ field }) => (
-                <Select label="Target Audience" options={AUDIENCES} placeholder="Select audience" error={errors.target_audience?.message} {...field} />
-              )} />
             </div>
             <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
               <p className="text-sm font-semibold text-[var(--text-primary)]">Departments Involved <span className="text-[var(--text-danger)]">*</span></p>
               <Controller name="departments_involved" control={control} render={({ field }) => (
                 <div className="flex flex-wrap gap-2">
-                  {departments.map(d => {
-                    const selected = field.value?.includes(d.name);
+                  {DEPARTMENTS_INVOLVED_OPTIONS.map(d => {
+                    const selected = field.value?.includes(d.value);
                     return (
                       <button
-                        key={d.id} type="button"
+                        key={d.value} type="button"
                         onClick={() => {
                           const curr = field.value || [];
-                          if (selected) field.onChange(curr.filter((n: string) => n !== d.name));
-                          else field.onChange([...curr, d.name]);
+                          if (selected) field.onChange(curr.filter((n: string) => n !== d.value));
+                          else field.onChange([...curr, d.value]);
                         }}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-100'} border`}
                       >
-                        {d.name}
+                        {d.label}
                       </button>
                     );
                   })}
@@ -827,17 +823,17 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><FileText className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Event Poster & Budget</h2>
             <Alert type="info">
-              <span>An event poster is <strong>required</strong> to submit for approval. Participant docs and other files can be added later.</span>
+              <span>An event poster is optional but recommended. Participant docs and other files can be added later.</span>
             </Alert>
-            <div className={`p-4 bg-[var(--page-bg)] rounded-xl border-2 border-dashed ${!posterFile ? 'border-red-400' : 'border-[var(--card-border)]'} flex flex-col items-center justify-center text-center`}>
+            <div className={`p-4 bg-[var(--page-bg)] rounded-xl border-2 border-dashed border-[var(--card-border)] flex flex-col items-center justify-center text-center`}>
               <input type="file" ref={posterRef} className="hidden" accept="image/*" onChange={(e) => {
                 if (e.target.files && e.target.files[0]) setPosterFile(e.target.files[0]);
               }} />
               <Button type="button" variant="secondary" onClick={() => posterRef.current?.click()} icon={<FileText className="w-4 h-4" />}>
-                Upload Event Poster <span className="text-[var(--text-danger)]">*</span>
+                Upload Event Poster
               </Button>
-              {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] mt-2 font-semibold">{posterFile.name} added</span>}
-              {!posterFile && <p className="text-xs text-[var(--text-danger)] mt-2 font-semibold">⚠ Event poster is required</p>}
+              {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] mt-2 font-semibold">New poster: {posterFile.name}</span>}
+              {!posterFile && <p className="text-xs text-[var(--text-muted)] mt-2 font-semibold">No poster uploaded — default will be used if none is uploaded</p>}
             </div>
             <Input label="Estimated Budget (₹)" type="number" placeholder="e.g. 25000" {...register('budget')} />
             <Textarea label="Additional Comments" placeholder="Any other notes for the approvers…" {...register('comments')} rows={4} />

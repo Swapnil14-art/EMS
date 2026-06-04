@@ -518,11 +518,13 @@ export const approvalService = {
     return Array.isArray(res.data) ? res.data : (res.data?.data || []);
   },
 
-  // Fallback for all history if needed (admin/coordinator views) -- API may not have this specific endpoint right now
-  getAllHistory: async (): Promise<{data: EventApproval[], total: number}> => {
+  // Fallback for all history if needed (admin/coordinator views)
+  getAllHistory: async (page = 1, size = 20): Promise<{data: EventApproval[], total: number}> => {
     try {
-      const res = await api.get(`/approvals/history`);
-      return { data: res.data?.data || res.data || [], total: res.data?.total || 0 };
+      const res = await api.get('/approvals/history', { params: { page, size } });
+      const rawData = res.data?.data || res.data || [];
+      const data = Array.isArray(rawData) ? rawData.map((item: any) => ({ ...item, status: item.action || item.status })) : [];
+      return { data, total: res.data?.total || data.length };
     } catch {
       return { data: [], total: 0 };
     }
@@ -625,9 +627,19 @@ export const registrationService = {
 // API mapped from /reports endpoints
 
 export const reportService = {
-  // POST /reports/{event_id}/submit — submit post-event report
-  submit: async (eventId: number, data: EventReport) => {
-    const res = await api.post(`/reports/${eventId}/submit`, data);
+  // POST /reports/{event_id}/submit — submit structured post-event report (JSON)
+  submitReport: async (eventId: number, payload: object) => {
+    const res = await api.post(`/reports/${eventId}/submit`, payload);
+    return res.data;
+  },
+
+  // POST /reports/{event_id}/upload-flier — upload event flier (1 compulsory)
+  uploadFlier: async (eventId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post(`/reports/${eventId}/upload-flier`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return res.data;
   },
 
@@ -672,6 +684,12 @@ export const reportService = {
     const res = await api.post(`/reports/${eventId}/upload-doc`, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    return res.data;
+  },
+
+  // Kept for backward compatibility
+  submit: async (eventId: number, data: EventReport) => {
+    const res = await api.post(`/reports/${eventId}/submit`, data);
     return res.data;
   },
 };
