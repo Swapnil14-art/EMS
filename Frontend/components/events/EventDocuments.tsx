@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Trash2, FileText, Link as LinkIcon, Upload, ExternalLink, Download, CheckCircle2, ArrowLeft, Search } from 'lucide-react';
-import { eventService, resourceService, reportService } from '@/lib/services';
+import { eventService, resourceService, reportService, rndReportService } from '@/lib/services';
 import { Button, Input, Select, Modal, Alert, EmptyState } from '@/components/ui';
 import type { EventDocument, EventLink, Event } from '@/types';
 import toast from 'react-hot-toast';
@@ -35,17 +35,20 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
   const [linkForm, setLinkForm] = useState({ link_type: 'other', url: '', label: '' });
   const [submitting, setSubmitting] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
+  const [rndReportData, setRndReportData] = useState<any>(null);
 
   const [uploadingInternal, setUploadingInternal] = useState(false);
   const [uploadingPart, setUploadingPart] = useState(false);
   const [uploadingAttendance, setUploadingAttendance] = useState(false);
   const [uploadingReport, setUploadingReport] = useState(false);
+  const [uploadingRndReport, setUploadingRndReport] = useState(false);
   const [uploadedAttendancePath, setUploadedAttendancePath] = useState<string | null>(null);
 
   const internalInputRef = useRef<HTMLInputElement>(null);
   const partInputRef = useRef<HTMLInputElement>(null);
   const attendanceInputRef = useRef<HTMLInputElement>(null);
   const reportInputRef = useRef<HTMLInputElement>(null);
+  const rndReportInputRef = useRef<HTMLInputElement>(null);
 
   const fetchEvents = () => {
     eventService.list({ size: 50, manage_only: true }).then(r => setMyEvents(r.data || [])).catch(() => { });
@@ -62,10 +65,12 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
       resourceService.getDocs(selectedEventId),
       resourceService.getLinks(selectedEventId),
       reportService.get(selectedEventId).catch(() => null),
-    ]).then(([dRes, lRes, rRes]) => {
+      rndReportService.get(selectedEventId).catch(() => null),
+    ]).then(([dRes, lRes, rRes, rndRes]) => {
       setDocs(Array.isArray(dRes) ? dRes : []);
       setLinks(Array.isArray(lRes) ? lRes : []);
       setReportData(rRes);
+      setRndReportData(rndRes);
     })
       .catch(() => { }).finally(() => setLoading(false));
   };
@@ -441,6 +446,62 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                     Upload New Document
                   </Button>
                   <p className="text-[10px] text-[var(--text-muted)] mt-2">Replaces existing report.</p>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Final RnD Report */}
+            <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
+              <div className="flex items-start justify-between mb-4 pr-8">
+                <div>
+                  <h3 className="section-title">Final RnD Report</h3>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Final RnD report submitted/generated for this event.</p>
+                </div>
+                {rndReportData?.generated_report_path && (
+                  <CheckCircle2 className="w-5 h-5 text-green-500 absolute top-6 right-6" />
+                )}
+              </div>
+
+              {rndReportData?.generated_report_path && (
+                <div className="mb-4">
+                  <a
+                    href={`/api/admin/files/${rndReportData.generated_report_path.replace(/^\/+/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-secondary gap-2 w-full justify-center h-11"
+                  >
+                    <Download className="w-4 h-4" /> Download Current RnD Report
+                  </a>
+                </div>
+              )}
+
+              {!viewOnly && !rndReportData?.generated_report_path ? (
+                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-slate-200">
+                  No RnD report submitted yet. Go to <button onClick={() => router.push(`${basePath}/rnd-report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">RnD Report Tab</button> to submit.
+                </div>
+              ) : !viewOnly ? (
+                <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
+                  <input type="file" ref={rndReportInputRef} className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !selectedEventId) return;
+                    setUploadingRndReport(true);
+                    try {
+                      await rndReportService.uploadDoc(selectedEventId, file);
+                      toast.success('RnD Report updated successfully');
+                      fetchDocsAndLinks();
+                    } catch (err: any) { toast.error('Failed to upload'); }
+                    finally { setUploadingRndReport(false); if (rndReportInputRef.current) rndReportInputRef.current.value = ''; }
+                  }} accept=".pdf,.doc,.docx" />
+                  <Button
+                    variant="secondary"
+                    loading={uploadingRndReport}
+                    icon={<Upload className="w-4 h-4" />}
+                    onClick={() => rndReportInputRef.current?.click()}
+                    className="w-full justify-center h-11"
+                  >
+                    Upload New Document
+                  </Button>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-2">Replaces existing RnD report.</p>
                 </div>
               ) : null}
             </div>

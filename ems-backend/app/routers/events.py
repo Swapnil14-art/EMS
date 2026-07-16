@@ -139,7 +139,15 @@ async def list_events(
             dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
             dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
             
-            dept_matchers = [Event.club_id.in_(dept_clubs.scalar_subquery())]
+            # Include events where dept clubs are primary OR collaborating
+            collab_match = select(EventCollaboratingClub.event_id).where(
+                EventCollaboratingClub.club_id.in_(dept_clubs.scalar_subquery())
+            )
+            
+            dept_matchers = [
+                Event.club_id.in_(dept_clubs.scalar_subquery()),
+                Event.id.in_(collab_match.scalar_subquery()),
+            ]
             if dept_code:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_code}%"))
             if dept_name:
@@ -152,7 +160,14 @@ async def list_events(
             query = query.where(or_(*dept_matchers))
         else:
             query = query.where(or_(*conditions))
+    elif current_user.role == "additional":
+        from app.utils.additional_perms import has_perm
+        if not has_perm(current_user, "view_events"):
+            raise HTTPException(status_code=403, detail="Missing permission: view_events")
+        # Additional users see the same public events as students (no internal/draft access)
+        query = query.where(Event.status.in_(["approved", "ongoing", "completed", "archived"]))
     # director / super_admin see all — no additional filter
+
 
     # Optional filters
     now = datetime.now(timezone.utc)
@@ -324,15 +339,16 @@ async def get_event(
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from app.models.club import Club
     event = await db.get(
         Event, event_id,
         options=[
-            selectinload(Event.club),
+            selectinload(Event.club).selectinload(Club.coordinators),
             selectinload(Event.venue),
             selectinload(Event.venues),
             selectinload(Event.links),
             selectinload(Event.sponsors),
-            selectinload(Event.collaborating_clubs).selectinload(EventCollaboratingClub.club),
+            selectinload(Event.collaborating_clubs).selectinload(EventCollaboratingClub.club).selectinload(Club.coordinators),
             selectinload(Event.coordinators),
             selectinload(Event.documents),
             selectinload(Event.other_docs),
@@ -370,6 +386,15 @@ async def get_event(
             if not match:
                 raise HTTPException(status_code=403, detail="Access denied")
 
+    # Additional role visibility check
+    elif current_user.role == "additional":
+        from app.utils.additional_perms import has_perm
+        if not has_perm(current_user, "view_event_details"):
+            raise HTTPException(status_code=403, detail="Missing permission: view_event_details")
+        if event.status not in visible_statuses:
+            raise HTTPException(status_code=404, detail="Event not found")
+
+
     # ── Registration info ──
     reg_count_result = await db.execute(
         select(func.count(EventRegistration.id)).where(
@@ -401,6 +426,11 @@ async def get_event(
         "target_audience": event.target_audience,
         "is_club_event": event.is_club_event,
         "club_id": event.club_id,
+        "club": {
+            "id": event.club.id,
+            "name": event.club.name,
+            "coordinators": [{"id": u.id, "name": u.name, "email": u.email} for u in getattr(event.club, "coordinators", [])]
+        } if event.club else None,
         "is_collaborative": event.is_collaborative,
         "is_sponsored": event.is_sponsored,
         "start_datetime": event.start_datetime,
@@ -425,7 +455,7 @@ async def get_event(
                   for l in event.links],
         "sponsors": [{"id": s.id, "name": s.name, "logo_path": s.logo_path}
                      for s in event.sponsors],
-        "collaborating_clubs": [{"id": c.id, "club_id": c.club_id, "name": c.club.name if c.club else f"Club {c.club_id}"}
+        "collaborating_clubs": [{"id": c.id, "club_id": c.club_id, "name": c.club.name if c.club else f"Club {c.club_id}", "coordinators": [{"id": u.id, "email": u.email} for u in getattr(c.club, "coordinators", [])] if c.club else []}
                                  for c in event.collaborating_clubs],
     }
 
@@ -525,6 +555,17 @@ async def create_event(
         if reg_deadline.tzinfo is None:
             reg_deadline = reg_deadline.replace(tzinfo=timezone.utc)
 
+        import os
+        import random
+        random_poster_path = None
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        default_posters_dir = os.path.join(base_dir, "static", "default_posters")
+        if os.path.exists(default_posters_dir):
+            posters = [f for f in os.listdir(default_posters_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            if posters:
+                chosen = random.choice(posters)
+                random_poster_path = f"/api/static/default_posters/{chosen}"
+
         event = Event(
             title=body.title,
             event_type=body.event_type,
@@ -575,6 +616,7 @@ async def create_event(
             other_requirements=body.other_requirements,
             budget=body.budget,
             comments=body.comments,
+            poster_path=random_poster_path,
             created_by=current_user.id,
             status="draft",
         )
@@ -715,13 +757,27 @@ async def update_event(
                 db.add(EventVenue(event_id=event.id, venue_id=vid))
 
         # Status reset logic
+        is_collab = event.is_collaborative and event.collaborating_clubs
         if event.status == "draft":
             pass  # stays draft
         elif event.status in [
             "pending_associate_dean", "pending_coordinator_parallel",
             "pending_director", "suggested_changes",
         ]:
-            event.status = "pending_associate_dean"
+            # For collaborative events, restart from coordinator parallel approval
+            if is_collab:
+                from app.services.approval_service import clear_approval_records
+                await clear_approval_records(db, event.id)
+                event.status = "pending_coordinator_parallel"
+                # Re-notify all collaborative coordinators
+                from app.services.approval_service import _get_all_collab_coordinators
+                from app.services.email_service import notify_collab_chain_restarted
+                all_coords = await _get_all_collab_coordinators(db, event)
+                if all_coords:
+                    editor_name = current_user.name or current_user.email
+                    notify_collab_chain_restarted(event, all_coords, editor_name)
+            else:
+                event.status = "pending_associate_dean"
         elif post_director and not after_start:
             # Save snapshot for diff
             new_snap = take_event_snapshot(event)
@@ -732,8 +788,21 @@ async def update_event(
                 new_snapshot=new_snap,
             )
             db.add(history)
-            event.status = "pending_associate_dean"
             event.edit_count = (event.edit_count or 0) + 1
+
+            # For collaborative events, restart from coordinator parallel approval
+            if is_collab:
+                from app.services.approval_service import clear_approval_records
+                await clear_approval_records(db, event.id)
+                event.status = "pending_coordinator_parallel"
+                from app.services.approval_service import _get_all_collab_coordinators
+                from app.services.email_service import notify_collab_chain_restarted
+                all_coords = await _get_all_collab_coordinators(db, event)
+                if all_coords:
+                    editor_name = current_user.name or current_user.email
+                    notify_collab_chain_restarted(event, all_coords, editor_name)
+            else:
+                event.status = "pending_associate_dean"
 
             # Notify registered students
             from app.models.event_registration import EventRegistration
@@ -784,8 +853,20 @@ async def submit_event(
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
 
-        if event.created_by != current_user.id and current_user.role != "super_admin":
-            raise HTTPException(status_code=403, detail="Only the event creator can submit")
+        # For collaborative events, any collaborating coordinator can submit (co-creators)
+        if event.is_collaborative:
+            collab_club_ids = [c.club_id for c in (event.collaborating_clubs or [])]
+            is_involved = (
+                event.created_by == current_user.id
+                or event.club_id == current_user.club_id
+                or current_user.club_id in collab_club_ids
+                or current_user.role == "super_admin"
+            )
+            if not is_involved:
+                raise HTTPException(status_code=403, detail="Only involved coordinators can submit a collaborative event")
+        else:
+            if event.created_by != current_user.id and current_user.role != "super_admin":
+                raise HTTPException(status_code=403, detail="Only the event creator can submit")
 
         allowed_statuses = ["draft", "suggested_changes"]
         if event.status not in allowed_statuses:
@@ -942,12 +1023,20 @@ async def delete_event(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        # Load event with all relationships that might have files
+        # Load event with all relationships that might have files or need cascading
         event = await db.get(Event, event_id, options=[
             selectinload(Event.sponsors),
             selectinload(Event.documents),
             selectinload(Event.other_docs),
             selectinload(Event.report),
+            selectinload(Event.rnd_report),
+            selectinload(Event.collaborating_clubs),
+            selectinload(Event.venues_assoc),
+            selectinload(Event.approvals),
+            selectinload(Event.links),
+            selectinload(Event.registrations),
+            selectinload(Event.coordinators),
+            selectinload(Event.edit_history),
         ])
         if not event:
             raise HTTPException(status_code=404, detail="Event not found")
@@ -980,6 +1069,17 @@ async def delete_event(
             if event.report.generated_report_path:
                 delete_file(event.report.generated_report_path)
 
+        if event.rnd_report:
+            if event.rnd_report.attendance_doc_path:
+                delete_file(event.rnd_report.attendance_doc_path)
+            if event.rnd_report.generated_report_path:
+                delete_file(event.rnd_report.generated_report_path)
+
+        # Remove email notifications associated with this event first to prevent FK violation
+        from sqlalchemy import delete
+        from app.models.email_notification import EmailNotification
+        await db.execute(delete(EmailNotification).where(EmailNotification.event_id == event.id))
+
         # Deleting event will trigger cascades in the DB/ORM
         await db.delete(event)
         await db.commit()
@@ -999,10 +1099,20 @@ async def upload_poster(
     current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    event = await db.get(Event, event_id)
+    event = await db.get(Event, event_id, options=[
+        selectinload(Event.collaborating_clubs),
+    ])
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.created_by != current_user.id and current_user.role != "super_admin":
+    
+    # Allow creator, super_admin, or any collaborating coordinator
+    collab_club_ids = [c.club_id for c in (event.collaborating_clubs or [])]
+    if (
+        event.created_by != current_user.id
+        and current_user.role != "super_admin"
+        and current_user.club_id not in collab_club_ids
+        and current_user.club_id != event.club_id
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     path = await save_file(file, event_id, "poster", file_type="poster")
@@ -1042,10 +1152,21 @@ async def upload_sponsor_doc(
     current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    event = await db.get(Event, event_id, options=[selectinload(Event.sponsors)])
+    event = await db.get(Event, event_id, options=[
+        selectinload(Event.sponsors),
+        selectinload(Event.collaborating_clubs),
+    ])
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.created_by != current_user.id and current_user.role != "super_admin":
+    
+    # Allow creator, super_admin, or any collaborating coordinator
+    collab_club_ids = [c.club_id for c in (event.collaborating_clubs or [])]
+    if (
+        event.created_by != current_user.id
+        and current_user.role != "super_admin"
+        and current_user.club_id not in collab_club_ids
+        and current_user.club_id != event.club_id
+    ):
         raise HTTPException(status_code=403, detail="Access denied")
 
     path = await save_file(file, event_id, "sponsor", file_type="document")

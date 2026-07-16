@@ -46,12 +46,13 @@ export default function ClubCoordinatorDashboard() {
           <StatCard title="Pending Approvals" value={pendingCount} icon={<Bell className="w-6 h-6"/>} color="red"/>
         </>}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {[
           {label:'Browse Events',href:'/events',icon:<Search className="w-5 h-5"/>,color:'text-indigo-600 bg-indigo-50'},
           {label:'Create Event',href:'/club_coordinator/events/create',icon:<PlusCircle className="w-5 h-5"/>,color:'text-[rgb(var(--color-primary))] bg-[var(--card-bg)]'},
           {label:'Documents',href:'/club_coordinator/documents',icon:<Edit className="w-5 h-5"/>,color:'text-[var(--text-secondary)] bg-[var(--card-bg)]'},
           {label:'Submit Report',href:'/club_coordinator/report',icon:<MapPin className="w-5 h-5"/>,color:'text-amber-600 bg-amber-50'},
+          {label:'RnD Report',href:'/club_coordinator/rnd-report',icon:<MapPin className="w-5 h-5"/>,color:'text-rose-600 bg-rose-50'},
         ].map(q=>(
           <Link key={q.href} href={q.href} className="card-hover p-4 flex flex-col items-center gap-2 text-center group">
             <div className={"w-10 h-10 rounded-2xl flex items-center justify-center "+q.color}>{q.icon}</div>

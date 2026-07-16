@@ -109,3 +109,28 @@ def require_roles(*roles: str):
         return current_user
 
     return role_checker
+
+
+def require_permission(perm: str):
+    """
+    Permission guard for 'additional' role users.
+    Also allows super_admin and any fixed role that is explicitly listed via require_roles.
+    Usage: Depends(require_permission("view_reports"))
+    """
+    from app.utils.additional_perms import has_perm
+
+    async def checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.is_first_login or not current_user.name:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Complete your profile before accessing this resource.",
+            )
+        if not has_perm(current_user, perm):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing permission: {perm}",
+            )
+        return current_user
+
+    return checker
+

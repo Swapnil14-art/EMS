@@ -29,7 +29,8 @@ const schema = z.object({
   school_department: z.string().min(1, 'School required'),
   event_incharge_name: z.string().min(2, 'Incharge name required'),
   event_incharge_contact: z.string().min(10, 'Valid contact required'),
-  target_audience: z.string().min(1, 'Select audience'),
+  target_audience: z.string().optional(),
+  departments_involved: z.array(z.string()).min(1, 'Select at least one department'),
   is_club_event: z.boolean(),
   is_collaborative: z.boolean(),
   is_sponsored: z.boolean(),
@@ -130,11 +131,11 @@ const EVENT_TYPES = [
   { value: 'workshop', label: 'Workshop' }, { value: 'hackathon', label: 'Hackathon' },
   { value: 'awareness', label: 'Awareness' }, { value: 'other', label: 'Other' },
 ];
-const AUDIENCES = [
-  { value: 'college_wide', label: 'College-wide' },
-  { value: 'engineering', label: 'Engineering' },
+const DEPARTMENTS_INVOLVED_OPTIONS = [
   { value: 'agriculture', label: 'Agriculture' },
-  { value: 'pharma', label: 'Pharma' },
+  { value: 'engineering', label: 'Engineering' },
+  { value: 'pharmacy', label: 'Pharmacy' },
+  { value: 'college_wide', label: 'College Wide' },
 ];
 
 // Helper to format date strings for input type="datetime-local"
@@ -194,6 +195,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
           school_department: ev.school_department || '',
           event_incharge_name: ev.event_incharge_name || '',
           event_incharge_contact: ev.event_incharge_contact || '',
+          departments_involved: ev.target_audience ? ev.target_audience.split(',').map((s: string) => s.trim()) : [],
           target_audience: ev.target_audience || '',
           is_club_event: !!ev.is_club_event,
           is_collaborative: !!ev.is_collaborative,
@@ -250,7 +252,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
   const watchDecoration = watch('decoration');
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
-    1: ['title', 'event_type', 'school_department', 'event_incharge_name', 'event_incharge_contact', 'target_audience', 'objectives'],
+    1: ['title', 'event_type', 'school_department', 'event_incharge_name', 'event_incharge_contact', 'departments_involved', 'objectives'],
     2: ['start_datetime', 'end_datetime'],
     3: [], 4: [], 5: [], 6: [], 7: [],
   };
@@ -265,10 +267,6 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
   };
 
   const openTermsModal = (data: FormData) => {
-    if (!posterFile && !existingPoster) {
-      toast.error("An Event Poster is required before submitting or saving changes.");
-      return;
-    }
     if (!window.confirm("WARNING: Saving these changes will reset the event's approval status and it will need to go through the approval chain again. Are you sure?")) {
       return;
     }
@@ -283,10 +281,10 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
       // Send the form data through — mapEventToApi handles cleanup
       const payload = {
         ...bufferedData,
+        target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
         event_type: bufferedData.event_type,
-        target_audience: bufferedData.target_audience,
         venue_custom: bufferedData.venue_type === 'Other' ? bufferedData.venue_custom : null,
         venue_id: bufferedData.venue_type !== 'Other' ? bufferedData.venue_id : null,
         seating_other_detail: bufferedData.seating_arrangement === 'Other' ? bufferedData.seating_other_detail : null,
@@ -359,10 +357,33 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
               <Controller name="event_type" control={control} render={({ field }) => (
                 <Select label="Event Type" options={EVENT_TYPES} placeholder="Select type" error={errors.event_type?.message} {...field} />
               )} />
-              <Controller name="target_audience" control={control} render={({ field }) => (
-                <Select label="Target Audience" options={AUDIENCES} placeholder="Select audience" error={errors.target_audience?.message} {...field} />
-              )} />
             </div>
+            
+            <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Departments Involved <span className="text-[var(--text-danger)]">*</span></p>
+              <Controller name="departments_involved" control={control} render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {DEPARTMENTS_INVOLVED_OPTIONS.map(d => {
+                    const selected = field.value?.includes(d.value);
+                    return (
+                      <button
+                        key={d.value} type="button"
+                        onClick={() => {
+                          const curr = field.value || [];
+                          if (selected) field.onChange(curr.filter((n: string) => n !== d.value));
+                          else field.onChange([...curr, d.value]);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-100'} border`}
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )} />
+              {errors.departments_involved && <p className="text-xs text-[var(--text-danger)]">{errors.departments_involved.message}</p>}
+            </div>
+
             <Input label="School" placeholder="e.g. School of Engineering" error={errors.school_department?.message} {...register('school_department')} />
             <div className="grid grid-cols-2 gap-4">
               <Input label="Event Incharge Name" placeholder="Full name" error={errors.event_incharge_name?.message} {...register('event_incharge_name')} />
@@ -554,18 +575,18 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><FileText className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Event Poster & Budget</h2>
             <Alert type="info">
-              <span>An event poster is <strong>required</strong>. Participant docs and other files can be added later.</span>
+              <span>An event poster is optional but recommended. Participant docs and other files can be added later.</span>
             </Alert>
-            <div className={`p-4 bg-[var(--page-bg)] rounded-xl border-2 border-dashed ${!posterFile && !existingPoster ? 'border-red-400' : 'border-[var(--card-border)]'} flex flex-col items-center justify-center text-center`}>
+            <div className={`p-4 bg-[var(--page-bg)] rounded-xl border-2 border-dashed border-[var(--card-border)] flex flex-col items-center justify-center text-center`}>
               <input type="file" ref={posterRef} className="hidden" accept="image/*" onChange={(e) => {
                 if (e.target.files && e.target.files[0]) setPosterFile(e.target.files[0]);
               }} />
               <Button type="button" variant="secondary" onClick={() => posterRef.current?.click()} icon={<FileText className="w-4 h-4" />}>
-                {existingPoster ? 'Replace Event Poster' : 'Upload Event Poster'} <span className="text-[var(--text-danger)]">*</span>
+                {existingPoster ? 'Replace Event Poster' : 'Upload Event Poster'}
               </Button>
               {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] mt-2 font-semibold">New poster: {posterFile.name}</span>}
               {!posterFile && existingPoster && <span className="text-xs text-emerald-600 mt-2 font-semibold">✓ Existing poster on file</span>}
-              {!posterFile && !existingPoster && <p className="text-xs text-[var(--text-danger)] mt-2 font-semibold">⚠ Event poster is required to save changes</p>}
+              {!posterFile && !existingPoster && <p className="text-xs text-[var(--text-muted)] mt-2 font-semibold">No poster uploaded — default will be used if none is uploaded</p>}
             </div>
             <Input label="Estimated Budget (₹)" type="number" placeholder="e.g. 25000" {...register('budget')} />
             <Textarea label="Additional Comments" placeholder="Any other notes for the approvers…" {...register('comments')} rows={4} />

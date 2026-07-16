@@ -17,6 +17,7 @@ const ROLES: { value: string; label: string }[] = [
   { value: 'associate_dean', label: 'Associate Dean' },
   { value: 'club_coordinator', label: 'Club Coordinator' },
   { value: 'student', label: 'Student' },
+  { value: 'additional', label: 'Additional' },
 ];
 
 const YEARS = [

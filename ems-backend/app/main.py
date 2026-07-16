@@ -11,8 +11,8 @@ from app.auth.router import router as auth_router
 from app.routers import (
     users, departments, clubs, venues,
     events, approvals, registrations,
-    reports, dashboard, admin,
-    system, notifications,
+    reports, rnd_reports, dashboard, admin,
+    system, notifications, permissions,
 )
 
 limiter = Limiter(key_func=get_remote_address)
@@ -49,7 +49,10 @@ def create_app() -> FastAPI:
 
     # Static file serving
     os.makedirs(settings.STORAGE_ROOT, exist_ok=True)
+    static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    os.makedirs(static_dir, exist_ok=True)
     app.mount("/uploads", StaticFiles(directory=settings.STORAGE_ROOT), name="uploads")
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     # Routers
     app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
@@ -61,10 +64,12 @@ def create_app() -> FastAPI:
     app.include_router(approvals.router, prefix="/approvals", tags=["Approvals"])
     app.include_router(registrations.router, prefix="/registrations", tags=["Registrations"])
     app.include_router(reports.router, prefix="/reports", tags=["Reports"])
+    app.include_router(rnd_reports.router, prefix="/rnd-reports", tags=["RnD Reports"])
     app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
     app.include_router(admin.router, prefix="/admin", tags=["Admin"])
     app.include_router(system.router, prefix="/system", tags=["System Settings"])
     app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+    app.include_router(permissions.router, prefix="/permissions", tags=["Permissions"])
 
     @app.get("/health", tags=["Health"])
     async def health_check():

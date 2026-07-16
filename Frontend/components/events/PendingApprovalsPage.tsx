@@ -13,10 +13,6 @@ import toast from 'react-hot-toast';
 export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: boolean } = {}) {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [action, setAction] = useState<'approve' | 'reject' | 'suggest_changes' | null>(null);
-  const [remarks, setRemarks] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
   const fetchPending = async () => {
     setLoading(true);
@@ -28,41 +24,6 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
   };
 
   useEffect(() => { fetchPending(); }, []);
-
-  const openAction = (event: Event, act: 'approve' | 'reject' | 'suggest_changes') => {
-    setSelectedEvent(event);
-    setAction(act);
-    setRemarks('');
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedEvent || !action) return;
-    if (action === 'reject' && !remarks.trim()) {
-      toast.error('Rejection reason is mandatory');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      // API mapped from POST /approvals/{event_id}/action
-      if (action === 'approve') {
-        await approvalService.approve(selectedEvent.id, remarks || undefined);
-        toast.success('Event approved successfully');
-      } else if (action === 'reject') {
-        await approvalService.reject(selectedEvent.id, remarks);
-        toast.success('Event rejected');
-      } else if (action === 'suggest_changes') {
-        await approvalService.suggestChanges(selectedEvent.id, remarks);
-        toast.success('Changes suggested to coordinator');
-      }
-      setSelectedEvent(null);
-      setAction(null);
-      await fetchPending();
-    } catch (err: any) {
-      toast.error(extractApiError(err, 'Action failed'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -126,7 +87,7 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
                   )}
                 </div>
 
-                {/* Actions */}
+                {/* Action — redirect to event details for review */}
                 <div className="flex gap-2 flex-shrink-0">
                   <Link href={`/events/${event.id}`}>
                     <Button variant="primary" size="sm">Review & Approve Details →</Button>
@@ -137,48 +98,7 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
           ))}
         </div>
       )}
-
-      {/* Approve / Reject Modal */}
-      <Modal
-        open={!!selectedEvent && !!action}
-        onClose={() => { setSelectedEvent(null); setAction(null); }}
-        title={action === 'approve' ? '✅ Approve Event' : action === 'reject' ? '❌ Reject Event' : '💬 Suggest Changes'}
-        size="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => { setSelectedEvent(null); setAction(null); }}>Cancel</Button>
-            <Button
-              variant={action === 'approve' ? 'primary' : 'danger'}
-              loading={submitting}
-              onClick={handleSubmit}
-            >
-              Confirm {action === 'approve' ? 'Approval' : action === 'reject' ? 'Rejection' : 'Suggestion'}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <div className="p-4 bg-[var(--page-bg)] rounded-xl">
-            <p className="font-semibold text-[var(--text-primary)]">{selectedEvent?.title}</p>
-            <p className="text-sm text-[var(--text-muted)] mt-0.5">{selectedEvent && formatDate(selectedEvent.start_datetime)}</p>
-          </div>
-
-          {action === 'reject' && (
-            <Alert type="warning">
-              <AlertTriangle className="w-4 h-4" />
-              <span>Rejection reason is <strong>mandatory</strong> and will be shared with the organizer.</span>
-            </Alert>
-          )}
-
-          <Textarea
-            label={action === 'approve' ? 'Remarks (optional)' : 'Reason for Rejection (required)'}
-            placeholder={action === 'approve' ? 'Add any notes for the organizer…' : 'Explain why this event is being rejected…'}
-            rows={4}
-            value={remarks}
-            onChange={e => setRemarks(e.target.value)}
-          />
-        </div>
-      </Modal>
     </div>
   );
 }
+

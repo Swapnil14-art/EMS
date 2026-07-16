@@ -4,15 +4,20 @@ services:
   frontend:
     build:
       context: ./Frontend
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
-        NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-EMS}
-        NEXT_PUBLIC_COLLEGE_NAME: ${NEXT_PUBLIC_COLLEGE_NAME:-NMIMS Shirpur}
+      target: deps
     container_name: ems_frontend
     restart: unless-stopped
+    command: npx next dev
+    working_dir: /app
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}
+      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-EMS}
+      - NEXT_PUBLIC_COLLEGE_NAME=${NEXT_PUBLIC_COLLEGE_NAME:-NMIMS Shirpur}
+      - NEXT_TELEMETRY_DISABLED=1
+    volumes:
+      - ./Frontend:/app
+      - /app/node_modules
     depends_on:
       - backend
     networks:

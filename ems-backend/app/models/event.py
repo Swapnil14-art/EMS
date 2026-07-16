@@ -80,7 +80,7 @@ class Event(Base):
     participant_doc_path = Column(Text, nullable=True)
 
     # Tracking
-    status = Column(String(60), nullable=False, default="draft")
+    status = Column(String(60), nullable=False, default="draft", index=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     responsible_coordinator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     current_approval_step = Column(Integer, nullable=False, default=1)
@@ -108,6 +108,7 @@ class Event(Base):
     coordinators = relationship("EventCoordinator", back_populates="event", cascade="all, delete-orphan")
     edit_history = relationship("EventEditHistory", back_populates="event", cascade="all, delete-orphan")
     report = relationship("EventReport", back_populates="event", uselist=False, cascade="all, delete-orphan")
+    rnd_report = relationship("EventRndReport", back_populates="event", uselist=False, cascade="all, delete-orphan")
 
 class EventVenue(Base):
     __tablename__ = "event_venues"

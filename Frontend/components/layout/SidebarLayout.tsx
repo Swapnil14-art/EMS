@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, BookOpen, Calendar, MapPin, Mail, Settings,
   Bell, BarChart3, Shield, ChevronLeft, ChevronRight, LogOut, KeyRound,
-  ChevronDown, GraduationCap, Building2, SlidersHorizontal, Home, Menu, X
+  ChevronDown, GraduationCap, Building2, SlidersHorizontal, Home, Menu, X,
+  Eye, FileText, FlaskConical, ShieldCheck
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { authService } from '@/lib/services';
@@ -25,6 +26,7 @@ const NAV_MAP: Record<string, NavItem[]> = {
     { label: 'Schools', href: '/admin/departments', icon: <Building2 className="w-4.5 h-4.5" /> },
     { label: 'Events', href: '/admin/events', icon: <Calendar className="w-4.5 h-4.5" /> },
     { label: 'Venues', href: '/admin/venues', icon: <MapPin className="w-4.5 h-4.5" /> },
+    { label: 'Permissions', href: '/admin/permissions', icon: <ShieldCheck className="w-4.5 h-4.5" /> },
     { label: 'Email Log', href: '/admin/email-log', icon: <Mail className="w-4.5 h-4.5" /> },
     { label: 'System Controls', href: '/admin/system-controls', icon: <SlidersHorizontal className="w-4.5 h-4.5" /> },
     { label: 'Settings', href: '/admin/settings', icon: <Settings className="w-4.5 h-4.5" /> },
@@ -52,6 +54,7 @@ const NAV_MAP: Record<string, NavItem[]> = {
     { label: 'Create Event', href: '/club_coordinator/events/create', icon: <Calendar className="w-4.5 h-4.5" /> },
     { label: 'Documents', href: '/club_coordinator/documents', icon: <BookOpen className="w-4.5 h-4.5" /> },
     { label: 'Report', href: '/club_coordinator/report', icon: <BarChart3 className="w-4.5 h-4.5" /> },
+    { label: 'RnD Report', href: '/club_coordinator/rnd-report', icon: <BarChart3 className="w-4.5 h-4.5" /> },
   ],
   student: [
     { label: 'Dashboard', href: '/student', icon: <LayoutDashboard className="w-4.5 h-4.5" /> },
@@ -61,7 +64,27 @@ const NAV_MAP: Record<string, NavItem[]> = {
   ],
 };
 
-const DASHBOARD_ROOTS = ['/admin', '/student', '/club_coordinator', '/director', '/associate_dean'];
+const DASHBOARD_ROOTS = ['/admin', '/student', '/club_coordinator', '/director', '/associate_dean', '/additional'];
+
+// Build dynamic nav for 'additional' role based on their permissions
+function buildAdditionalNav(perms: string[]): NavItem[] {
+  const items: NavItem[] = [
+    { label: 'Dashboard', href: '/additional', icon: <LayoutDashboard className="w-4.5 h-4.5" /> },
+  ];
+  if (perms.includes('view_events') || perms.includes('view_event_details')) {
+    items.push({ label: 'Events', href: '/additional/events', icon: <Calendar className="w-4.5 h-4.5" /> });
+  }
+  if (perms.includes('view_reports') || perms.includes('submit_reports')) {
+    items.push({ label: 'Reports', href: '/additional/reports', icon: <FileText className="w-4.5 h-4.5" /> });
+  }
+  if (perms.includes('view_rnd_reports') || perms.includes('submit_rnd_reports')) {
+    items.push({ label: 'RnD Reports', href: '/additional/rnd-reports', icon: <FlaskConical className="w-4.5 h-4.5" /> });
+  }
+  if (perms.includes('manage_permissions')) {
+    items.push({ label: 'Permissions', href: '/additional/permissions', icon: <ShieldCheck className="w-4.5 h-4.5" /> });
+  }
+  return items;
+}
 
 interface SidebarLayoutProps { children: React.ReactNode; }
 
@@ -86,7 +109,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
 
   if (!user) return null;
 
-  const userNavItems = NAV_MAP[user.role] || [];
+  const userNavItems = user.role === 'additional'
+    ? buildAdditionalNav(user.extra_permissions ?? [])
+    : (NAV_MAP[user.role] || []);
   const navItems: NavItem[] = [
     { label: 'Home', href: '/', icon: <Home className="w-4.5 h-4.5" /> },
     ...userNavItems

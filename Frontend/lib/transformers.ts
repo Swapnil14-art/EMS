@@ -29,6 +29,7 @@ export function mapUserFromApi(apiUser: any): User {
     phone_number: apiUser.phone_number,
     is_club_coordinator_requested: apiUser.is_club_coordinator_requested,
     club_name: apiUser.club_name,
+    extra_permissions: apiUser.extra_permissions || [],
     // Derived convenience fields
     is_active: (apiUser.status || 'active') === 'active',
     force_password_change: apiUser.is_first_login ?? apiUser.force_password_change ?? false,

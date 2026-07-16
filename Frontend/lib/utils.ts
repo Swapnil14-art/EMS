@@ -89,6 +89,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   associate_dean:   'Associate Dean',
   club_coordinator: 'Club Coordinator',
   student:          'Student',
+  additional:       'Additional',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
@@ -97,6 +98,7 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   associate_dean:   'bg-[rgb(var(--btn-primary-bg)/0.1)] text-[rgb(var(--color-primary))]',
   club_coordinator: 'bg-amber-100 text-amber-800',
   student:          'bg-gray-100 text-gray-700',
+  additional:       'bg-violet-100 text-violet-800',
 };
 
 // ─── Role dashboard routes ────────────────────────────────────────────────────
@@ -107,6 +109,7 @@ export const ROLE_DASHBOARD: Record<UserRole, string> = {
   associate_dean:   '/associate_dean',
   club_coordinator: '/club_coordinator',
   student:          '/student',
+  additional:       '/additional',
 };
 
 // ─── Event type display ───────────────────────────────────────────────────────

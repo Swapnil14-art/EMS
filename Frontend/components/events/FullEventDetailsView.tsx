@@ -24,6 +24,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
   const [loadingRegs, setLoadingRegs] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [reportData, setReportData] = useState<any>(null);
+  const [rndReportData, setRndReportData] = useState<any>(null);
 
   const [isPendingAction, setIsPendingAction] = useState(false);
   const [action, setAction] = useState<'approve' | 'reject' | 'suggest_changes' | null>(null);
@@ -42,6 +43,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
     // Fetch report to get attendance document
     import('@/lib/services').then(mod => {
       mod.reportService.get(event.id).then(setReportData).catch(() => { });
+      mod.rndReportService.get(event.id).then(setRndReportData).catch(() => { });
     });
 
     if (user?.role === 'director' || user?.role === 'associate_dean' || user?.role === 'club_coordinator') {
@@ -150,7 +152,8 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             <Field label="Target Audience" value={event.target_audience} />
             <Field label="Event Incharge" value={event.event_incharge_name} />
             <Field label="Contact" value={event.event_incharge_contact} />
-            {event.is_club_event && event.club?.name && <Field label="Club" value={event.club.name} />}
+            {event.is_club_event && event.club?.name && <Field label="Organizing Club" value={event.club.name} />}
+            {event.is_club_event && event.club?.coordinators && event.club.coordinators.length > 0 && <Field label="Club Coordinator Email" value={event.club.coordinators.map((c: any) => c.email).join(', ')} />}
             <Field label="Est. Budget" value={event.budget ? `₹ ${event.budget.toLocaleString()}` : undefined} />
           </div>
         </div>
@@ -237,7 +240,12 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                   <div className="flex flex-wrap gap-2 mt-1">
                     {(event as any).collaborating_clubs && (event as any).collaborating_clubs.length > 0 ? (
                       (event as any).collaborating_clubs.map((c: any) => (
-                        <span key={c.id} className="badge bg-indigo-50 text-indigo-700 border border-indigo-100">{c.name}</span>
+                        <span key={c.id} className="inline-flex flex-col items-start badge bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg">
+                          <span className="font-bold">{c.name}</span>
+                          {c.coordinators && c.coordinators.length > 0 && (
+                            <span className="text-xs font-medium opacity-80 mt-0.5">{c.coordinators.map((coord: any) => coord.email).join(', ')}</span>
+                          )}
+                        </span>
                       ))
                     ) : (
                       <span className="text-sm text-gray-500 font-medium">None specified</span>
@@ -335,6 +343,27 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                   <div>
                     <p className="font-semibold text-[var(--text-primary)]">Post-Event Report</p>
                     <p className="text-xs text-[var(--text-muted)]">Downloadable final event report</p>
+                  </div>
+                </a>
+              );
+            })()}
+
+            {(() => {
+              const path = rndReportData?.generated_report_path;
+              if (!path) return null;
+              return (
+                <a 
+                  href={`/api/admin/files/${path.replace(/^\/+/, '')}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center gap-3 p-4 bg-white border border-[var(--card-border)] rounded-2xl hover:border-[rgb(var(--color-primary))] transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-[rgb(var(--color-primary))]/10 flex items-center justify-center text-[rgb(var(--color-primary))] group-hover:scale-110 transition-transform">
+                    <Download className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[var(--text-primary)]">RnD Report</p>
+                    <p className="text-xs text-[var(--text-muted)]">Downloadable RnD report</p>
                   </div>
                 </a>
               );

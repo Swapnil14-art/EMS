@@ -50,7 +50,7 @@ async def serve_file(
             raise HTTPException(status_code=403, detail="Access denied")
 
     # Report docs — staff only
-    if "/report/" in path_lower and path_lower.endswith(".docx"):
+    if ("/report/" in path_lower or "/rnd_report/" in path_lower) and path_lower.endswith(".docx"):
         if not current_user or not can_view_internal_docs(current_user):
             raise HTTPException(status_code=403, detail="Access denied")
 
