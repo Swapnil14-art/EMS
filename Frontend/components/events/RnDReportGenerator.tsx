@@ -40,6 +40,8 @@ interface GuestSpeaker {
   designation: string;
   organization: string;
   expertise: string;
+  speaker_type?: string;
+  custom_speaker_type?: string;
 }
 
 interface SocialLinks {
@@ -47,6 +49,7 @@ interface SocialLinks {
   instagram: string;
   x: string;
   linkedin: string;
+  preserve_aspect_ratio?: boolean;
 }
 
 interface CompetitionWinner {
@@ -94,8 +97,15 @@ const PROGRAM_TYPES = [
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-const emptySpeaker = (): GuestSpeaker => ({ name: '', designation: '', organization: '', expertise: '' });
-const emptyLinks = (): SocialLinks => ({ facebook: '', instagram: '', x: '', linkedin: '' });
+const emptySpeaker = (): GuestSpeaker => ({
+  name: '',
+  designation: '',
+  organization: '',
+  expertise: '',
+  speaker_type: 'Guest Speaker',
+  custom_speaker_type: '',
+});
+const emptyLinks = (): SocialLinks => ({ facebook: '', instagram: '', x: '', linkedin: '', preserve_aspect_ratio: false });
 
 // ─── Small UI helpers ─────────────────────────────────────────────────────────
 
@@ -203,6 +213,33 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
   const [competitions, setCompetitions] = useState<CompetitionWinner[]>([
     { game: '', studentWinners: [''], facultyWinners: [''] }
   ]);
+  const [preserveAspectRatio, setPreserveAspectRatio] = useState(false);
+
+  const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const dims = { width: img.naturalWidth, height: img.naturalHeight };
+        URL.revokeObjectURL(img.src);
+        resolve(dims);
+      };
+      img.onerror = () => {
+        resolve({ width: 400, height: 300 });
+      };
+    });
+  };
+
+  const scaleDimensions = (origW: number, origH: number, maxW: number, maxH: number) => {
+    let w = origW;
+    let h = origH;
+    if (w > maxW || h > maxH) {
+      const ratio = Math.min(maxW / w, maxH / h);
+      w = w * ratio;
+      h = h * ratio;
+    }
+    return { width: Math.round(w), height: Math.round(h) };
+  };
 
   // ── File state ─────────────────────────────────────────────────────────────
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
@@ -342,7 +379,7 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
     guest_speakers: speakers.filter(s => s.name),
     faculty_coordinators: facultyCoordinators.filter(Boolean),
     student_coordinators: studentCoordinators.filter(Boolean),
-    social_pamphlet: Object.values(socialPamphlet).some(Boolean) ? socialPamphlet : null,
+    social_pamphlet: { ...socialPamphlet, preserve_aspect_ratio: preserveAspectRatio },
     social_video: Object.values(socialVideo).some(Boolean) ? socialVideo : null,
     speaker_background: speakerBackground || null,
     session_report: sessionReport || null,
@@ -399,6 +436,22 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
     const photoTypes = photos.map(p => getImageType(p.file));
     const flierBuf = flier ? await fileToArrayBuffer(flier.file) : null;
     const flierType = flier ? getImageType(flier.file) : 'jpg';
+
+    let flierDims = { width: 400, height: 300 };
+    if (preserveAspectRatio && flier) {
+      const dims = await getImageDimensions(flier.file);
+      flierDims = scaleDimensions(dims.width, dims.height, 400, 300);
+    }
+
+    const photoDims = await Promise.all(
+      photos.map(async (p) => {
+        if (preserveAspectRatio) {
+          const dims = await getImageDimensions(p.file);
+          return scaleDimensions(dims.width, dims.height, 540, 360);
+        }
+        return { width: 540, height: 360 };
+      })
+    );
 
     const thinBorder = {
       top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
@@ -461,9 +514,9 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
 
     // Social links block helper
     const socialBlock = (links: SocialLinks) => {
-      const platformOrder: (keyof SocialLinks)[] = ['facebook', 'instagram', 'x', 'linkedin'];
+      const platformOrder: ('facebook' | 'instagram' | 'x' | 'linkedin')[] = ['facebook', 'instagram', 'x', 'linkedin'];
       const items = platformOrder
-        .map((platform): [keyof SocialLinks, string] => [platform, links[platform]])
+        .map((platform): ['facebook' | 'instagram' | 'x' | 'linkedin', string] => [platform, links[platform] as string])
         .filter(([, v]) => v);
       
       return items.map(([platform, url], index) =>
@@ -497,148 +550,179 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
 
       spacer(),
 
-      // ── Event Details ─────────────────────────────────────────────────
-      h2('Event Details'),
-      field('Event Title', event.title),
-      field('Program Type', programType || 'N/A'),
-      field('Department', event.school_department || 'N/A'),
+      // ── Guest Speaker(s) ──────────────────────────────────────────────────
+      ...(speakers.filter(s => s.name).length > 0 ? [
+        new Paragraph({
+          children: [new TextRun({ text: 'Name and designation of the Guest Speakers/ Judges/ Mentors etc.:', bold: true, size: 24, font: 'Times New Roman' })],
+          spacing: { before: 120, after: 60 },
+        }),
+        ...speakers.filter(s => s.name).flatMap((spk) => {
+          let spkType = spk.speaker_type || 'Guest Speaker';
+          if (spkType === 'Others') {
+            spkType = spk.custom_speaker_type || 'Others';
+          }
+          return [
+            new Paragraph({
+              children: [new TextRun({ text: `${spkType}:`, bold: true, size: 24, font: 'Times New Roman' })],
+              indent: { left: 720 },
+              spacing: { before: 60, after: 40 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Name: ', bold: true, size: 24, font: 'Times New Roman' }),
+                new TextRun({ text: spk.name, size: 24, font: 'Times New Roman' }),
+              ],
+              indent: { left: 1080 },
+              spacing: { after: 40 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Designation: ', bold: true, size: 24, font: 'Times New Roman' }),
+                new TextRun({ text: spk.designation || 'N/A', size: 24, font: 'Times New Roman' }),
+              ],
+              indent: { left: 1080 },
+              spacing: { after: 40 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Organization: ', bold: true, size: 24, font: 'Times New Roman' }),
+                new TextRun({ text: spk.organization || 'N/A', size: 24, font: 'Times New Roman' }),
+              ],
+              indent: { left: 1080 },
+              spacing: { after: 40 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: 'Area of Expertise: ', bold: true, size: 24, font: 'Times New Roman' }),
+                new TextRun({ text: spk.expertise || 'N/A', size: 24, font: 'Times New Roman' }),
+              ],
+              indent: { left: 1080 },
+              spacing: { after: 40 },
+            }),
+            spacer(),
+          ];
+        })
+      ] : [
+        new Paragraph({
+          children: [
+            new TextRun({ text: 'Name and designation of the Guest Speakers/ Judges/ Mentors etc.: ', bold: true, size: 24, font: 'Times New Roman' }),
+            new TextRun({ text: 'N/A', size: 24, font: 'Times New Roman' }),
+          ],
+          spacing: { before: 120, after: 60 },
+        }),
+        spacer(),
+      ]),
+
+      // ── Venue & Dates ─────────────────────────────────────────────────────
       field('Venue', event.venue?.name || event.venue_custom || 'N/A'),
       field('Start Date', formatDateTime(event.start_datetime).split(',')[0]),
       field('End Date', formatDateTime(event.end_datetime).split(',')[0]),
       field('Time', `${formatDateTime(event.start_datetime)} – ${formatDateTime(event.end_datetime)}`),
       field('Duration (hrs)', String(durationHrs)),
-      field('Mode of Delivery', modeOfDelivery ? modeOfDelivery.charAt(0).toUpperCase() + modeOfDelivery.slice(1) : 'N/A'),
-
+      field('Department', event.school_department || 'N/A'),
+      field('Organizing Club', event.club?.name || 'Non-Club Event'),
       spacer(),
 
-      // ── Guest Speakers ────────────────────────────────────────────────
-      h2('Guest Speaker(s)'),
-      ...speakers.filter(s => s.name).flatMap((spk, i) => [
-        ...(speakers.filter(s => s.name).length > 1
-          ? [new Paragraph({ children: [new TextRun({ text: `Speaker ${i + 1}`, bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } })]
-          : []),
-        field('Name', spk.name),
-        field('Designation', spk.designation || 'N/A'),
-        field('Organization', spk.organization || 'N/A'),
-        field('Area of Expertise', spk.expertise || 'N/A'),
-        spacer(),
-      ]),
-
-      // ── Social Media ──────────────────────────────────────────────────
-      h2('Social Media Links'),
-      ...(Object.values(socialPamphlet).some(Boolean) ? [
-        new Paragraph({ children: [new TextRun({ text: 'Link of social media post of e-pamphlet:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 60 } }),
-        ...socialBlock(socialPamphlet),
-      ] : [body2('Link of social media post of e-pamphlet: N/A')]),
+      // ── Social Media Links ────────────────────────────────────────────────
+      new Paragraph({ children: [new TextRun({ text: 'Link of Social Media Post of E-Pamphlet:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 60 } }),
+      ...(Object.values(socialPamphlet).some(Boolean) ? socialBlock(socialPamphlet) : [body2('  N/A')]),
       spacer(),
-      ...(Object.values(socialVideo).some(Boolean) ? [
-        new Paragraph({ children: [new TextRun({ text: 'Link for social media post of video:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 60 } }),
-        ...socialBlock(socialVideo),
-        spacer(),
-      ] : [body2('Link for social media post of video: N/A')]),
+      new Paragraph({ children: [new TextRun({ text: 'Link of Social Media Post of Video:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 60 } }),
+      ...(Object.values(socialVideo).some(Boolean) ? socialBlock(socialVideo) : [body2('  N/A')]),
+      spacer(),
 
+      // ── Program Type ──────────────────────────────────────────────────────────
+      field('Program Type', programType || 'N/A'),
       spacer(),
 
       // ── Objective & Learning ──────────────────────────────────────────
-      h2('Objective & Learning Outcomes'),
-      new Paragraph({ children: [new TextRun({ text: 'Objective of the Activity (100 chars):', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 60 } }),
-      body2(objective || 'N/A'),
-      new Paragraph({ children: [new TextRun({ text: 'Benefit in Terms of Learning / Skills / Knowledge (150 chars):', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
-      body2(learningBenefit || 'N/A'),
-
+      field('Objective of the Activity (100 chars)', objective || 'N/A'),
+      field('Benefit in Terms of Learning / Skills / Knowledge (150 chars)', learningBenefit || 'N/A'),
       spacer(),
 
-      // ── Coordinators ──────────────────────────────────────────────────
-      h2('Coordinators'),
-      new Paragraph({ children: [new TextRun({ text: 'Faculty Coordinators:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 40 } }),
-      ...(facultyCoordinators.filter(Boolean).length > 0
-        ? facultyCoordinators.filter(Boolean).map(name =>
-            new Paragraph({
-              children: [new TextRun({ text: name, size: 24, font: 'Times New Roman' })],
-              indent: { left: 720 },
-              spacing: { after: 40 },
-            })
-          )
-        : [new Paragraph({ children: [new TextRun({ text: 'N/A', size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 40 } })]
-      ),
-      new Paragraph({ children: [new TextRun({ text: 'Student Coordinators:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 80, after: 40 } }),
-      ...(studentCoordinators.filter(Boolean).length > 0
-        ? studentCoordinators.filter(Boolean).map(name =>
-            new Paragraph({
-              children: [new TextRun({ text: name, size: 24, font: 'Times New Roman' })],
-              indent: { left: 720 },
-              spacing: { after: 40 },
-            })
-          )
-        : [new Paragraph({ children: [new TextRun({ text: 'N/A', size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 40 } })]
-      ),
-
+      // ── Coordinators ──────────────────────────────────────────────────────────
+      field('Faculty Coordinators', facultyCoordinators.filter(Boolean).join(', ') || 'N/A'),
+      field('Student Coordinators', studentCoordinators.filter(Boolean).join(', ') || 'N/A'),
       spacer(),
 
-      // ── Participants & Expenditure ────────────────────────────────────
-      h2('Participants & Expenditure'),
-      field('Student Participants', studentCount || '0'),
-      field('Faculty Participants', facultyCount || '0'),
-      field('External Participants', externalCount || '0'),
+      // ── Participants & Budget ─────────────────────────────────────────────────
+      field('Number of Student Participants', studentCount || '0'),
+      field('Number of Faculty Participants', facultyCount || '0'),
+      field('Number of External Participants', externalCount || '0'),
       field('Total Participants', String((parseInt(studentCount) || 0) + (parseInt(facultyCount) || 0) + (parseInt(externalCount) || 0))),
       field('Estimated Budget', event.budget ? `Rs. ${Number(event.budget).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'N/A'),
       field('Actual Expenditure', actualBudget ? `Rs. ${parseFloat(actualBudget).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : 'N/A'),
+      spacer(),
 
+      // ── Mode of Session Delivery ──────────────────────────────────────────────
+      field('Mode of Delivery', modeOfDelivery ? modeOfDelivery.charAt(0).toUpperCase() + modeOfDelivery.slice(1) : 'N/A'),
       spacer(),
 
       // ── Speaker Background ────────────────────────────────────────────
-      h2('Background of the Speaker(s)'),
-      body2(speakerBackground || 'N/A'),
-
+      field('Background of the Speaker(s)', speakerBackground || 'N/A'),
       spacer(),
 
       // ── Session Report ─────────────────────────────────────────────────
-      h2('Report on the Session'),
-      new Paragraph({ children: [new TextRun({ text: 'Event Summary:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 60 } }),
-      body2(eventSummary || 'N/A'),
-      new Paragraph({ children: [new TextRun({ text: 'Detailed Session Report:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
-      body2(sessionReport || 'N/A'),
-      new Paragraph({ children: [new TextRun({ text: 'Key Outcomes of the Event:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
-      ...keyOutcomes.filter(Boolean).map(o =>
-        new Paragraph({
-          numbering: { reference: 'report-bullets', level: 0 },
-          children: [new TextRun({ text: o, size: 24, font: 'Times New Roman' })],
-        })
-      ),
+      new Paragraph({ children: [new TextRun({ text: 'Report on the Session:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'Session Summary:', bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 40 } }),
+      new Paragraph({ children: [new TextRun({ text: eventSummary || 'N/A', size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 60 } }),
+      new Paragraph({ children: [new TextRun({ text: 'Detailed Session Report:', bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { before: 60, after: 40 } }),
+      new Paragraph({ children: [new TextRun({ text: sessionReport || 'N/A', size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 60 } }),
+      ...(issues ? [
+        new Paragraph({ children: [new TextRun({ text: 'Issues Faced:', bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { before: 60, after: 40 } }),
+        new Paragraph({ children: [new TextRun({ text: issues, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 60 } }),
+      ] : []),
+      ...(feedback ? [
+        new Paragraph({ children: [new TextRun({ text: 'Feedback and Suggestions:', bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { before: 60, after: 40 } }),
+        new Paragraph({ children: [new TextRun({ text: feedback, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 60 } }),
+      ] : []),
+      spacer(),
 
+      // ── Key Outcomes ──────────────────────────────────────────────────────────
+      new Paragraph({ children: [new TextRun({ text: 'Key Outcomes:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 60 } }),
+      ...(keyOutcomes.filter(Boolean).length > 0 ? (
+        keyOutcomes.filter(Boolean).map(o =>
+          new Paragraph({
+            numbering: { reference: 'report-bullets', level: 0 },
+            children: [new TextRun({ text: o, size: 24, font: 'Times New Roman' })],
+          })
+        )
+      ) : [
+        new Paragraph({ children: [new TextRun({ text: 'N/A', size: 24, font: 'Times New Roman' })], indent: { left: 720 } }),
+      ]),
       spacer(),
 
       // ── Conclusion ─────────────────────────────────────────────────────
-      h2('Conclusion'),
-      body2(conclusion || 'N/A'),
-
+      field('Conclusion', conclusion || 'N/A'),
       spacer(),
 
       // ── Winners ──────────────────────────────────────────────────────────
       ...(includeWinners && competitions.some(c => c.game) ? [
-        new Paragraph({ children: [new TextRun({ text: 'Winners of the competitions:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 240 } }),
-        ...competitions.filter(c => c.game).flatMap((comp, ci) => [
-          new Paragraph({ children: [new TextRun({ text: `The ${comp.game} award was presented to:`, size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+        new Paragraph({ children: [new TextRun({ text: 'Winners:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 240 } }),
+        ...competitions.filter(c => c.game).flatMap((comp) => [
+          new Paragraph({ children: [new TextRun({ text: `The ${comp.game} award was presented to:`, bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 120 } }),
           ...(comp.studentWinners.filter(Boolean).length > 0 ? [
-            new Paragraph({ children: [new TextRun({ text: 'Student winners', size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+            new Paragraph({ children: [new TextRun({ text: 'Student winners:', bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 1080 }, spacing: { after: 120 } }),
             ...comp.studentWinners.filter(Boolean).map((win, wi) =>
               new Paragraph({
                 children: [
                   new TextRun({ text: `${wi + 1}.\t`, size: 24, font: 'Times New Roman' }),
                   new TextRun({ text: win, size: 24, font: 'Times New Roman' }),
                 ],
+                indent: { left: 1440 },
                 spacing: { after: 120 }
               })
             ),
           ] : []),
           ...(comp.facultyWinners.filter(Boolean).length > 0 ? [
-            new Paragraph({ children: [new TextRun({ text: 'Faculty winners', size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+            new Paragraph({ children: [new TextRun({ text: 'Faculty winners:', bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 1080 }, spacing: { after: 120 } }),
             ...comp.facultyWinners.filter(Boolean).map((win, wi) =>
               new Paragraph({
                 children: [
                    new TextRun({ text: `${wi + 1}.\t`, size: 24, font: 'Times New Roman' }),
                    new TextRun({ text: win, size: 24, font: 'Times New Roman' }),
                 ],
+                indent: { left: 1440 },
                 spacing: { after: 120 }
               })
             ),
@@ -647,30 +731,31 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
         ]),
       ] : []),
 
-      // ── Attachments ───────────────────────────────────────────────────
-      h2('Attachments'),
+      // ── Glimpses of the Event ──────────────────────────────────────────
+      new Paragraph({ children: [new TextRun({ text: 'Glimpses of the Event:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { before: 120, after: 120 } }),
 
       // Flier
       ...(flierBuf ? [
-        new Paragraph({ children: [new TextRun({ text: 'Event Flier:', bold: true, size: 24, font: 'Times New Roman' })], spacing: { after: 120 } }),
+        new Paragraph({ children: [new TextRun({ text: 'Event Flier:', bold: true, size: 24, font: 'Times New Roman' })], indent: { left: 720 }, spacing: { after: 120 } }),
         new Paragraph({
           alignment: AlignmentType.CENTER,
           spacing: { after: 240 },
-          children: [new ImageRun({ data: flierBuf, transformation: { width: 400, height: 300 }, type: flierType })],
+          children: [new ImageRun({ data: flierBuf, transformation: flierDims, type: flierType })],
         }),
       ] : []),
 
       // Photos
       ...(photoBufs.length > 0 ? [
         new Paragraph({
-          children: [new TextRun({ text: `Glimpses of the Event (${photoBufs.length} photographs):`, bold: true, size: 24, font: 'Times New Roman' })],
+          children: [new TextRun({ text: `Event Photos (${photoBufs.length} photographs):`, bold: true, size: 24, font: 'Times New Roman' })],
+          indent: { left: 720 },
           spacing: { before: 120, after: 120 },
         }),
         ...photoBufs.map((buf, idx) =>
           new Paragraph({
             alignment: AlignmentType.CENTER,
             spacing: { after: 240 },
-            children: [new ImageRun({ data: buf, transformation: { width: 540, height: 360 }, type: photoTypes[idx] || 'jpg' })],
+            children: [new ImageRun({ data: buf, transformation: photoDims[idx], type: photoTypes[idx] || 'jpg' })],
           })
         ),
       ] : []),
@@ -924,7 +1009,7 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
       </SectionCard>
 
       {/* ── Guest Speakers ────────────────────────────────────────────────────── */}
-      <SectionCard title="Guest Speaker(s)" icon={<Mic className="w-4 h-4" />}>
+      <SectionCard title="Name and designation of the Guest Speakers/ Judges/ Mentors etc.:" icon={<Mic className="w-4 h-4" />}>
         {speakers.map((spk, i) => (
           <div key={i} className="p-4 rounded-xl border border-[var(--card-border)] bg-slate-50/50 space-y-3">
             <div className="flex items-center justify-between">
@@ -936,6 +1021,24 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <Label>Speaker Type</Label>
+                <div className="relative">
+                  <Select value={spk.speaker_type || 'Guest Speaker'} onChange={e => updateSpeaker(i, 'speaker_type', e.target.value)}>
+                    <option value="Guest Speaker">Guest Speaker</option>
+                    <option value="Judge">Judge</option>
+                    <option value="Mentor">Mentor</option>
+                    <option value="Others">Others</option>
+                  </Select>
+                  <ChevronDown className="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+              </Field>
+              {spk.speaker_type === 'Others' && (
+                <Field>
+                  <Label required>Custom Speaker Type</Label>
+                  <Input placeholder="e.g. Industry Expert, Chief Guest" value={spk.custom_speaker_type || ''} onChange={e => updateSpeaker(i, 'custom_speaker_type', e.target.value)} />
+                </Field>
+              )}
               <Field><Label required>Name</Label><Input placeholder="Full name" value={spk.name} onChange={e => updateSpeaker(i, 'name', e.target.value)} /></Field>
               <Field><Label>Designation</Label><Input placeholder="e.g. CEO, Professor" value={spk.designation} onChange={e => updateSpeaker(i, 'designation', e.target.value)} /></Field>
               <Field><Label>Organization</Label><Input placeholder="Company / Institution" value={spk.organization} onChange={e => updateSpeaker(i, 'organization', e.target.value)} /></Field>
@@ -1229,6 +1332,20 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
         )}
       </div>
 
+      {/* ── Image Aspect Ratio Checkbox ────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+        <input
+          id="preserveAspectRatio"
+          type="checkbox"
+          checked={preserveAspectRatio}
+          onChange={e => setPreserveAspectRatio(e.target.checked)}
+          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer"
+        />
+        <label htmlFor="preserveAspectRatio" className="text-xs font-medium text-slate-700 cursor-pointer select-none">
+          Preserve Original Image Aspect Ratio (Scale proportionally without distortion)
+        </label>
+      </div>
+
       {/* ── Preview Button ────────────────────────────────────────────────────── */}
       <Button disabled={!canPreview} onClick={() => setShowPreview(true)} className="w-full justify-center py-3" icon={<Eye className="w-4 h-4" />}>
         Generate Preview
@@ -1268,105 +1385,148 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
               <p className="font-bold text-base text-black font-serif">"{event.title}"</p>
             </div>
 
-            <div className="px-8 py-6 space-y-5">
-              {/* Event Details */}
-              <PreviewSection title="Event Details">
-              <PreviewTable rows={[
-                ['Event Title', event.title],
-                ['Program Type', programType],
-                ['Venue', event.venue?.name || event.venue_custom || '—'],
-                ['Start', formatDateTime(event.start_datetime)],
-                ['End', formatDateTime(event.end_datetime)],
-                ['Mode', modeOfDelivery || '—'],
-              ]} />
-              </PreviewSection>
-
+            <div className="px-8 py-6 space-y-5 text-left">
               {/* Guest Speakers */}
-              {speakers.filter(s => s.name).length > 0 && (
-                <PreviewSection title="Guest Speaker(s)">
-                  {speakers.filter(s => s.name).map((spk, i) => (
-                    <div key={i} className="mb-2">
-                      {speakers.filter(s => s.name).length > 1 && <p className="font-semibold text-black font-serif text-xs mb-1">Speaker {i + 1}</p>}
-                      <PreviewTable rows={[['Name', spk.name], ['Designation', spk.designation], ['Org', spk.organization], ['Expertise', spk.expertise]]} />
-                    </div>
-                  ))}
-                </PreviewSection>
+              {speakers.filter(s => s.name).length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-black font-serif text-xs font-bold">Name and designation of the Guest Speakers/ Judges/ Mentors etc.:</p>
+                  {speakers.filter(s => s.name).map((spk, idx) => {
+                    let spkType = spk.speaker_type || 'Guest Speaker';
+                    if (spkType === 'Others') {
+                      spkType = spk.custom_speaker_type || 'Others';
+                    }
+                    return (
+                      <div key={idx} className="space-y-0.5 pl-4">
+                        <p className="text-black font-serif text-xs font-bold">{spkType}:</p>
+                        <p className="text-black font-serif text-xs pl-4"><span className="font-bold">Name:</span> {spk.name}</p>
+                        <p className="text-black font-serif text-xs pl-4"><span className="font-bold">Designation:</span> {spk.designation || '—'}</p>
+                        <p className="text-black font-serif text-xs pl-4"><span className="font-bold">Organization:</span> {spk.organization || '—'}</p>
+                        <p className="text-black font-serif text-xs pl-4"><span className="font-bold">Area of Expertise:</span> {spk.expertise || '—'}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-black font-serif text-xs"><span className="font-bold">Name and designation of the Guest Speakers/ Judges/ Mentors etc.:</span> N/A</p>
               )}
 
-              {/* Objective & Learning */}
-              <PreviewSection title="Objective & Learning Outcomes">
-                <p className="text-black font-serif text-xs whitespace-pre-wrap">{objective || '—'}</p>
-              </PreviewSection>
+              {/* Venue & Dates */}
+              <p className="text-black font-serif text-xs"><span className="font-bold">Venue:</span> {event.venue?.name || event.venue_custom || '—'}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Start Date:</span> {formatDateTime(event.start_datetime)}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">End Date:</span> {formatDateTime(event.end_datetime)}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Time:</span> {formatDateTime(event.start_datetime)} – {formatDateTime(event.end_datetime)}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Duration (hrs):</span> {((new Date(event.end_datetime).getTime() - new Date(event.start_datetime).getTime()) / 3600000).toFixed(2)}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Department:</span> {event.school_department || '—'}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Organizing Club:</span> {event.club?.name || 'Non-Club Event'}</p>
 
               {/* Social Media Links */}
-              {(Object.values(socialPamphlet).some(Boolean) || Object.values(socialVideo).some(Boolean)) && (
-                <PreviewSection title="Social Media Links">
-                  {Object.values(socialPamphlet).some(Boolean) && (
-                    <div className="mb-3">
-                      <p className="font-semibold text-black font-serif text-xs mb-1">Link of social media post of e-pamphlet:</p>
-                      {(['facebook', 'instagram', 'x', 'linkedin'] as const).map((platform, index) => {
-                        const url = socialPamphlet[platform];
-                        return url ? (
-                          <p key={platform} className="text-black font-serif text-xs pl-4">
-                            {index + 1}. {platform.charAt(0).toUpperCase() + platform.slice(1)}: <a href={url} className="text-blue-600 underline break-all">{url}</a>
-                          </p>
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-                  {Object.values(socialVideo).some(Boolean) && (
-                    <div>
-                      <p className="font-semibold text-black font-serif text-xs mb-1 mt-2">Link for social media post of video:</p>
-                      {(['facebook', 'instagram', 'x', 'linkedin'] as const).map((platform, index) => {
-                        const url = socialVideo[platform];
-                        return url ? (
-                          <p key={platform} className="text-black font-serif text-xs pl-4">
-                            {index + 1}. {platform.charAt(0).toUpperCase() + platform.slice(1)}: <a href={url} className="text-blue-600 underline break-all">{url}</a>
-                          </p>
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-                </PreviewSection>
-              )}
+              <div className="space-y-1">
+                <p className="text-black font-serif text-xs font-bold">Link of Social Media Post of E-Pamphlet:</p>
+                {Object.values(socialPamphlet).some(Boolean) ? (
+                  ((['linkedin', 'facebook', 'instagram', 'x'] as const).map(platform => {
+                    const url = socialPamphlet[platform];
+                    return url ? (
+                      <p key={platform} className="text-black font-serif text-xs pl-4">
+                        • <span className="font-bold">{platform.charAt(0).toUpperCase() + platform.slice(1)}:</span> <a href={url} className="text-blue-600 underline break-all">{url}</a>
+                      </p>
+                    ) : null;
+                  }))
+                ) : (
+                  <p className="text-black font-serif text-xs pl-4">N/A</p>
+                )}
+              </div>
 
-              {/* Participants & Expenditure */}
-              <PreviewSection title="Participants & Expenditure">
-                <PreviewTable rows={[
-                  ['Students', studentCount || '0'],
-                  ['Faculty', facultyCount || '0'],
-                  ['External', externalCount || '0'],
-                  ['Total', String((parseInt(studentCount) || 0) + (parseInt(facultyCount) || 0) + (parseInt(externalCount) || 0))],
-                  ['Actual Expenditure', actualBudget ? `Rs. ${parseFloat(actualBudget).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'],
-                ]} />
-              </PreviewSection>
+              <div className="space-y-1">
+                <p className="text-black font-serif text-xs font-bold">Link of Social Media Post of Video:</p>
+                {Object.values(socialVideo).some(Boolean) ? (
+                  ((['linkedin', 'facebook', 'instagram', 'x'] as const).map(platform => {
+                    const url = socialVideo[platform];
+                    return url ? (
+                      <p key={platform} className="text-black font-serif text-xs pl-4">
+                        • <span className="font-bold">{platform.charAt(0).toUpperCase() + platform.slice(1)}:</span> <a href={url} className="text-blue-600 underline break-all">{url}</a>
+                      </p>
+                    ) : null;
+                  }))
+                ) : (
+                  <p className="text-black font-serif text-xs pl-4">N/A</p>
+                )}
+              </div>
 
-              {/* Session Report */}
-              <PreviewSection title="Report on the Session">
-                <p className="text-black font-serif text-xs whitespace-pre-wrap">{eventSummary}</p>
-              </PreviewSection>
+              {/* Program Type */}
+              <p className="text-black font-serif text-xs"><span className="font-bold">Program Type:</span> {programType || '—'}</p>
 
-              {keyOutcomes.filter(Boolean).length > 0 && (
-                <PreviewSection title="Key Outcomes">
-                  <ul className="space-y-1">
-                    {keyOutcomes.filter(Boolean).map((o, i) => (
-                      <li key={i} className="flex gap-2"><span className="text-black shrink-0">•</span><span className="text-black font-serif text-xs">{o}</span></li>
-                    ))}
-                  </ul>
-                </PreviewSection>
-              )}
+              {/* Objective of the Activity */}
+              <p className="text-black font-serif text-xs whitespace-pre-wrap"><span className="font-bold">Objective of the Activity (100 chars):</span> {objective || '—'}</p>
 
-              {conclusion && <PreviewSection title="Conclusion"><p className="text-black font-serif text-xs whitespace-pre-wrap">{conclusion}</p></PreviewSection>}
+              {/* Benefit in Terms of Learning */}
+              <p className="text-black font-serif text-xs whitespace-pre-wrap"><span className="font-bold">Benefit in Terms of Learning / Skills / Knowledge (150 chars):</span> {learningBenefit || '—'}</p>
+
+              {/* Coordinators */}
+              <p className="text-black font-serif text-xs"><span className="font-bold">Faculty Coordinators:</span> {facultyCoordinators.filter(Boolean).join(', ') || 'N/A'}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Student Coordinators:</span> {studentCoordinators.filter(Boolean).join(', ') || 'N/A'}</p>
+
+              {/* Participants */}
+              <p className="text-black font-serif text-xs"><span className="font-bold">Number of Student Participants:</span> {studentCount || '0'}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Number of Faculty Participants:</span> {facultyCount || '0'}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Number of External Participants:</span> {externalCount || '0'}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Total Participants:</span> {String((parseInt(studentCount) || 0) + (parseInt(facultyCount) || 0) + (parseInt(externalCount) || 0))}</p>
+              
+              {/* Budget */}
+              <p className="text-black font-serif text-xs"><span className="font-bold">Estimated Budget:</span> {event.budget ? `Rs. ${event.budget.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}</p>
+              <p className="text-black font-serif text-xs"><span className="font-bold">Actual Expenditure:</span> {actualBudget ? `Rs. ${parseFloat(actualBudget).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}</p>
+
+              {/* Mode of Session Delivery */}
+              <p className="text-black font-serif text-xs"><span className="font-bold">Mode of Delivery:</span> {modeOfDelivery ? modeOfDelivery.charAt(0).toUpperCase() + modeOfDelivery.slice(1) : '—'}</p>
+
+              {/* Speaker Background */}
+              <p className="text-black font-serif text-xs whitespace-pre-wrap"><span className="font-bold">Background of the Speaker(s):</span> {speakerBackground || '—'}</p>
+
+              {/* Report on the Session */}
+              <div className="space-y-2">
+                <p className="text-black font-serif text-xs font-bold">Report on the Session:</p>
+                <p className="text-black font-serif text-xs font-bold pl-4">Session Summary:</p>
+                <p className="text-black font-serif text-xs whitespace-pre-wrap pl-4">{eventSummary || '—'}</p>
+                <p className="text-black font-serif text-xs font-bold pl-4">Detailed Session Report:</p>
+                <p className="text-black font-serif text-xs whitespace-pre-wrap pl-4">{sessionReport || '—'}</p>
+                {issues && (
+                  <>
+                    <p className="text-black font-serif text-xs font-bold pl-4">Issues Faced:</p>
+                    <p className="text-black font-serif text-xs whitespace-pre-wrap pl-4">{issues}</p>
+                  </>
+                )}
+                {feedback && (
+                  <>
+                    <p className="text-black font-serif text-xs font-bold pl-4">Feedback and Suggestions:</p>
+                    <p className="text-black font-serif text-xs whitespace-pre-wrap pl-4">{feedback}</p>
+                  </>
+                )}
+              </div>
+
+              {/* Key Outcomes */}
+              <div className="space-y-1">
+                <p className="text-black font-serif text-xs font-bold">Key Outcomes:</p>
+                {keyOutcomes.filter(Boolean).length > 0 ? (
+                  keyOutcomes.filter(Boolean).map((o, idx) => (
+                    <p key={idx} className="text-black font-serif text-xs pl-4">• {o}</p>
+                  ))
+                ) : (
+                  <p className="text-black font-serif text-xs pl-4">N/A</p>
+                )}
+              </div>
+
+              {/* Conclusion */}
+              <p className="text-black font-serif text-xs whitespace-pre-wrap"><span className="font-bold">Conclusion:</span> {conclusion || '—'}</p>
 
               {/* Winners */}
               {includeWinners && competitions.some(c => c.game) && (
-                <PreviewSection title="Winners">
+                <div className="space-y-2">
+                  <p className="text-black font-serif text-xs font-bold">Winners:</p>
                   {competitions.filter(c => c.game).map((comp, ci) => (
-                    <div key={ci} className="mb-3">
-                      <p className="font-semibold text-black font-serif text-xs mb-1">The {comp.game} award was presented to:</p>
+                    <div key={ci} className="pl-4 space-y-1">
+                      <p className="text-black font-serif text-xs font-bold">The {comp.game} award was presented to:</p>
                       {comp.studentWinners.filter(Boolean).length > 0 && (
-                        <div className="mb-1">
-                          <p className="font-semibold text-black font-serif text-xs">Student winners:</p>
+                        <div>
+                          <p className="text-black font-serif text-xs font-bold">Student winners:</p>
                           {comp.studentWinners.filter(Boolean).map((win, wi) => (
                             <p key={wi} className="text-black font-serif text-xs pl-4">{wi + 1}. {win}</p>
                           ))}
@@ -1374,7 +1534,7 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
                       )}
                       {comp.facultyWinners.filter(Boolean).length > 0 && (
                         <div>
-                          <p className="font-semibold text-black font-serif text-xs">Faculty winners:</p>
+                          <p className="text-black font-serif text-xs font-bold">Faculty winners:</p>
                           {comp.facultyWinners.filter(Boolean).map((win, wi) => (
                             <p key={wi} className="text-black font-serif text-xs pl-4">{wi + 1}. {win}</p>
                           ))}
@@ -1382,25 +1542,29 @@ export default function RnDReportGenerator({ event, onComplete }: RnDReportGener
                       )}
                     </div>
                   ))}
-                </PreviewSection>
+                </div>
               )}
 
               {/* Flier */}
               {flier && (
-                <PreviewSection title="Event Flier">
-                  <img src={flier.preview} alt="Flier" className="max-w-[200px] rounded-lg border" />
-                </PreviewSection>
+                <div className="space-y-1">
+                  <p className="text-black font-serif text-xs font-bold">Event Flier:</p>
+                  <div className="pl-4">
+                    <img src={flier.preview} alt="Flier" className={`max-w-[200px] rounded-lg border ${preserveAspectRatio ? 'object-contain' : 'object-cover'}`} />
+                  </div>
+                </div>
               )}
 
               {/* Photos */}
               {photos.length > 0 && (
-                <PreviewSection title={`Event Photos (${photos.length})`}>
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <p className="text-black font-serif text-xs font-bold">Event Photos ({photos.length}):</p>
+                  <div className="grid grid-cols-2 gap-3 pl-4">
                     {photos.map((p, i) => (
-                      <img key={p.id} src={p.preview} alt={`Photo ${i + 1}`} className="w-full rounded-lg object-cover" style={{ maxHeight: 200 }} />
+                      <img key={p.id} src={p.preview} alt={`Photo ${i + 1}`} className={`w-full rounded-lg ${preserveAspectRatio ? 'object-contain' : 'object-cover'}`} style={{ maxHeight: 200 }} />
                     ))}
                   </div>
-                </PreviewSection>
+                </div>
               )}
             </div>
           </div>
