@@ -8,6 +8,7 @@ import {
 import type { Event } from '@/types';
 import { formatDateTime } from '@/lib/utils';
 import { StatusBadge, EventTypeBadge } from '@/components/shared/StatusBadge';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { eventService, approvalService } from '@/lib/services';
@@ -146,8 +147,8 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
           <h2 className="section-title flex items-center gap-2 text-lg"><Info className="w-5 h-5 text-[rgb(var(--color-primary))]" /> A. Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             <Field label="Event Type" value={event.event_type} />
-            <Field label="Organizing School" value={event.school_department} />
-            <Field label="Target Audience" value={event.target_audience} />
+            <Field label="Organizing School" value={<SchoolDisplay value={event.school_department} />} />
+            <Field label="Target Audience" value={<SchoolDisplay value={event.target_audience} />} />
             <Field label="Event Incharge" value={event.event_incharge_name} />
             <Field label="Contact" value={event.event_incharge_contact} />
             {event.is_club_event && event.club?.name && <Field label="Organizing Club" value={event.club.name} />}

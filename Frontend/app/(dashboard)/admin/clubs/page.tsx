@@ -4,6 +4,8 @@ import { Plus, Search, Users, Edit2, BookOpen, Trash2 } from 'lucide-react';
 import { clubService, departmentService, userService } from '@/lib/services';
 import { Button, Input, Select, Modal, EmptyState, Pagination } from '@/components/ui';
 import type { Club, User } from '@/types';
+import { getSchoolInfo } from '@/lib/utils';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -51,7 +53,10 @@ export default function AdminClubsPage() {
     fetchClubs();
     departmentService.list().then(depts => {
       const arr = Array.isArray(depts) ? depts : [];
-      setDeptOptions(arr.map((d: any) => ({ value: String(d.id), label: `${d.name} (${d.code})` })));
+      setDeptOptions(arr.map((d: any) => {
+        const info = getSchoolInfo(d.code);
+        return { value: String(d.id), label: info ? info.abbreviation : `${d.name} (${d.code})` };
+      }));
     }).catch(() => {});
     
     userService.list({ role: 'club_coordinator', size: 500 }).then(res => {
@@ -149,7 +154,7 @@ export default function AdminClubsPage() {
               </span>
             </div>
             <h3 className="font-display font-bold text-[var(--text-primary)] mb-1 pr-16">{club.name}</h3>
-            <p className="text-xs text-[var(--text-muted)] mb-2">{club.department?.name || 'Unknown school'}</p>
+            <div className="text-xs text-[var(--text-muted)] mb-2"><SchoolDisplay value={club.department?.name || 'Unknown school'} /></div>
             
             {club.coordinators && club.coordinators.length > 0 ? (
               <div className="text-xs text-[var(--text-secondary)] mt-2">

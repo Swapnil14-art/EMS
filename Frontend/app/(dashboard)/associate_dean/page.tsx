@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Bell, Shield, Calendar, BookOpen, ChevronRight, CheckCircle2, MapPin, BarChart3, User, XCircle } from 'lucide-react';
 import { StatCard, StatCardSkeleton } from '@/components/shared/StatCard';
 import PendingApprovalsPage from '@/components/events/PendingApprovalsPage';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import { approvalService, dashboardService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import type { Event } from '@/types';
@@ -29,7 +30,7 @@ export default function AssociateDeanDashboard() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="page-title">Associate Dean Dashboard</h1>
-          <p className="page-subtitle">Welcome, {user?.name?.split(' ')[0]} · School institutional review · {user?.department?.name}</p>
+          <p className="page-subtitle">Welcome, {user?.name?.split(' ')[0]} · School institutional review · <SchoolDisplay value={user?.department?.name} /></p>
         </div>
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

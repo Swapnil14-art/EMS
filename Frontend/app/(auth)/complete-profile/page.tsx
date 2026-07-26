@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { User, Phone, GraduationCap, ChevronRight, Hash, Users, Network } from 'lucide-react';
 import { authService, departmentService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
-import { COURSES, SPECIALIZATIONS, YEAR_OF_STUDY } from '@/lib/utils';
+import { COURSES, SPECIALIZATIONS, YEAR_OF_STUDY, getSchoolInfo } from '@/lib/utils';
 import { Button, Input, Select, Alert } from '@/components/ui';
 import { extractApiError } from '@/lib/transformers';
 
@@ -58,7 +58,10 @@ export default function CompleteProfilePage() {
   useEffect(() => {
     departmentService.list().then((depts) => {
       const deptArray = Array.isArray(depts) ? depts : (depts as any)?.data || [];
-      setDepartments(deptArray.map((d: any) => ({ label: d.name, value: String(d.id) })));
+      setDepartments(deptArray.map((d: any) => {
+        const info = getSchoolInfo(d.code);
+        return { label: info ? info.abbreviation : d.name, value: String(d.id) };
+      }));
     }).catch(console.error);
   }, []);
 

@@ -13,6 +13,7 @@ import { eventService, venueService } from '@/lib/services';
 import type { Event } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import { TermsModal } from '@/components/shared/TermsModal';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import toast from 'react-hot-toast';
 
 /** Convert a datetime-local input value (local time, no TZ) to a UTC ISO string for the API */
@@ -375,7 +376,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
                         }}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-100'} border`}
                       >
-                        {d.label}
+                        <SchoolDisplay value={d.value} />
                       </button>
                     );
                   })}

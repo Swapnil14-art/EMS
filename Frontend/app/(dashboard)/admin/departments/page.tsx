@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Building2, Trash2 } from 'lucide-react';
 import { departmentService } from '@/lib/services';
 import { Button, Input, Modal, EmptyState, Pagination } from '@/components/ui';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import type { Department } from '@/types';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -96,8 +97,9 @@ export default function AdminDepartmentsPage() {
                 <Building2 className="w-5 h-5 text-indigo-600" />
               </div>
             </div>
-            <h3 className="font-display font-bold text-[var(--text-primary)] mb-1">{dept.name}</h3>
-            <p className="text-sm font-mono bg-muted text-[var(--text-muted)] px-2 py-0.5 rounded-md inline-block">{dept.code}</p>
+            <h3 className="font-display font-bold text-[var(--text-primary)] mb-1">
+              <SchoolDisplay value={dept.code} />
+            </h3>
           </div>
         ))}
       </div>

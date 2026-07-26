@@ -7,6 +7,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import { eventService, clubService, departmentService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import type { Club, Department } from '@/types';
+import { getSchoolInfo } from '@/lib/utils';
 
 interface EventCalendarProps {
   isPublic?: boolean;
@@ -131,7 +132,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             onChange={(e) => setSelectedDept(e.target.value)}
           >
             <option value="all">🏢 All Schools</option>
-            {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            {departments.map(d => {
+              const info = getSchoolInfo(d.code);
+              return <option key={d.id} value={d.name}>{info ? info.abbreviation : d.name}</option>;
+            })}
           </select>
 
           <select

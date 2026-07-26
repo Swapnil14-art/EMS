@@ -4,6 +4,7 @@ import { Plus, Search, RefreshCw, UserCheck, UserX, Edit2, Trash2, Shield, Users
 import { userService } from '@/lib/services';
 import { Button, Input, Select, Modal, Alert, Pagination, EmptyState, Spinner } from '@/components/ui';
 import { RoleBadge } from '@/components/shared/StatusBadge';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import { ROLE_LABELS } from '@/lib/utils';
 import type { User, UserRole } from '@/types';
 import toast from 'react-hot-toast';
@@ -306,7 +307,7 @@ export default function AdminUsersPage() {
                 </td>
                 <td className="text-[var(--text-secondary)] text-xs">{u.email}</td>
                 <td><RoleBadge role={u.role} /></td>
-                <td className="text-[var(--text-secondary)] text-xs">{u.department?.name || '—'}</td>
+                <td className="text-[var(--text-secondary)] text-xs"><SchoolDisplay value={u.department?.name} /></td>
                 <td>
                   <span className={`badge ${u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
                     {u.is_active ? 'Active' : 'Inactive'}

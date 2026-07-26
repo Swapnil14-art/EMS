@@ -204,3 +204,22 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2);
 }
+
+// ─── School Display and Tooltips ──────────────────────────────────────────────
+
+export const SCHOOL_MAP: Record<string, { abbreviation: string; fullName: string }> = {
+  ENGG: { abbreviation: 'MPSTME', fullName: 'Mukesh Patel School of Technology Management & Engineering' },
+  AGRI: { abbreviation: 'SAST', fullName: 'School of Agricultural Sciences & Technology' },
+  PHRM: { abbreviation: 'SPTM', fullName: 'School of Pharmacy & Technology Management' },
+  
+  ENGINEERING: { abbreviation: 'MPSTME', fullName: 'Mukesh Patel School of Technology Management & Engineering' },
+  AGRICULTURE: { abbreviation: 'SAST', fullName: 'School of Agricultural Sciences & Technology' },
+  PHARMACY: { abbreviation: 'SPTM', fullName: 'School of Pharmacy & Technology Management' },
+};
+
+export function getSchoolInfo(codeOrName: string) {
+  if (!codeOrName) return null;
+  const key = String(codeOrName).trim().toUpperCase();
+  return SCHOOL_MAP[key] || null;
+}
+

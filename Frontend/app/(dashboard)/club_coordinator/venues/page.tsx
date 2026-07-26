@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { MapPin, Calendar, Users, Clock, Search } from 'lucide-react';
 import { venueService } from '@/lib/services';
 import { Input, EmptyState } from '@/components/ui';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import type { Venue } from '@/types';
 
 export default function VenuesPage() {
@@ -55,7 +56,7 @@ export default function VenuesPage() {
             <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
               <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />Max {venue.max_capacity} concurrent</span>
               {venue.department?.name && (
-                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{venue.department.name}</span>
+                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /><SchoolDisplay value={venue.department.name} /></span>
               )}
             </div>
           </div>
