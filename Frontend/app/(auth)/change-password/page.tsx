@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -74,8 +75,8 @@ export default function ChangePasswordPage() {
         </div>
         <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/15 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display">E</span>
+            <div className="w-10 h-10 relative flex items-center justify-center">
+              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={40} height={40} className="w-full h-full object-contain" priority />
             </div>
             <div>
               <p className="text-[var(--btn-primary-text)] font-display font-bold">EMS</p>
@@ -108,8 +109,8 @@ export default function ChangePasswordPage() {
         <div className="w-full max-w-md py-8">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-6">
-            <div className="w-9 h-9 bg-[var(--btn-primary-bg)] rounded-xl flex items-center justify-center">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display text-sm">E</span>
+            <div className="w-9 h-9 relative flex items-center justify-center">
+              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={36} height={36} className="w-full h-full object-contain" priority />
             </div>
             <span className="font-display font-bold text-[var(--text-primary)]">EMS — NMIMS Shirpur</span>
           </div>

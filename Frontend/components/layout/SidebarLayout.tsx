@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, BookOpen, Calendar, MapPin, Mail, Settings,
@@ -122,8 +123,8 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       <div className={cn("flex items-center p-4 border-b border-[var(--card-border)]", collapsed ? "flex-col justify-center gap-4" : "justify-between")}>
         {!collapsed && (
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-[var(--btn-primary-bg)] rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display text-sm">E</span>
+            <div className="w-8 h-8 relative flex items-center justify-center flex-shrink-0">
+              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={32} height={32} className="w-full h-full object-contain" priority />
             </div>
             <div>
               <p className="font-display font-bold text-[var(--text-primary)] text-sm leading-none">EMS</p>
@@ -132,8 +133,8 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
           </Link>
         )}
         {collapsed && (
-          <Link href="/" className="w-8 h-8 bg-[var(--btn-primary-bg)] rounded-lg flex items-center justify-center">
-            <span className="text-[var(--btn-primary-text)] font-bold font-display text-sm">E</span>
+          <Link href="/" className="w-8 h-8 relative flex items-center justify-center">
+            <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={32} height={32} className="w-full h-full object-contain" priority />
           </Link>
         )}
         <button onClick={() => setCollapsed(!collapsed)}

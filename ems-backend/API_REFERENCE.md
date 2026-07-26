@@ -135,7 +135,8 @@ _No request body required._
   "club_id": null,
   "status": "active",
   "is_first_login": false,
-  "sap_id": "70412300123"
+  "sap_id": "70412300123",
+  "extra_permissions": []
 }
 ```
 

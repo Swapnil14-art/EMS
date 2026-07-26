@@ -297,6 +297,11 @@ STATUS → POSSIBLE NEXT STATUS → TRIGGER → ROLE RESPONSIBLE
 *   **Restricted Actions:** Browsing admin endpoints, bypassing target audience firewalls.
 *   **Hidden UI Elements:** Sidebar admin elements, Edit buttons, Upload tools, Dashboard buttons.
 
+### Role: `additional`
+*   **Allowed Actions:** Dynamic permission-based access assigned individually by email via Super Admin (`extra_permissions`). Capabilities depend on assigned permission codes (`view_events`, `view_event_details`, `view_reports`, `submit_reports`, `view_rnd_reports`, `submit_rnd_reports`, `manage_permissions`).
+*   **Restricted Actions:** All actions not explicitly granted via `extra_permissions`.
+*   **Hidden UI Elements:** Sidebar items and dashboard tiles for modules where permission is not explicitly granted.
+
 ---
 
 ## 17. Data Flow Mapping

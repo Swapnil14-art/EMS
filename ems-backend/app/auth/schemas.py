@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional
+from typing import Optional, List
 
 
 class SignupRequest(BaseModel):
@@ -64,6 +64,7 @@ class UserInfo(BaseModel):
     status: str
     is_first_login: bool
     sap_id: Optional[str] = None
+    extra_permissions: Optional[List[str]] = []
 
     class Config:
         from_attributes = True

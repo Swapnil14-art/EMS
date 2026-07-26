@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -86,8 +87,8 @@ export default function LoginPage() {
           <div className="absolute bottom-20 right-20 w-48 h-48 bg-yellow-300 rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 text-center">
-          <div className="w-20 h-20 bg-white/15 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/20">
-            <span className="text-[var(--btn-primary-text)] font-display font-bold text-3xl">E</span>
+          <div className="w-20 h-20 bg-white backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/20 p-2">
+            <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={80} height={80} className="w-full h-full object-contain" priority />
           </div>
           <h1 className="font-display font-bold text-[var(--btn-primary-text)] text-4xl mb-3">EMS</h1>
           <p className="text-[rgb(var(--color-primary))]/20 text-lg mb-2">Event Management System</p>
@@ -109,8 +110,8 @@ export default function LoginPage() {
         <div className="w-full max-w-md py-8">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-[var(--btn-primary-bg)] rounded-xl flex items-center justify-center">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display">E</span>
+            <div className="w-10 h-10 relative flex items-center justify-center">
+              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={40} height={40} className="w-full h-full object-contain" priority />
             </div>
             <div><p className="font-display font-bold text-[var(--text-primary)]">EMS</p><p className="text-xs text-[var(--text-muted)]">NMIMS Shirpur</p></div>
           </div>
