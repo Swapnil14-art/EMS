@@ -9,8 +9,13 @@ from app.models.event import Event
 from app.models.event_registration import EventRegistration
 from app.models.club import Club
 from app.models.venue import Venue
+from app.models.event_approval import EventApproval
 
 router = APIRouter()
+
+
+
+
 
 
 @router.get("/coordinator")
@@ -27,13 +32,35 @@ async def coordinator_dashboard(
     )
     total_events = total_result.scalar()
 
-    # Events by status
+    # Events by status (created by them)
     status_result = await db.execute(
         select(Event.status, func.count(Event.id))
         .where(base_filter)
         .group_by(Event.status)
     )
     events_by_status = {row[0]: row[1] for row in status_result.all()}
+
+    # Add count of parallel coordinator approvals/rejections performed by this coordinator
+    approved_collab = await db.execute(
+        select(func.count(EventApproval.id))
+        .where(
+            EventApproval.approver_id == current_user.id,
+            EventApproval.action == "approved"
+        )
+    )
+    approved_collab_count = approved_collab.scalar() or 0
+
+    rejected_collab = await db.execute(
+        select(func.count(EventApproval.id))
+        .where(
+            EventApproval.approver_id == current_user.id,
+            EventApproval.action == "rejected"
+        )
+    )
+    rejected_collab_count = rejected_collab.scalar() or 0
+
+    events_by_status["approved"] = events_by_status.get("approved", 0) + approved_collab_count
+    events_by_status["rejected"] = events_by_status.get("rejected", 0) + rejected_collab_count
 
     # Total participants across all events
     participant_result = await db.execute(
@@ -104,10 +131,46 @@ async def admin_dashboard(
     total_events = total_result.scalar()
 
     # Events by status
-    status_result = await db.execute(
-        select(Event.status, func.count(Event.id)).group_by(Event.status)
-    )
-    events_by_status = {row[0]: row[1] for row in status_result.all()}
+    if current_user.role == "director":
+        # Director should see actions performed by themselves
+        approved_result = await db.execute(
+            select(func.count(EventApproval.id))
+            .where(
+                EventApproval.approver_id == current_user.id,
+                EventApproval.action == "approved"
+            )
+        )
+        approved_count = approved_result.scalar() or 0
+
+        rejected_result = await db.execute(
+            select(func.count(EventApproval.id))
+            .where(
+                EventApproval.approver_id == current_user.id,
+                EventApproval.action == "rejected"
+            )
+        )
+        rejected_count = rejected_result.scalar() or 0
+
+        suggested_result = await db.execute(
+            select(func.count(EventApproval.id))
+            .where(
+                EventApproval.approver_id == current_user.id,
+                EventApproval.action == "suggested_changes"
+            )
+        )
+        suggested_count = suggested_result.scalar() or 0
+
+        events_by_status = {
+            "approved": approved_count,
+            "rejected": rejected_count,
+            "suggested_changes": suggested_count
+        }
+    else:
+        # super_admin sees global events status count
+        status_result = await db.execute(
+            select(Event.status, func.count(Event.id)).group_by(Event.status)
+        )
+        events_by_status = {row[0]: row[1] for row in status_result.all()}
 
     # Events by type
     type_result = await db.execute(
@@ -196,13 +259,39 @@ async def associate_dean_dashboard(
     else:
         base_filter = Event.id > 0 # dummy filter if no dep
 
-    # Events by status
-    status_result = await db.execute(
-        select(Event.status, func.count(Event.id))
-        .where(base_filter)
-        .group_by(Event.status)
+    # Events by status (actions performed by associate dean)
+    approved_result = await db.execute(
+        select(func.count(EventApproval.id))
+        .where(
+            EventApproval.approver_id == current_user.id,
+            EventApproval.action == "approved"
+        )
     )
-    events_by_status = {row[0]: row[1] for row in status_result.all()}
+    approved_count = approved_result.scalar() or 0
+
+    rejected_result = await db.execute(
+        select(func.count(EventApproval.id))
+        .where(
+            EventApproval.approver_id == current_user.id,
+            EventApproval.action == "rejected"
+        )
+    )
+    rejected_count = rejected_result.scalar() or 0
+
+    suggested_result = await db.execute(
+        select(func.count(EventApproval.id))
+        .where(
+            EventApproval.approver_id == current_user.id,
+            EventApproval.action == "suggested_changes"
+        )
+    )
+    suggested_count = suggested_result.scalar() or 0
+
+    events_by_status = {
+        "approved": approved_count,
+        "rejected": rejected_count,
+        "suggested_changes": suggested_count
+    }
 
     # Total department events
     total_result = await db.execute(select(func.count(Event.id)).where(base_filter))
