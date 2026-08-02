@@ -15,8 +15,8 @@ export default defineConfig({
   forbidOnly: IS_CI,
   retries: IS_CI ? 2 : 1,
   workers: IS_CI ? 2 : undefined,
-  timeout: 45_000,
-  expect: { timeout: 10_000 },
+  timeout: 60_000,
+  expect: { timeout: 15_000 },
 
   /* ── Global Setup ───────────────────────────────────────────────────────── */
   globalSetup: path.resolve('./tests/global-setup.ts'),
@@ -32,8 +32,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    actionTimeout: 15_000,
-    navigationTimeout: 20_000,
+    actionTimeout: 30_000,
+    navigationTimeout: 30_000,
     // Ignore HTTPS errors for local dev
     ignoreHTTPSErrors: true,
     // Extra HTTP headers

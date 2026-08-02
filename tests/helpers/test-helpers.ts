@@ -21,7 +21,7 @@ export const ROLE_DASHBOARDS: Record<string, string> = {
 
 /** Navigate and wait for network idle */
 export async function navigateTo(page: Page, path: string) {
-  await page.goto(path, { waitUntil: 'networkidle' });
+  await page.goto(path, { waitUntil: 'commit', timeout: 15_000 });
 }
 
 /** Wait for page to finish loading (no spinners) */

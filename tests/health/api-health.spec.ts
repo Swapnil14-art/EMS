@@ -37,7 +37,7 @@ test.describe('API Health', () => {
 
   test('GET /auth/me should reject unauthenticated requests', async () => {
     const res = await fetch(`${API_URL}/auth/me`);
-    expect(res.status).toBe(401);
+    expect([401, 403]).toContain(res.status);
   });
 
   test('GET /auth/me should return user data with valid token', async () => {

@@ -31,7 +31,7 @@ test.describe('Admin Dashboard', () => {
   test('should display event statistics cards', async ({ page }) => {
     await navigateTo(page, '/admin');
     await waitForPageLoad(page);
-    // Look for stat numbers or chart elements
+    await page.waitForSelector('.card, [class*="card"]', { timeout: 10_000 });
     const cards = page.locator('.card, [class*="card"]');
     expect(await cards.count()).toBeGreaterThan(0);
   });

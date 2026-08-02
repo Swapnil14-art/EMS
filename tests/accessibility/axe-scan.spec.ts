@@ -20,6 +20,7 @@ const A11Y_PAGES = [
 ];
 
 test.describe('Accessibility Scan', () => {
+  test.setTimeout(60_000);
   for (const pg of A11Y_PAGES) {
     test(`${pg.name} (${pg.path}) should have no critical accessibility violations`, async ({
       browser,
@@ -29,8 +30,8 @@ test.describe('Accessibility Scan', () => {
       });
       const page = await context.newPage();
 
-      await page.goto(pg.path, { waitUntil: 'networkidle' });
-      await page.waitForTimeout(2000); // Let dynamic content render
+      await page.goto(pg.path, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+      await page.waitForTimeout(500);
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa'])

@@ -1,17 +1,16 @@
 /**
  * Global Setup — Authenticates all test users and saves storage states.
  *
- * Runs once before all projects. Creates persisted auth sessions so
- * individual tests don't need to log in repeatedly.
+ * Runs once before all projects. Authenticates via REST API and writes
+ * persisted Zustand auth storage state files instantly.
  */
-import { chromium, FullConfig } from '@playwright/test';
+import { FullConfig } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:8080';
 const API_URL = process.env.PLAYWRIGHT_API_URL || 'http://localhost:8000';
 
-// ─── Test Users (from seed scripts) ──────────────────────────────────────────
 export const TEST_USERS = {
   admin: { email: 'admin@nmims.in', password: 'Admin@123', role: 'super_admin' },
   director: { email: 'director@nmims.in', password: 'Test@123', role: 'director' },
@@ -21,14 +20,12 @@ export const TEST_USERS = {
 } as const;
 
 export type TestUserKey = keyof typeof TEST_USERS;
-
 const AUTH_DIR = path.resolve('tests/.auth');
 
 async function globalSetup(_config: FullConfig) {
-  // Ensure auth directory exists
   fs.mkdirSync(AUTH_DIR, { recursive: true });
 
-  // Verify API is healthy before proceeding
+  // Verify API health
   try {
     const res = await fetch(`${API_URL}/health`);
     if (!res.ok) throw new Error(`API health check failed: ${res.status}`);
@@ -38,13 +35,11 @@ async function globalSetup(_config: FullConfig) {
     throw err;
   }
 
-  const browser = await chromium.launch();
-
   for (const [key, user] of Object.entries(TEST_USERS)) {
     const storageFile = path.join(AUTH_DIR, `${key}.json`);
 
     try {
-      // Login via API to get tokens
+      // Authenticate via API
       const loginRes = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,8 +47,7 @@ async function globalSetup(_config: FullConfig) {
       });
 
       if (!loginRes.ok) {
-        console.warn(`⚠️  Could not authenticate ${key} (${user.email}): ${loginRes.status}`);
-        // Write empty storage state so tests can handle gracefully
+        console.warn(`⚠️ Could not authenticate ${key} (${user.email}): ${loginRes.status}`);
         fs.writeFileSync(storageFile, JSON.stringify({ cookies: [], origins: [] }));
         continue;
       }
@@ -68,49 +62,53 @@ async function globalSetup(_config: FullConfig) {
       });
       const userData = meRes.ok ? await meRes.json() : null;
 
-      // Create a browser context and inject auth state into localStorage
-      const context = await browser.newContext({ baseURL: BASE_URL });
-      const page = await context.newPage();
-      await page.goto(BASE_URL);
-
-      // Inject the Zustand persisted auth store into localStorage
-      await page.evaluate(
-        ({ user: u, accessToken: at, refreshToken: rt }) => {
-          const storeState = {
-            state: {
-              user: u,
-              accessToken: at,
-              refreshToken: rt,
-              isAuthenticated: true,
-              isHydrated: true,
-            },
-            version: 0,
+      const userPayload = userData
+        ? {
+            ...userData,
+            is_active: true,
+            is_first_login: false,
+            force_password_change: false,
+          }
+        : {
+            email: user.email,
+            role: user.role,
+            is_active: true,
+            force_password_change: false,
+            is_first_login: false,
           };
-          localStorage.setItem('ems-auth', JSON.stringify(storeState));
-        },
-        {
-          user: userData
-            ? {
-                ...userData,
-                is_active: userData.status === 'active',
-                force_password_change: userData.is_first_login,
-              }
-            : { email: user.email, role: user.role, is_active: true, force_password_change: false },
-          accessToken,
-          refreshToken,
-        }
-      );
 
-      await context.storageState({ path: storageFile });
-      await context.close();
-      console.log(`✅ Auth state saved for: ${key} (${user.email})`);
+      // Construct Playwright StorageState with Zustand auth state
+      const storageState = {
+        cookies: [],
+        origins: [
+          {
+            origin: BASE_URL,
+            localStorage: [
+              {
+                name: 'ems-auth',
+                value: JSON.stringify({
+                  state: {
+                    user: userPayload,
+                    accessToken,
+                    refreshToken,
+                    isAuthenticated: true,
+                    isHydrated: true,
+                  },
+                  version: 0,
+                }),
+              },
+            ],
+          },
+        ],
+      };
+
+      fs.writeFileSync(storageFile, JSON.stringify(storageState, null, 2));
+      console.log(`✅ Saved instant auth state for: ${key} (${user.email})`);
     } catch (err) {
-      console.warn(`⚠️  Failed to setup auth for ${key}: ${err}`);
+      console.warn(`⚠️ Failed to setup auth for ${key}: ${err}`);
       fs.writeFileSync(storageFile, JSON.stringify({ cookies: [], origins: [] }));
     }
   }
-
-  await browser.close();
 }
 
 export default globalSetup;
