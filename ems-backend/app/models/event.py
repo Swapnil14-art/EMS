@@ -30,6 +30,7 @@ class Event(Base):
     # Section B — Dates/Times
     start_datetime = Column(TIMESTAMP(timezone=True), nullable=False)
     end_datetime = Column(TIMESTAMP(timezone=True), nullable=False)
+    registration_start_datetime = Column(TIMESTAMP(timezone=True), nullable=True)
     registration_deadline = Column(TIMESTAMP(timezone=True), nullable=True)
 
     # Section C — Venue

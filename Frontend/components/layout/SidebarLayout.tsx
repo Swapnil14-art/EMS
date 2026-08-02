@@ -129,13 +129,18 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   };
 
   const NavLink = ({ item }: { item: NavItem }) => {
-    const isActive = item.href === '/' || DASHBOARD_ROOTS.includes(item.href)
-      ? pathname === item.href
-      : pathname === item.href || pathname.startsWith(`${item.href}/`);
+    // Dashboard roots should only be active on their exact landing route.
+    // Other navigation entries remain active for their nested detail pages.
+    const isDashboardRoot = DASHBOARD_ROOTS.includes(item.href);
+    const isActive = item.href === '/'
+      ? pathname === '/'
+      : isDashboardRoot
+        ? pathname === item.href
+        : pathname === item.href || pathname.startsWith(`${item.href}/`);
     return (
       <Link href={item.href}
         title={sidebarCollapsed ? item.label : undefined}
-        className={cn('nav-item relative', sidebarCollapsed && 'lg:px-2', isActive && 'nav-item-active')}>
+        className={cn('nav-item relative select-none', sidebarCollapsed && 'lg:px-3', isActive && 'nav-item-active')}>
         <span className="flex-shrink-0">{item.icon}</span>
         <span className={cn('truncate', sidebarCollapsed && 'lg:sr-only')}>{item.label}</span>
         {item.badge && (
@@ -145,7 +150,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
     );
   };
 
-  const SidebarContent = () => <nav className={cn('min-h-0 flex-1 overflow-y-auto px-3 py-3 space-y-1', sidebarCollapsed && 'lg:px-2')} aria-label="Main navigation">{navItems.map(item => <NavLink key={item.href} item={item} />)}</nav>;
+  const SidebarContent = () => <nav className={cn('min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-3', sidebarCollapsed && 'lg:px-2')} aria-label="Main navigation">{navItems.map(item => <NavLink key={item.href} item={item} />)}</nav>;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--page-bg)]">
@@ -190,13 +195,13 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         sidebarCollapsed && 'lg:w-[4.75rem]'
       )}>
         <div className={cn('border-b border-[var(--card-border)] px-4 py-3', sidebarCollapsed && 'lg:px-3')}>
-          <div className="flex items-center justify-start">
+          <div className="flex items-center justify-between">
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               aria-label="Toggle navigation menu"
               aria-pressed={sidebarCollapsed}
               title="Menu"
-              className="hidden cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-primary)] lg:flex"
+              className={cn('hidden select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-primary)] lg:flex', sidebarCollapsed && 'lg:px-2')}
             >
               <span className="relative h-4 w-4" aria-hidden="true">
                 <span className={cn('absolute left-0 top-1 block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'top-[7px] rotate-45')} />

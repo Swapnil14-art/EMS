@@ -46,7 +46,9 @@ def create_app() -> FastAPI:
             raise
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Process-Time"] = f"{time.perf_counter() - start:.3f}"
-        logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.1f", request_id, request.method, request.url.path, response.status_code, (time.perf_counter() - start) * 1000)
+        path = request.url.path
+        if not (path == "/health" or path.startswith("/uploads/") or path.startswith("/static/")):
+            logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.1f", request_id, request.method, path, response.status_code, (time.perf_counter() - start) * 1000)
         return response
 
     # CORS — allow Next.js frontend + Swagger/dev origins

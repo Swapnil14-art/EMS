@@ -4,21 +4,37 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
+import { AlertCircle, CalendarDays, Filter } from 'lucide-react';
 import { eventService, clubService, departmentService } from '@/lib/services';
-import { useAuthStore } from '@/store/authStore';
 import type { Club, Department } from '@/types';
 
 interface EventCalendarProps {
   isPublic?: boolean;
 }
 
+type CalendarEvent = {
+  id: string;
+  title?: string;
+  start?: string;
+  color?: string;
+  status?: string;
+  [key: string]: unknown;
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  approved: '#16a34a', upcoming: '#16a34a', ongoing: '#2563eb', completed: '#64748b',
+  past: '#64748b', draft: '#64748b', pending_associate_dean: '#d97706',
+  pending_coordinator_parallel: '#d97706', pending_director: '#d97706',
+  suggested_changes: '#9333ea', rejected: '#dc2626', cancelled: '#dc2626',
+};
+
 export default function EventCalendar({ isPublic = false }: EventCalendarProps) {
   const router = useRouter();
-  const { user } = useAuthStore();
   const calendarRef = useRef<FullCalendar>(null);
   
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -63,16 +79,23 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
         if (selectedDept !== 'all') params.department = selectedDept;
         if (selectedClub !== 'all') params.club_id = selectedClub;
         
-        if (selectedStatus !== 'all') {
-          params.status = selectedStatus;
-        } else if (isPublic) {
-          params.status = 'approved';
-        }
+        if (selectedStatus !== 'all') params.status = selectedStatus;
 
         const data = await eventService.getCalendar(params);
-        setEvents(data || []);
+        const calendarEvents = Array.isArray(data) ? data : (data?.data || []);
+        setEvents(calendarEvents
+          .filter((event: CalendarEvent) => event?.id != null && event?.start)
+          .map((event: CalendarEvent) => ({
+            ...event,
+            id: String(event.id),
+            title: event.title?.trim() || 'Untitled event',
+            color: event.color || STATUS_COLORS[event.status || ''] || '#2563eb',
+          })));
+        setError(null);
       } catch (err) {
         console.error('Failed to fetch calendar events', err);
+        setEvents([]);
+        setError('The event schedule could not be loaded. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -89,14 +112,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
   };
 
   const handleEventClick = (info: any) => {
-    if (isPublic) {
-      router.push(`/events`);
-    } else {
-      router.push(`/events/${info.event.id}`);
-    }
+    router.push(`/events/${info.event.id}`);
   };
 
-  const getDisplayStatusText = (status: string) => {
+  const getDisplayStatusText = (status = 'scheduled') => {
     switch (status) {
       case 'upcoming': return 'Upcoming';
       case 'ongoing': return 'Ongoing';
@@ -118,12 +137,12 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
         <div>
           <h2 className="text-xl font-display font-bold text-[var(--text-primary)]">Event Calendar</h2>
           <p className="text-sm text-[var(--text-muted)] mt-1">
-            {isPublic ? 'Public view of campus events' : 'View and manage event schedules across campus'}
+            All campus events, across every school, department, and club.
           </p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto bg-[var(--card-bg)] p-2 rounded-xl border border-[var(--card-border)]">
-          <span className="text-sm font-semibold text-[var(--text-secondary)] pl-2">Filter:</span>
+          <span className="text-sm font-semibold text-[var(--text-secondary)] pl-2 flex items-center gap-1.5"><Filter className="w-3.5 h-3.5" /> Filter</span>
           
           <select
             className="input-field py-1.5 px-3 min-w-[140px] text-sm"
@@ -187,6 +206,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             .fc-header-toolbar {
               flex-direction: column;
               gap: 0.5rem;
+              padding: 0.75rem !important;
             }
             .fc-toolbar-chunk {
               display: flex;
@@ -195,6 +215,11 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               flex-wrap: wrap;
               gap: 0.5rem;
             }
+            .fc-toolbar-title { font-size: 1rem !important; }
+            .fc-button-primary { padding: 0.3rem 0.55rem !important; font-size: 0.75rem !important; }
+            .fc-col-header-cell-cushion { padding: 0.5rem 0.2rem !important; font-size: 0.7rem; }
+            .fc-daygrid-day-number { padding: 0.35rem !important; font-size: 0.75rem; }
+            .fc-event { margin: 1px 2px !important; padding: 2px 3px; }
           }
           .fc-toolbar-title { 
             font-size: 1.125rem !important; 
@@ -228,8 +253,8 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
              font-weight: 500;
           }
           .fc-event { 
-            border-radius: 6px; 
-            padding: 2px 4px; 
+            border-radius: 8px;
+            padding: 3px 6px;
             margin: 1px 4px !important;
             cursor: pointer; 
             transition: all 0.2s ease; 
@@ -245,6 +270,8 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           .fc-daygrid-event-dot { display: none; }
           .fc-event-time { font-weight: 700 !important; margin-right: 4px; }
           .fc-event-title { font-weight: 600 !important; }
+          .fc-popover { border-radius: 0.875rem; overflow: hidden; box-shadow: var(--shadow-card-md); }
+          .fc-more-link { color: var(--brand-primary); font-weight: 700; padding: 0.25rem; }
           
           /* Tooltip styling */
           .event-content-wrapper {
@@ -277,6 +304,12 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             </div>
           </div>
         )}
+
+        {!loading && error && (
+          <div className="absolute inset-x-4 top-4 z-10 flex items-center gap-3 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] p-3 text-sm text-[var(--text-danger)]">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" /> {error}
+          </div>
+        )}
         
         <FullCalendar
           ref={calendarRef}
@@ -302,8 +335,8 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           }}
           displayEventTime={true}
           eventContent={(eventInfo) => {
-             const dept = eventInfo.event.extendedProps.department;
-             const venue = eventInfo.event.extendedProps.venue;
+             const dept = eventInfo.event.extendedProps.department || 'Campus event';
+             const venue = eventInfo.event.extendedProps.venue || 'Venue TBA';
              return (
              <div className="event-content-wrapper" title={`${eventInfo.event.title}\nVenue: ${venue}\nDept: ${dept || 'N/A'}`}>
                <div className="flex items-center gap-1 event-title text-[10px] sm:text-xs">
@@ -320,6 +353,14 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           )}}
         />
       </div>
+
+      {!loading && !error && events.length === 0 && (
+        <div className="mt-4 rounded-xl border border-dashed border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-5 text-center">
+          <CalendarDays className="w-6 h-6 mx-auto mb-2 text-[var(--text-muted)]" />
+          <p className="text-sm font-semibold text-[var(--text-secondary)]">No events in this date range</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Try another month or clear a filter to see the full campus schedule.</p>
+        </div>
+      )}
 
       {/* Legend */}
       <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 px-2">

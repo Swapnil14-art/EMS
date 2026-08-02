@@ -97,7 +97,7 @@ export default function AdminDepartmentsPage() {
               </div>
             </div>
             <h3 className="font-display font-bold text-[var(--text-primary)] mb-1">{dept.name}</h3>
-            <p className="text-sm font-mono bg-muted text-[var(--text-muted)] px-2 py-0.5 rounded-md inline-block">{dept.code}</p>
+            <p className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--brand-soft)] px-2 py-0.5 font-mono text-sm font-semibold tracking-wide text-[var(--brand-primary)]">{dept.code}</p>
           </div>
         ))}
       </div>

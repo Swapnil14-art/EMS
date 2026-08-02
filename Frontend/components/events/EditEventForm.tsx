@@ -37,6 +37,8 @@ const schema = z.object({
   objectives: z.array(z.string()).optional(),
   start_datetime: z.string().min(1, 'Start date/time required'),
   end_datetime: z.string().min(1, 'End date/time required'),
+  registration_start_datetime: z.string().optional(),
+  registration_deadline: z.string().optional(),
   venue_id: z.string().optional(),
   venue_custom: z.string().optional(),
   venue_type: z.string().optional(),
@@ -77,6 +79,13 @@ const schema = z.object({
     const end = new Date(data.end_datetime);
     if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End date & time must be after start date & time', path: ['end_datetime'] });
+    }
+  }
+  if (data.registration_start_datetime && data.registration_deadline) {
+    const regStart = new Date(data.registration_start_datetime);
+    const regEnd = new Date(data.registration_deadline);
+    if (!isNaN(regStart.getTime()) && !isNaN(regEnd.getTime()) && regEnd < regStart) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Student registration end date & time cannot be earlier than start date & time', path: ['registration_deadline'] });
     }
   }
   if (data.it_laptop && (!data.it_laptop_details || data.it_laptop_details.trim() === '')) {
@@ -153,7 +162,7 @@ function SectionProgress({ current, total }: { current: number; total: number })
   return (
     <div className="flex items-center gap-1 mb-8">
       {Array.from({ length: total }, (_, i) => (
-        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-muted'}`} />
+        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-[var(--surface-subtle)]'}`} />
       ))}
     </div>
   );
@@ -204,6 +213,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
           is_sponsored: !!ev.is_sponsored,
           start_datetime: formatDateTimeForInput(ev.start_datetime),
           end_datetime: formatDateTimeForInput(ev.end_datetime),
+          registration_start_datetime: formatDateTimeForInput(ev.registration_start_datetime),
+          registration_deadline: formatDateTimeForInput(ev.registration_deadline),
           venue_id: ev.venue_id ? ev.venue_id.toString() : '',
           venue_custom: ev.venue_custom || '',
           venue_type: ev.venue_type || '',
@@ -255,7 +266,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'school_department', 'event_incharge_name', 'event_incharge_contact', 'departments_involved', 'objectives'],
-    2: ['start_datetime', 'end_datetime'],
+    2: ['start_datetime', 'end_datetime', 'registration_start_datetime', 'registration_deadline'],
     3: [], 4: [], 5: [], 6: [], 7: [],
   };
 
@@ -286,6 +297,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
+        registration_start_datetime: bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
+        registration_deadline: bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
         event_type: bufferedData.event_type,
         venue_custom: bufferedData.venue_type === 'Other' ? bufferedData.venue_custom : null,
         venue_id: bufferedData.venue_type !== 'Other' ? bufferedData.venue_id : null,
@@ -469,6 +482,17 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
             <div className="grid grid-cols-2 gap-4">
               <Input label="Start Date & Time" type="datetime-local" error={errors.start_datetime?.message} {...register('start_datetime')} />
               <Input label="End Date & Time" type="datetime-local" error={errors.end_datetime?.message} {...register('end_datetime')} />
+            </div>
+
+            <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule</h3>
+                <p className="text-xs text-[var(--text-muted)]">Updating registration dates for approved events takes effect immediately without re-triggering approval workflow.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} />
+                <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} />
+              </div>
             </div>
           </div>
         )}

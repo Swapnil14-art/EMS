@@ -34,7 +34,7 @@ export function EventCard({ event, showStatus = true }: EventCardProps) {
   return (
     <Link href={`/events/${event.id}`} className="block group event-card card-hover overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
       {/* Image area */}
-      <div className="event-img-wrap relative h-48 bg-gradient-to-br overflow-hidden">
+      <div className="event-img-wrap relative h-40 overflow-hidden bg-gradient-to-br sm:h-48">
         {event.poster_url ? (
           <img src={event.poster_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
         ) : (

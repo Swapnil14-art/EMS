@@ -31,6 +31,9 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
   const [remarks, setRemarks] = useState('');
   const [submittingAction, setSubmittingAction] = useState(false);
 
+  const userId = user?.id;
+  const userRole = user?.role;
+
   useEffect(() => {
     if (canViewRegistrations) {
       setLoadingRegs(true);
@@ -44,7 +47,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
     reportService.get(event.id).then(setReportData).catch(() => { });
     rndReportService.get(event.id).then(setRndReportData).catch(() => { });
 
-    if (user?.role === 'director' || user?.role === 'associate_dean' || user?.role === 'club_coordinator') {
+    if (userRole === 'director' || userRole === 'associate_dean' || userRole === 'club_coordinator') {
       approvalService.getPending().then(res => {
         const pendingEvents = Array.isArray(res) ? res : (res?.data || []);
         if (pendingEvents.some((e: any) => e.id === event.id)) {
@@ -52,7 +55,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
         }
       }).catch(() => { });
     }
-  }, [event.id, canViewRegistrations, user]);
+  }, [event.id, canViewRegistrations, userId, userRole]);
 
   const handleAction = (act: 'approve' | 'reject' | 'suggest_changes') => {
     setAction(act);
@@ -162,6 +165,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Start Date & Time" value={formatDateTime(event.start_datetime)} />
             <Field label="End Date & Time" value={formatDateTime(event.end_datetime)} />
+            {event.registration_start_datetime && <Field label="Registration Start Date & Time" value={formatDateTime(event.registration_start_datetime)} />}
             {event.registration_deadline && <Field label="Registration Deadline" value={formatDateTime(event.registration_deadline)} />}
           </div>
         </div>
@@ -476,7 +480,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                 size="lg"
                 icon={<CheckCircle2 className="w-5 h-5" />}
                 onClick={() => handleAction('approve')}
-                className="bg-[var(--status-success-bg)] hover:bg-[var(--status-success-bg)] text-white"
+                className="bg-[var(--status-success-text)] text-white hover:opacity-90"
               >
                 Approve Event
               </Button>

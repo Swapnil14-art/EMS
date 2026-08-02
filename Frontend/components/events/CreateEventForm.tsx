@@ -40,6 +40,8 @@ const schema = z.object({
   // Section B
   start_datetime: z.string().min(1, 'Start date/time required'),
   end_datetime: z.string().min(1, 'End date/time required'),
+  registration_start_datetime: z.string().optional(),
+  registration_deadline: z.string().optional(),
   // Section C
   venue_selections: z.array(z.object({
     venue_type: z.string().min(1, 'Select venue type'),
@@ -90,6 +92,13 @@ const schema = z.object({
     const end = new Date(data.end_datetime);
     if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End date & time must be after start date & time', path: ['end_datetime'] });
+    }
+  }
+  if (data.registration_start_datetime && data.registration_deadline) {
+    const regStart = new Date(data.registration_start_datetime);
+    const regEnd = new Date(data.registration_deadline);
+    if (!isNaN(regStart.getTime()) && !isNaN(regEnd.getTime()) && regEnd < regStart) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Student registration end date & time cannot be earlier than start date & time', path: ['registration_deadline'] });
     }
   }
   if (data.it_laptop && (!data.it_laptop_details || data.it_laptop_details.trim() === '')) {
@@ -173,7 +182,7 @@ function SectionProgress({ current, total }: { current: number; total: number })
   return (
     <div className="flex items-center gap-1 mb-8">
       {Array.from({ length: total }, (_, i) => (
-        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-muted'}`} />
+        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-[var(--surface-subtle)]'}`} />
       ))}
     </div>
   );
@@ -250,7 +259,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
-    2: ['start_datetime', 'end_datetime'],
+    2: ['start_datetime', 'end_datetime', 'registration_start_datetime', 'registration_deadline'],
     3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [], 7: [],
   };
 
@@ -276,6 +285,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
+        registration_start_datetime: data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -327,6 +338,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
+        registration_start_datetime: data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -386,6 +399,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
+        registration_start_datetime: bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
+        registration_deadline: bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: bufferedData.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -616,6 +631,17 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             <div className="grid grid-cols-2 gap-4">
               <Input label="Start Date & Time" type="datetime-local" error={errors.start_datetime?.message} {...register('start_datetime')} />
               <Input label="End Date & Time" type="datetime-local" error={errors.end_datetime?.message} {...register('end_datetime')} />
+            </div>
+
+            <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule</h3>
+                <p className="text-xs text-[var(--text-muted)]">Specify when student registration opens and closes for this event.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} />
+                <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} />
+              </div>
             </div>
           </div>
         )}

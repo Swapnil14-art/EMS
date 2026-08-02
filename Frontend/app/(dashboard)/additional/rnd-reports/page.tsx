@@ -143,7 +143,7 @@ export default function AdditionalRndReportsPage() {
                           <p className="text-sm font-medium text-[var(--status-info-text)] truncate max-w-full px-2">{selectedFile.name}</p>
                           <button onClick={() => { setSelectedFile(null); if (fileRef.current) fileRef.current.value = ''; }} className="text-xs text-[var(--status-info-text)] hover:underline mt-1">Change File</button>
                         </div>
-                        <Button loading={uploading} onClick={handleUpload} className="w-full justify-center h-11 bg-[var(--status-info-bg)] hover:bg-[var(--status-info-bg)] text-white border-0" icon={<CheckCircle2 className="w-4 h-4" />}>
+                        <Button loading={uploading} onClick={handleUpload} className="h-11 w-full justify-center border-0 bg-[var(--status-info-text)] text-white hover:opacity-90" icon={<CheckCircle2 className="w-4 h-4" />}>
                           SUBMIT RnD REPORT
                         </Button>
                       </div>

@@ -19,6 +19,7 @@ class EventCreate(BaseModel):
     sponsor_name: Optional[str] = None
     start_datetime: datetime
     end_datetime: datetime
+    registration_start_datetime: Optional[datetime] = None
     registration_deadline: Optional[datetime] = None
     venue_id: Optional[int] = None
     venue_ids: Optional[List[int]] = None
@@ -71,6 +72,7 @@ class EventUpdate(BaseModel):
     sponsor_name: Optional[str] = None
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
+    registration_start_datetime: Optional[datetime] = None
     registration_deadline: Optional[datetime] = None
     venue_id: Optional[int] = None
     venue_ids: Optional[List[int]] = None
@@ -190,6 +192,7 @@ class EventOut(BaseModel):
     is_sponsored: bool
     start_datetime: datetime
     end_datetime: datetime
+    registration_start_datetime: Optional[datetime]
     registration_deadline: Optional[datetime]
     venue_id: Optional[int]
     venue_ids: Optional[List[int]] = []

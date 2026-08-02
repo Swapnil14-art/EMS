@@ -107,9 +107,11 @@ export function mapEventToApi(formData: any): any {
     delete payload.venue_id;
   }
 
-  // Ensure budget is a number
-  if (payload.budget === undefined || payload.budget === null || payload.budget === '') {
-    payload.budget = 0;
+  // Ensure budget is a number if provided
+  if ('budget' in payload) {
+    if (payload.budget === undefined || payload.budget === null || payload.budget === '') {
+      payload.budget = 0;
+    }
   }
 
   // Clean up frontend-only fields that the backend schema does not accept

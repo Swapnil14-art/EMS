@@ -222,7 +222,7 @@ export default function ClubCoordinatorReportPage() {
                     <Button
                       loading={uploading}
                       onClick={handleConfirmUpload}
-                      className="w-full justify-center h-11 bg-[var(--status-success-bg)] hover:bg-[var(--status-success-bg)] text-white border-0"
+                      className="h-11 w-full justify-center border-0 bg-[var(--status-success-text)] text-white hover:opacity-90"
                       icon={<CheckCircle2 className="w-4 h-4" />}
                       disabled={!selectedId}
                     >
@@ -307,7 +307,7 @@ export default function ClubCoordinatorReportPage() {
                     <Button
                       loading={uploading}
                       onClick={handleConfirmUpload}
-                      className="w-full justify-center h-11 bg-[var(--status-success-bg)] hover:bg-[var(--status-success-bg)] text-white border-0"
+                      className="h-11 w-full justify-center border-0 bg-[var(--status-success-text)] text-white hover:opacity-90"
                       icon={<CheckCircle2 className="w-4 h-4" />}
                       disabled={!selectedId}
                     >

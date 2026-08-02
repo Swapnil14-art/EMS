@@ -168,7 +168,7 @@ export default function AdminClubsPage() {
                 <span className={`badge ${club.level === 'college_wide' ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                   {club.level === 'college_wide' ? 'College-Wide' : 'Department'}
                 </span>
-                <span className={`badge ${club.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
+                <span className={`badge ${club.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                   {club.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>

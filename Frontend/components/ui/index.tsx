@@ -235,7 +235,7 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
         {title && (
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[var(--card-border)]">
             <h3 className="text-lg font-display font-bold text-[var(--text-primary)]">{title}</h3>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-[var(--text-muted)] transition-colors">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-subtle)]">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -284,7 +284,7 @@ export function Toggle({ checked, onChange, label, disabled }: ToggleProps) {
         onClick={() => onChange(!checked)}
         className={cn(
           'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary',
-          checked ? 'bg-[var(--btn-primary-bg)]' : 'bg-muted',
+          checked ? 'bg-[var(--btn-primary-bg)]' : 'bg-[var(--surface-subtle)]',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
       >
@@ -338,7 +338,7 @@ export function Tabs({ tabs, active, onChange }: TabsProps) {
           {tab.count !== undefined && (
             <span className={cn(
               'px-1.5 py-0.5 rounded-full text-xs font-bold',
-              active === tab.value ? 'bg-[var(--card-bg)] text-[rgb(var(--color-primary))]' : 'bg-muted text-[var(--text-muted)]'
+              active === tab.value ? 'bg-[var(--card-bg)] text-[rgb(var(--color-primary))]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
             )}>
               {tab.count}
             </span>

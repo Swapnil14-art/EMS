@@ -56,7 +56,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
   const rndReportInputRef = useRef<HTMLInputElement>(null);
 
   const fetchEvents = () => {
-    const listParams = isCoordinator ? { size: 100, manage_only: true } : { size: 100 };
+    const listParams = isCoordinator ? { size: 50, manage_only: true } : { size: 50 };
     eventService.list(listParams).then(r => setMyEvents(r.data || [])).catch(() => { });
   };
 
@@ -229,7 +229,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
       {/* Event selector */}
       {!selectedEventId && (
         <div className="card w-full p-4 space-y-4">
-          <div className="flex items-center gap-3 w-full">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
             <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -240,7 +240,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                 { value: 'ONGOING', label: 'Ongoing' },
                 { value: 'COMPLETED', label: 'Completed' }
               ]}
-              className="w-48 flex-shrink-0"
+              className="w-full sm:w-48 sm:flex-shrink-0"
             />
             <div className="flex-1 w-full">
               <Input

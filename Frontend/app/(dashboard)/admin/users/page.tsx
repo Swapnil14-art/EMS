@@ -318,7 +318,7 @@ export default function AdminUsersPage() {
                 <td><RoleBadge role={u.role} /></td>
                 <td className="text-[var(--text-secondary)] text-xs">{u.department?.name || '—'}</td>
                 <td>
-                  <span className={`badge ${u.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
+                  <span className={`badge ${u.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                     {u.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
@@ -488,7 +488,7 @@ export default function AdminUsersPage() {
                 <div className="flex gap-2 flex-shrink-0">
                   {s.year_of_study && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)] text-[10px]">{s.year_of_study}</span>}
                   {s.branch && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)] text-[10px]">{s.branch}</span>}
-                  <span className={`badge text-[10px] ${s.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
+                  <span className={`badge text-[10px] ${s.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                     {s.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>

@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+
 // Using plain <img> for user-uploaded posters (served via Nginx static files)
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock } from 'lucide-react';
@@ -21,8 +22,8 @@ const PLACEHOLDER_COLORS = [
 
 function StatusPill({ status }: { status: string }) {
   if (status === 'ongoing') return (
-    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--status-success-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow-lg">
-      <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+    <span className="flex items-center gap-1.5 rounded-full border border-[var(--status-success-text)] bg-[var(--status-success-bg)] px-3 py-1.5 text-xs font-bold text-[var(--status-success-text)] shadow-lg">
+      <span className="h-2 w-2 animate-pulse rounded-full bg-current" />
       LIVE NOW
     </span>
   );
@@ -33,7 +34,7 @@ function StatusPill({ status }: { status: string }) {
     </span>
   );
   return (
-    <span className="px-3 py-1.5 bg-[var(--surface-subtle)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow-lg">
+    <span className="rounded-full bg-[var(--surface-subtle)] px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] shadow-lg">
       {status.toUpperCase()}
     </span>
   );
@@ -42,13 +43,21 @@ function StatusPill({ status }: { status: string }) {
 export default function HeroCarousel({ events }: HeroCarouselProps) {
   const [current, setCurrent] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const animTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const go = useCallback((idx: number) => {
     if (isAnimating) return;
     setIsAnimating(true);
     setCurrent((idx + events?.length) % events?.length);
-    setTimeout(() => setIsAnimating(false), 500);
+    if (animTimerRef.current) clearTimeout(animTimerRef.current);
+    animTimerRef.current = setTimeout(() => setIsAnimating(false), 500);
   }, [isAnimating, events?.length]);
+
+  useEffect(() => {
+    return () => {
+      if (animTimerRef.current) clearTimeout(animTimerRef.current);
+    };
+  }, []);
 
   // Auto-advance every 5s
   useEffect(() => {
@@ -58,7 +67,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   }, [current, go, events?.length]);
 
   if (!events?.length) return (
-    <div className="w-full h-[540px] bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+    <div className="flex h-[400px] w-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 sm:h-[500px] lg:h-[540px]">
       <div className="text-center text-[var(--btn-primary-text)]">
         <p className="font-display text-3xl font-bold opacity-60">No Featured Events</p>
         <p className="text-[rgb(var(--color-primary))]/20 mt-2">Check back soon for upcoming events</p>
@@ -70,7 +79,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   const bgGradient = PLACEHOLDER_COLORS[current % PLACEHOLDER_COLORS.length];
 
   return (
-    <div className="relative w-full h-[540px] overflow-hidden">
+    <div className="relative h-[400px] w-full overflow-hidden sm:h-[500px] lg:h-[540px]">
       {/* Background image or gradient */}
       <div className={`absolute inset-0 bg-gradient-to-br ${bgGradient} transition-all duration-700`}>
         {event.poster_url && (
@@ -87,19 +96,19 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
 
       {/* Content */}
       <div className="relative z-10 h-full flex items-end">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 pb-16 w-full">
+        <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-12 lg:px-8 lg:pb-16">
           <div className={`max-w-2xl transition-all duration-500 ${isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
 
-            <div className="flex items-center gap-3 mb-4">
+            <div className="mb-3 flex items-center gap-2 sm:mb-4 sm:gap-3">
               <StatusPill status={event.status} />
               <EventTypeBadge type={event.event_type} className="bg-white/20 text-[var(--btn-primary-text)] border border-white/20 backdrop-blur-sm" />
             </div>
 
-            <h2 className="font-display font-bold text-[var(--btn-primary-text)] text-4xl md:text-5xl leading-tight mb-4 drop-shadow-lg">
+            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-[var(--btn-primary-text)] drop-shadow-lg sm:mb-4 sm:text-4xl md:text-5xl">
               {event.title}
             </h2>
 
-            <div className="flex flex-wrap items-center gap-4 mb-6 text-[rgb(var(--color-primary))]/10 text-sm">
+            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[rgb(var(--color-primary))]/10 sm:mb-6 sm:gap-4 sm:text-sm">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
                 {formatDate(event.start_datetime)}
@@ -118,13 +127,13 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              <Link href={`/events/${event.id}`} className="btn-primary px-6 py-3 text-base">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <Link href={`/events/${event.id}`} className="btn-primary px-4 py-2 text-sm sm:px-6 sm:py-3 sm:text-base">
                 View Details
               </Link>
               {event.status === 'approved' && (
                 <Link href={`/events/${event.id}#register`}
-                  className="px-6 py-3 text-base font-semibold text-[var(--btn-primary-text)] border-2 border-white/40 rounded-xl hover:bg-[rgb(var(--card-bg)/0.1)] transition-colors backdrop-blur-sm">
+                  className="rounded-xl border-2 border-white/40 px-4 py-2 text-sm font-semibold text-[var(--btn-primary-text)] backdrop-blur-sm transition-colors hover:bg-[rgb(var(--card-bg)/0.1)] sm:px-6 sm:py-3 sm:text-base">
                   Register
                 </Link>
               )}
@@ -149,7 +158,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
 
       {/* Dot indicators */}
       {events?.length > 1 && (
-        <div className="absolute bottom-6 right-8 z-20 flex items-center gap-2">
+        <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 sm:bottom-6 sm:right-8 sm:gap-2">
           {events?.map((_, i) => (
             <button
               key={i}
@@ -163,7 +172,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
       )}
 
       {/* Event counter */}
-      <div className="absolute top-6 right-8 z-20 glass-card px-3 py-1.5 rounded-full text-[var(--btn-primary-text)] text-xs font-semibold">
+      <div className="absolute right-4 top-4 z-20 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--btn-primary-text)] glass-card sm:right-8 sm:top-6 sm:px-3 sm:py-1.5">
         {current + 1} / {events?.length}
       </div>
     </div>

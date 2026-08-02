@@ -46,7 +46,7 @@ export default function ApprovalHistoryPage() {
                     ? <Link href={"/events/" + a.event_id} className="text-sm text-[rgb(var(--color-primary))] hover:text-[rgb(var(--color-primary))] font-medium">Event #{a.event_id}</Link>
                     : <span className="text-sm text-[var(--text-muted)]">—</span>}
                 </td>
-                <td><span className="badge bg-muted text-[var(--text-primary)]">{a.role_at_approval}</span></td>
+                <td><span className="badge bg-[var(--surface-subtle)] text-[var(--text-secondary)]">{a.role_at_approval}</span></td>
                 <td className="text-xs text-[var(--text-secondary)] max-w-[200px] truncate">{a.remarks || '—'}</td>
                 <td className="text-xs text-[var(--text-muted)]">{a.actioned_at ? formatDateTime(a.actioned_at) : '—'}</td>
               </tr>

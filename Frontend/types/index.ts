@@ -205,6 +205,7 @@ export interface Event {
   // Frontend convenience (composed from event_date + start/end_time)
   start_datetime: string;
   end_datetime: string;
+  registration_start_datetime?: string;
   registration_deadline?: string;
 
   venue_id?: number;

@@ -11,8 +11,11 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--page-bg);
   color: var(--page-text);
+  caret-color: transparent;
   -webkit-font-smoothing: antialiased;
 }
+
+input, textarea, select, [contenteditable='true'] { caret-color: auto; }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -131,3 +134,33 @@ body {
 /* Dot indicator */
 .dot-active { @apply bg-primary w-6; }
 .dot-inactive { @apply bg-primary w-2; }
+
+/* Compact content density on phones. Header, footer, and navigation are intentionally excluded. */
+@media (max-width: 639px) {
+  main .page-title { font-size: 1.35rem; line-height: 1.75rem; }
+  main .section-title { font-size: 1.125rem; line-height: 1.5rem; }
+  main .page-subtitle { font-size: 0.8125rem; }
+  main h1.text-2xl, main h2.text-2xl { font-size: 1.35rem; line-height: 1.75rem; }
+  main .text-xl { font-size: 1.125rem; line-height: 1.5rem; }
+
+  main .card.p-8, main .card-hover.p-8 { padding: 1.25rem; }
+  main .card.p-6, main .card-hover.p-6 { padding: 1rem; }
+  main .card.p-5, main .card-hover.p-5 { padding: 1rem; }
+  main .card.p-4, main .card-hover.p-4 { padding: 0.875rem; }
+  main .card { border-radius: 1rem; }
+  main .gap-6 { gap: 1rem; }
+  main .gap-5 { gap: 0.875rem; }
+  main .space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.25rem; }
+  main .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
+  main .badge { padding: 0.2rem 0.55rem; font-size: 0.6875rem; }
+  main .input { padding: 0.55rem 0.75rem; font-size: 0.875rem; }
+  main .input.pl-10 { padding-left: 2.5rem; }
+  main .input.pr-10 { padding-right: 2.5rem; }
+  main .ems-table th { padding: 0.65rem 0.75rem; font-size: 0.65rem; }
+  main .ems-table td { padding: 0.75rem; font-size: 0.8125rem; }
+
+  .landing-page .section-title { font-size: 1.25rem; }
+  .landing-page > .max-w-7xl { padding-top: 2rem; padding-bottom: 2rem; }
+  .landing-page .event-card .p-4 { padding: 0.875rem; }
+  .landing-page .blue-section h2 { font-size: 1.75rem; line-height: 2.1rem; }
+}

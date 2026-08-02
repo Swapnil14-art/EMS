@@ -56,11 +56,10 @@ async def get_optional_user(
         except JWTError:
             payload = {}
 
-    # Check if a user ID is present in payload
-    user_id = payload.get("user_id") if 'payload' in locals() else None
-    
-    if not user_id:
-        # Check force_login before allowing anonymous access
+    user_id = payload.get("user_id") if payload else None
+
+    # Lazy-load system config only when needed (anonymous or invalid user)
+    async def _check_force_login():
         config_result = await db.execute(select(SystemSettings).limit(1))
         config = config_result.scalar_one_or_none()
         if config and config.force_login:
@@ -68,6 +67,9 @@ async def get_optional_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="System administrator has enforced global login. Please log in.",
             )
+
+    if not user_id:
+        await _check_force_login()
         return None
 
     result = await db.execute(
@@ -77,14 +79,7 @@ async def get_optional_user(
     )
     user = result.scalar_one_or_none()
     if not user or user.status == "inactive":
-        # Check force_login before allowing anonymous access
-        config_result = await db.execute(select(SystemSettings).limit(1))
-        config = config_result.scalar_one_or_none()
-        if config and config.force_login:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="System administrator has enforced global login. Please log in.",
-            )
+        await _check_force_login()
         return None
     return user
 

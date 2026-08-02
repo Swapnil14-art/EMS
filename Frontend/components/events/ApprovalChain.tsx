@@ -28,14 +28,14 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
           <div key={approval.id} className="relative">
             {/* Connector line */}
             {!isLast && (
-              <div className="absolute left-5 top-full w-0.5 h-3 bg-muted z-10" />
+              <div className="absolute left-5 top-full z-10 h-3 w-0.5 bg-[var(--border-strong)]" />
             )}
 
             <div className={cn(
               'rounded-2xl border-2 p-4 transition-colors',
               approval.status === 'approved' ? 'border-[var(--status-success-text)] bg-[var(--status-success-bg)]' :
               approval.status === 'rejected' ? 'border-[var(--status-danger-text)] bg-[var(--status-danger-bg)]' :
-              'border-[var(--card-border)] bg-white'
+              'border-[var(--card-border)] bg-[var(--surface-bg)]'
             )}>
               <div className="flex items-start gap-3">
                 {/* Status icon */}
@@ -62,7 +62,7 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
                       'badge text-xs',
                       approval.status === 'approved' ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' :
                       approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' :
-                      'bg-muted text-[var(--text-muted)]'
+                      'border border-[var(--border-strong)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
                     )}>
                       {approval.status === 'approved' ? 'Approved' :
                        approval.status === 'rejected' ? 'Rejected' : 'Pending'}
@@ -78,7 +78,7 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
                   {approval.remarks && (
                     <div className={cn(
                       'mt-2 p-3 rounded-xl text-xs',
-                      approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' : 'bg-muted text-[var(--text-secondary)]'
+                      approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
                     )}>
                       <span className="font-semibold">Remarks: </span>{approval.remarks}
                     </div>

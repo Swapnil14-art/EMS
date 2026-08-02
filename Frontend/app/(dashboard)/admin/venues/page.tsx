@@ -97,7 +97,7 @@ export default function AdminVenuesPage() {
               <MapPin className={`w-5 h-5 ${isChild ? 'text-[var(--status-info-text)]' : 'text-[rgb(var(--color-primary))]'}`} />
             </div>
             <div className="flex items-center gap-2">
-              <span className={`badge ${venue.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
+              <span className={`badge ${venue.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                 {venue.is_active ? 'Active' : 'Inactive'}
               </span>
               <button onClick={() => openEdit(venue)} className="p-1.5 text-[var(--text-muted)] hover:text-[rgb(var(--color-primary))] hover:bg-[var(--card-bg)] rounded-lg transition-colors" title="Edit">

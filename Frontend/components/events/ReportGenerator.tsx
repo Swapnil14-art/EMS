@@ -920,7 +920,7 @@ export default function ReportGenerator({ event, onComplete, isRnD = false }: Re
               <button
                 type="button"
                 onClick={() => removeCollaboratorLogo(logo.id)}
-                className="absolute top-1 right-1 p-1 bg-[var(--status-danger-bg)] text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-1 top-1 rounded-full bg-[var(--status-danger-text)] p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -1275,7 +1275,7 @@ export default function ReportGenerator({ event, onComplete, isRnD = false }: Re
             <button
               type="button"
               onClick={() => { URL.revokeObjectURL(flier.preview); setFlier(null); }}
-              className="absolute top-1 right-1 p-1 bg-[var(--status-danger-bg)] text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute right-1 top-1 rounded-full bg-[var(--status-danger-text)] p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
             >
               <X className="w-3 h-3" />
             </button>
@@ -1308,7 +1308,7 @@ export default function ReportGenerator({ event, onComplete, isRnD = false }: Re
               <button
                 type="button"
                 onClick={() => removePhoto(photo.id)}
-                className="absolute top-1 right-1 p-1 bg-[var(--status-danger-bg)] text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute right-1 top-1 rounded-full bg-[var(--status-danger-text)] p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
               >
                 <X className="w-3 h-3" />
               </button>

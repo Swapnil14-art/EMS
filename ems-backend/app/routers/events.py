@@ -41,24 +41,97 @@ router = APIRouter()
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
+def is_student_eligible_for_event(user: User, event: Event) -> bool:
+    """
+    Check if a student user is eligible to view/register for an event.
+    """
+    ta = (event.target_audience or "").strip().lower()
+    sd = (event.school_department or "").strip().lower()
+
+    # 1. College-wide / All / Empty target audience or school_department
+    if ta in ("college_wide", "college", "all", "") or "college" in ta or "all" in ta:
+        return True
+    if "college" in sd or "all" in sd:
+        return True
+
+    # 2. Extract user department code and name safely without triggering async lazy-loading
+    dept_codes = []
+    dept_names = []
+    try:
+        from sqlalchemy import inspect
+        insp = inspect(user)
+        if insp and "department" not in insp.unloaded and getattr(user, "department", None):
+            if getattr(user.department, "code", None):
+                dept_codes.append(user.department.code.strip().lower())
+            if getattr(user.department, "name", None):
+                dept_names.append(user.department.name.strip().lower())
+    except Exception:
+        pass
+
+    # If user has no department assigned, allow visibility for general public/college-wide events
+    if not dept_codes and not dept_names:
+        return True
+
+    def matches(str1: str, str2: str) -> bool:
+        if not str1 or not str2:
+            return False
+        return str1 in str2 or str2 in str1
+
+    # Check target_audience & school_department
+    for code in dept_codes:
+        if matches(code, ta) or matches(code, sd):
+            return True
+    for name in dept_names:
+        if matches(name, ta) or matches(name, sd):
+            return True
+
+    # Check departments_involved (list of strings or JSON or string)
+    depts_inv = event.departments_involved or []
+    if isinstance(depts_inv, list):
+        for item in depts_inv:
+            item_str = str(item).strip().lower()
+            if item_str in ("college_wide", "college", "all") or "college" in item_str or "all" in item_str:
+                return True
+            for code in dept_codes:
+                if matches(code, item_str):
+                    return True
+            for name in dept_names:
+                if matches(name, item_str):
+                    return True
+    elif isinstance(depts_inv, str):
+        item_str = depts_inv.strip().lower()
+        if item_str in ("college_wide", "college", "all") or "college" in item_str or "all" in item_str:
+            return True
+        for code in dept_codes:
+            if matches(code, item_str):
+                return True
+        for name in dept_names:
+            if matches(name, item_str):
+                return True
+
+    return False
+
+
 def _apply_student_filter(query, user: User):
     """
     Filter for student role:
     1. Only approved or ongoing events where registration is currently open.
     2. Eligible based on event's department/school eligibility or College-Wide.
     """
-    now = datetime.now(timezone.utc)
-    visible_statuses = ["approved", "ongoing"]
-    query = query.where(
-        Event.status.in_(visible_statuses),
-        or_(
-            and_(Event.registration_deadline.isnot(None), Event.registration_deadline >= now),
-            and_(Event.registration_deadline.is_(None), Event.start_datetime >= now),
-        ),
-    )
+    visible_statuses = ["approved", "ongoing", "completed", "archived"]
+    query = query.where(Event.status.in_(visible_statuses))
     
-    dept_code = user.department.code.strip().lower() if user.department and user.department.code else ""
-    dept_name = user.department.name.strip().lower() if user.department and user.department.name else ""
+    dept_code = ""
+    dept_name = ""
+    try:
+        from sqlalchemy import inspect
+        insp = inspect(user)
+        if insp and "department" not in insp.unloaded and getattr(user, "department", None):
+            dept_code = user.department.code.strip().lower() if user.department.code else ""
+            dept_name = user.department.name.strip().lower() if user.department.name else ""
+    except Exception:
+        pass
+
     dept_inv_str = cast(Event.departments_involved, String)
     logger.info(f"Student event filter — dept_code='{dept_code}', dept_name='{dept_name}' (User ID: {user.id})")
     
@@ -103,6 +176,16 @@ async def list_events(
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Sanitize FastAPI Query defaults when invoked directly or when parameters are default objects
+    if hasattr(status, "default"): status = None
+    if hasattr(club_id, "default"): club_id = None
+    if hasattr(department_id, "default"): department_id = None
+    if hasattr(from_date, "default"): from_date = None
+    if hasattr(to_date, "default"): to_date = None
+    if hasattr(search, "default"): search = None
+    if hasattr(my_events, "default"): my_events = False
+    if hasattr(manage_only, "default"): manage_only = False
+
     query = select(Event)
 
     if not current_user:
@@ -267,16 +350,10 @@ async def get_calendar_events(
         )
     )
 
-    # Status filter logic
-    allowed_statuses = ["approved", "ongoing", "completed"]
-    if current_user and current_user.role != "student":
-        # Let staff users see pending/archived if they want, but still exclude draft/rejected/cancelled unless explicitly matched (optional)
-        # But instructions say: "Include ONLY: approved, ongoing, completed. EXCLUDE: draft, rejected, cancelled."
-        query = query.where(Event.status.in_(allowed_statuses))
-    else:
-        query = query.where(Event.status.in_(allowed_statuses))
-        
-    if status and status in allowed_statuses:
+    # The campus calendar is intentionally shared: every visitor and every role
+    # sees the same schedule, across all departments and clubs.  A status filter
+    # is opt-in so the default view cannot silently hide events.
+    if status:
         query = query.where(Event.status == status)
 
     if club_id:
@@ -284,24 +361,6 @@ async def get_calendar_events(
         
     if department:
         query = query.where(Event.school_department.ilike(f"%{department}%"))
-
-    # Role Visibility
-    if current_user:
-        if current_user.role == "student":
-            query = _apply_student_filter(query, current_user)
-        elif current_user.role == "club_coordinator":
-            calendar_conditions = [
-                Event.created_by == current_user.id,
-                Event.id.in_(
-                    select(EventCoordinator.event_id).where(
-                        EventCoordinator.user_id == current_user.id
-                    ).scalar_subquery()
-                ),
-                Event.status == "approved"
-            ]
-            if current_user.club_id:
-                calendar_conditions.append(Event.club_id == current_user.club_id)
-            query = query.where(or_(*calendar_conditions))
 
     result = await db.execute(query)
     events = result.scalars().all()
@@ -377,22 +436,8 @@ async def get_event(
         if event.status not in visible_statuses:
             raise HTTPException(status_code=404, detail="Event not found")
         
-        ta = (event.target_audience or "").strip().lower()
-        sd = (event.school_department or "").strip().lower()
-        
-        # Always allow college-wide / all / empty
-        if ta not in ("college_wide", "college", "all", ""):
-            dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-            dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
-            
-            match = False
-            if dept_code and (dept_code in ta or dept_code in sd):
-                match = True
-            if dept_name and (dept_name in ta or dept_name in sd):
-                match = True
-            
-            if not match:
-                raise HTTPException(status_code=403, detail="Access denied")
+        if not is_student_eligible_for_event(current_user, event):
+            raise HTTPException(status_code=403, detail="Access denied")
 
     # Additional role visibility check
     elif current_user.role == "additional":
@@ -443,6 +488,7 @@ async def get_event(
         "is_sponsored": event.is_sponsored,
         "start_datetime": event.start_datetime,
         "end_datetime": event.end_datetime,
+        "registration_start_datetime": event.registration_start_datetime,
         "registration_deadline": event.registration_deadline,
         "venue_id": event.venue_id,
         "venue_ids": [v.id for v in event.venues] if hasattr(event, "venues") else [],
@@ -558,10 +604,20 @@ async def create_event(
             err_msg = f"Venue clash detected! The venue is already booked for: {detail_str}. Please choose a different venue or time slot."
             raise HTTPException(status_code=409, detail=err_msg)
 
-        # Default registration deadline = start - 1 day
+        # Registration dates handling
+        reg_start = body.registration_start_datetime
+        if reg_start and reg_start.tzinfo is None:
+            reg_start = reg_start.replace(tzinfo=timezone.utc)
+
         reg_deadline = body.registration_deadline or (start_dt - timedelta(days=1))
-        if reg_deadline.tzinfo is None:
+        if reg_deadline and reg_deadline.tzinfo is None:
             reg_deadline = reg_deadline.replace(tzinfo=timezone.utc)
+
+        if reg_start and reg_deadline and reg_deadline < reg_start:
+            raise HTTPException(
+                status_code=400,
+                detail="Student registration end date & time cannot be earlier than start date & time"
+            )
 
         import os
         import random
@@ -587,6 +643,7 @@ async def create_event(
             is_sponsored=body.is_sponsored,
             start_datetime=start_dt,
             end_datetime=end_dt,
+            registration_start_datetime=reg_start,
             registration_deadline=reg_deadline,
             venue_id=body.venue_id,
             venue_custom=body.venue_custom,
@@ -679,6 +736,39 @@ async def update_event(
             raise HTTPException(status_code=403, detail="You cannot edit this event")
 
         now = datetime.now(timezone.utc)
+        update_data = body.model_dump(exclude_unset=True)
+        is_registration_dates_only = bool(update_data) and set(update_data.keys()).issubset({"registration_start_datetime", "registration_deadline"})
+
+        # Special case: Editing registration schedule alone for any event (including approved/ongoing)
+        if is_registration_dates_only:
+            if "registration_start_datetime" in update_data:
+                reg_s = body.registration_start_datetime
+                if reg_s and reg_s.tzinfo is None:
+                    reg_s = reg_s.replace(tzinfo=timezone.utc)
+                event.registration_start_datetime = reg_s
+
+            if "registration_deadline" in update_data:
+                reg_e = body.registration_deadline
+                if reg_e and reg_e.tzinfo is None:
+                    reg_e = reg_e.replace(tzinfo=timezone.utc)
+                event.registration_deadline = reg_e
+
+            chk_s = event.registration_start_datetime
+            chk_e = event.registration_deadline
+            if chk_s and chk_e:
+                chk_s_utc = chk_s if chk_s.tzinfo else chk_s.replace(tzinfo=timezone.utc)
+                chk_e_utc = chk_e if chk_e.tzinfo else chk_e.replace(tzinfo=timezone.utc)
+                if chk_e_utc < chk_s_utc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Student registration end date & time cannot be earlier than start date & time"
+                    )
+
+            event.updated_at = now
+            await db.commit()
+            await db.refresh(event)
+            return {"id": event.id, "status": event.status, "message": "Registration schedule updated successfully"}
+
         event_start = event.start_datetime
         if event_start.tzinfo is None:
             event_start = event_start.replace(tzinfo=timezone.utc)
@@ -695,9 +785,6 @@ async def update_event(
                 status_code=400,
                 detail="After event start, only links can be edited via /links endpoints",
             )
-
-        # Apply updates
-        update_data = body.model_dump(exclude_unset=True)
         
         # Defensive Boolean details handling inside dict
         if 'podium_setup' in update_data and not update_data['podium_setup']: update_data['podium_details'] = None
@@ -728,11 +815,28 @@ async def update_event(
                 end_dt = end_dt.replace(tzinfo=timezone.utc)
             event.end_datetime = end_dt
             
-        if body.registration_deadline:
+        if "registration_start_datetime" in update_data:
+            reg_s = body.registration_start_datetime
+            if reg_s and reg_s.tzinfo is None:
+                reg_s = reg_s.replace(tzinfo=timezone.utc)
+            event.registration_start_datetime = reg_s
+
+        if "registration_deadline" in update_data:
             reg_dt = body.registration_deadline
-            if reg_dt.tzinfo is None:
+            if reg_dt and reg_dt.tzinfo is None:
                 reg_dt = reg_dt.replace(tzinfo=timezone.utc)
             event.registration_deadline = reg_dt
+
+        chk_s = event.registration_start_datetime
+        chk_e = event.registration_deadline
+        if chk_s and chk_e:
+            chk_s_utc = chk_s if chk_s.tzinfo else chk_s.replace(tzinfo=timezone.utc)
+            chk_e_utc = chk_e if chk_e.tzinfo else chk_e.replace(tzinfo=timezone.utc)
+            if chk_e_utc < chk_s_utc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Student registration end date & time cannot be earlier than start date & time"
+                )
             
         evt_st_compare = event.start_datetime if event.start_datetime.tzinfo else event.start_datetime.replace(tzinfo=timezone.utc)
         evt_end_compare = event.end_datetime if event.end_datetime.tzinfo else event.end_datetime.replace(tzinfo=timezone.utc)
