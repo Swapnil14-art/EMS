@@ -10,6 +10,8 @@ import { useAuthStore } from '@/store/authStore';
 import { Button, Input, Alert } from '@/components/ui';
 import { ROLE_DASHBOARD } from '@/lib/utils';
 import { extractApiError } from '@/lib/transformers';
+import { authService, systemService } from '@/lib/services';
+import { setAccessToken, setRefreshToken } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { BrandMark } from '@/components/layout/BrandMark';
 
@@ -32,24 +34,20 @@ export default function LoginPage() {
 
   // Check if user signup is disabled via public config (no auth needed)
   useEffect(() => {
-    import('@/lib/services').then(({ systemService }) => {
-      systemService.getPublicConfig().then(config => {
-        if (config?.disable_role_signup) {
-          setRegistrationDisabled(true);
-        }
-      }).catch(() => {});
-    });
+    systemService.getPublicConfig().then(config => {
+      if (config?.disable_role_signup) {
+        setRegistrationDisabled(true);
+      }
+    }).catch(() => {});
   }, []);
 
   // API mapped from POST /auth/login
   const onSubmit = async (data: FormData) => {
     setApiError('');
     try {
-      const { authService } = await import('@/lib/services');
       const loginRes = await authService.login(data);
 
       // Store tokens immediately so /auth/me call is authenticated
-      const { setAccessToken, setRefreshToken } = await import('@/lib/api');
       setAccessToken(loginRes.accessToken);
       setRefreshToken(loginRes.refreshToken);
 
@@ -139,7 +137,7 @@ export default function LoginPage() {
                 leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.password?.message}
                 rightElement={
-                  <button type="button" onClick={() => setShowPass(!showPass)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
+                  <button type="button" onClick={() => setShowPass(!showPass)} aria-label={showPass ? 'Hide password' : 'Show password'} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 }

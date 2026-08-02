@@ -211,35 +211,52 @@ async def _handle_parallel_coordinator_approval(
     approved_count = len(approval_result.scalars().all())
 
     if approved_count >= expected_count:
-        event.status = "pending_associate_dean"
-        # Collect ALL unique department IDs from creator's club + collaborating clubs
         from app.models.club import Club
-        dept_ids = set()
+        creator_club = await db.get(Club, event.club_id) if event.club_id else None
 
-        if event.club_id:
-            creator_club = await db.get(Club, event.club_id)
+        is_cw = False
+        if creator_club and getattr(creator_club, "level", "department") == "college_wide":
+            is_cw = True
+        elif event.departments_involved:
+            depts_upper = [str(d).strip().upper() for d in event.departments_involved]
+            if "COLLEGE WIDE" in depts_upper or "COLLEGE_WIDE" in depts_upper:
+                is_cw = True
+
+        if is_cw:
+            event.status = "pending_director"
+            director_result = await db.execute(
+                select(User).where(User.role == "director", User.status == "active")
+            )
+            directors = director_result.scalars().all()
+            for director in directors:
+                notify_pending_director(event, director)
+        else:
+            event.status = "pending_associate_dean"
+            # Collect ALL unique department IDs from creator's club + collaborating clubs
+            dept_ids = set()
+
             if creator_club and creator_club.department_id:
                 dept_ids.add(creator_club.department_id)
 
-        for collab in collab_clubs:
-            if collab.club_id:
-                collab_club = await db.get(Club, collab.club_id)
-                if collab_club and collab_club.department_id:
-                    dept_ids.add(collab_club.department_id)
+            for collab in collab_clubs:
+                if collab.club_id:
+                    collab_club = await db.get(Club, collab.club_id)
+                    if collab_club and collab_club.department_id:
+                        dept_ids.add(collab_club.department_id)
 
-        # Notify Associate Deans for ALL involved departments
-        if dept_ids:
-            from app.services.email_service import notify_event_submitted
-            dean_result = await db.execute(
-                select(User).where(
-                    User.role == "associate_dean",
-                    User.department_id.in_(dept_ids),
-                    User.status == "active",
+            # Notify Associate Deans for ALL involved departments
+            if dept_ids:
+                from app.services.email_service import notify_event_submitted
+                dean_result = await db.execute(
+                    select(User).where(
+                        User.role == "associate_dean",
+                        User.department_id.in_(dept_ids),
+                        User.status == "active",
+                    )
                 )
-            )
-            deans = dean_result.scalars().all()
-            for dean in deans:
-                notify_event_submitted(event, dean)
+                deans = dean_result.scalars().all()
+                for dean in deans:
+                    notify_event_submitted(event, dean)
 
 
 async def _check_all_deans_approved(db, event) -> bool:
@@ -337,3 +354,42 @@ async def clear_approval_records(db, event_id: int):
     await db.execute(
         sa_delete(EventApproval).where(EventApproval.event_id == event_id)
     )
+
+
+async def set_non_collab_pending_status(db: AsyncSession, event: Event):
+    """Set next pending status for a non-collaborative event submission or edit.
+    For college-wide clubs or events with COLLEGE WIDE department involved: goes directly to pending_director and notifies Director.
+    For department clubs: goes to pending_associate_dean and notifies Associate Deans."""
+    from app.models.club import Club
+    club = await db.get(Club, event.club_id) if event.club_id else None
+
+    is_college_wide_event = False
+    if club and getattr(club, "level", "department") == "college_wide":
+        is_college_wide_event = True
+    elif event.departments_involved:
+        depts_upper = [str(d).strip().upper() for d in event.departments_involved]
+        if "COLLEGE WIDE" in depts_upper or "COLLEGE_WIDE" in depts_upper:
+            is_college_wide_event = True
+
+    if is_college_wide_event:
+        event.status = "pending_director"
+        director_result = await db.execute(
+            select(User).where(User.role == "director", User.status == "active")
+        )
+        directors = director_result.scalars().all()
+        for director in directors:
+            notify_pending_director(event, director)
+    else:
+        event.status = "pending_associate_dean"
+        if club and club.department_id:
+            dean_result = await db.execute(
+                select(User).where(
+                    User.role == "associate_dean",
+                    User.department_id == club.department_id,
+                    User.status == "active",
+                )
+            )
+            deans = dean_result.scalars().all()
+            from app.services.email_service import notify_event_submitted
+            for dean in deans:
+                notify_event_submitted(event, dean)

@@ -471,26 +471,49 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             </div>
             <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
               <p className="text-sm font-semibold text-[var(--text-primary)]">Departments Involved <span className="text-[var(--text-danger)]">*</span></p>
-              <Controller name="departments_involved" control={control} render={({ field }) => (
-                <div className="flex flex-wrap gap-2">
-                  {DEPARTMENTS_INVOLVED_OPTIONS.map(d => {
-                    const selected = field.value?.includes(d.value);
-                    return (
-                      <button
-                        key={d.value} type="button"
-                        onClick={() => {
-                          const curr = field.value || [];
-                          if (selected) field.onChange(curr.filter((n: string) => n !== d.value));
-                          else field.onChange([...curr, d.value]);
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-text)]' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--surface-subtle)]'} border`}
-                      >
-                        {d.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )} />
+              <Controller name="departments_involved" control={control} render={({ field }) => {
+                const currentValues = field.value || [];
+                const isCollegeWideSelected = currentValues.some(v => String(v).toUpperCase() === 'COLLEGE WIDE' || String(v).toUpperCase() === 'COLLEGE_WIDE');
+                const deptOptions = [
+                  ...departments.map((d: any) => ({ value: d.name, label: d.name })),
+                  { value: 'COLLEGE WIDE', label: 'COLLEGE WIDE' }
+                ];
+                const visibleOptions = isCollegeWideSelected
+                  ? deptOptions.filter(d => d.value === 'COLLEGE WIDE')
+                  : deptOptions;
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {visibleOptions.map(d => {
+                        const selected = currentValues.includes(d.value);
+                        return (
+                          <button
+                            key={d.value} type="button"
+                            onClick={() => {
+                              if (d.value === 'COLLEGE WIDE') {
+                                if (selected) field.onChange([]);
+                                else field.onChange(['COLLEGE WIDE']);
+                              } else {
+                                let next = currentValues.filter((v: string) => String(v).toUpperCase() !== 'COLLEGE WIDE' && String(v).toUpperCase() !== 'COLLEGE_WIDE');
+                                if (selected) next = next.filter((v: string) => v !== d.value);
+                                else next = [...next, d.value];
+                                field.onChange(next);
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-text)]' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--surface-subtle)]'} border`}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-1.5">
+                      Approval chain is determined automatically based on the selected department(s). Selecting <strong>COLLEGE WIDE</strong> sends the event directly to the Director.
+                    </p>
+                  </div>
+                );
+              }} />
               {errors.departments_involved && <p className="text-xs text-[var(--text-danger)]">{errors.departments_involved.message}</p>}
             </div>
 

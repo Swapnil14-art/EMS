@@ -76,18 +76,19 @@ def upsert_venue(db, *, name: str, location: str, max_capacity: int,
 
 
 def upsert_club(db, *, name: str, description: str,
-                department_id: int) -> Club:
+                department_id: int, level: str = "department") -> Club:
     existing = db.query(Club).filter_by(name=name).first()
     if not existing:
         c = Club(
             name=name,
             description=description,
             department_id=department_id,
+            level=level,
             is_active=True,
         )
         db.add(c)
         db.flush()
-        print(f"  + Club: {name}")
+        print(f"  + Club: {name} (level: {level})")
         return c
     print(f"  · Club already exists: {name}")
     return existing
@@ -197,7 +198,8 @@ def seed():
         club_cultural = upsert_club(
             db, name="Cultural Committee",
             description="Annual fest organising body — dance, drama, music",
-            department_id=dept_engg.id)
+            department_id=dept_engg.id,
+            level="college_wide")
         db.commit()
 
         # ────────────────────────────────────────────────────────────────────

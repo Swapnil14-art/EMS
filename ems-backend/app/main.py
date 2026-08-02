@@ -1,10 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi.staticfiles import StaticFiles
 import os
+import logging
+import time
+import uuid
 
 from app.config import settings
 from app.auth.router import router as auth_router
@@ -16,6 +20,7 @@ from app.routers import (
 )
 
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger("ems.request")
 
 
 def create_app() -> FastAPI:
@@ -29,6 +34,20 @@ def create_app() -> FastAPI:
     # Rate limiting
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+    @app.middleware("http")
+    async def request_context(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        start = time.perf_counter()
+        try:
+            response: Response = await call_next(request)
+        except Exception:
+            logger.exception("Unhandled request failure request_id=%s method=%s path=%s", request_id, request.method, request.url.path)
+            raise
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Process-Time"] = f"{time.perf_counter() - start:.3f}"
+        logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.1f", request_id, request.method, request.url.path, response.status_code, (time.perf_counter() - start) * 1000)
+        return response
 
     # CORS — allow Next.js frontend + Swagger/dev origins
     cors_origins = [

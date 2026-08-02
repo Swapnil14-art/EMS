@@ -4,6 +4,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Trash2, FileText, Link as LinkIcon, Upload, ExternalLink, Download, CheckCircle2, ArrowLeft, Search } from 'lucide-react';
 import { eventService, resourceService, reportService, rndReportService } from '@/lib/services';
 import { Button, Input, Select, Modal, Alert, EmptyState } from '@/components/ui';
+import { useAuthStore } from '@/store/authStore';
 import type { EventDocument, EventLink, Event } from '@/types';
 import toast from 'react-hot-toast';
 
@@ -16,6 +17,10 @@ const LINK_TYPES = [
 ];
 
 export function EventDocuments({ basePath, viewOnly = false }: { basePath: string; viewOnly?: boolean }) {
+  const { user } = useAuthStore();
+  const isCoordinator = user?.role === 'club_coordinator';
+  const effectiveViewOnly = viewOnly || !isCoordinator;
+
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlEventId = searchParams.get('event') ? Number(searchParams.get('event')) : null;
@@ -51,7 +56,8 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
   const rndReportInputRef = useRef<HTMLInputElement>(null);
 
   const fetchEvents = () => {
-    eventService.list({ size: 50, manage_only: true }).then(r => setMyEvents(r.data || [])).catch(() => { });
+    const listParams = isCoordinator ? { size: 100, manage_only: true } : { size: 100 };
+    eventService.list(listParams).then(r => setMyEvents(r.data || [])).catch(() => { });
   };
 
   useEffect(() => {
@@ -281,7 +287,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="section-title">External Links</h2>
-                {!viewOnly && <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={() => setAddLinkOpen(true)}>Add Link</Button>}
+                {!effectiveViewOnly && <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={() => setAddLinkOpen(true)}>Add Link</Button>}
               </div>
               <div className="card border-border bg-white">
                 {links?.length === 0 ? (
@@ -295,7 +301,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                           <p className="font-medium text-sm text-[var(--text-primary)]">{link.label || link.link_type}</p>
                           <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-[rgb(var(--color-primary))] hover:underline truncate block">{link.url}</a>
                         </div>
-                        {!viewOnly && (
+                        {!effectiveViewOnly && (
                           <button onClick={() => handleDeleteLink(link.id)}
                             className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors">
                             <Trash2 className="w-4 h-4" />
@@ -329,7 +335,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                 </div>
               )}
 
-              {!viewOnly && !isCompleted ? (
+              {!effectiveViewOnly && !isCompleted ? (
                 <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
                   <input type="file" ref={partInputRef} className="hidden" onChange={handleUploadParticipant} accept="application/pdf" />
                   <Button variant={selectedEvent.participant_doc_url ? 'secondary' : 'primary'} loading={uploadingPart} icon={<Upload className="w-4 h-4" />} onClick={() => partInputRef.current?.click()} className="w-full justify-center">
@@ -337,14 +343,14 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                   </Button>
                   <p className="text-[10px] text-[var(--text-muted)] mt-2">PDF files only. Replaces existing file.</p>
                 </div>
-              ) : !viewOnly ? (
+              ) : !effectiveViewOnly ? (
                 <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   Upload restricted (Event has ended)
                 </div>
               ) : null}
             </div>
 
-            {/* ── Attendance Document — FIXED ───────────────────────────────── */}
+            {/* ── Attendance Document ───────────────────────────────── */}
             <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
               <div className="flex items-start justify-between mb-4 pr-8">
                 <div>
@@ -371,7 +377,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                 </div>
               )}
 
-              {!viewOnly && !reportData?.generated_report_path ? (
+              {!effectiveViewOnly && !reportData?.generated_report_path ? (
                 <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
                   <input type="file" ref={attendanceInputRef} className="hidden" onChange={handleUploadAttendance} accept=".pdf,.doc,.docx,.xls,.xlsx,.csv" />
                   <Button
@@ -387,14 +393,14 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                     <p className="text-[10px] text-[var(--text-muted)] mt-2">Files only. Replaces existing file.</p>
                   )}
                 </div>
-              ) : !viewOnly ? (
+              ) : !effectiveViewOnly ? (
                 <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   Upload restricted (Report Submitted)
                 </div>
               ) : null}
             </div>
 
-            {/* Final Event Report — unchanged */}
+            {/* Final Event Report */}
             <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
               <div className="flex items-start justify-between mb-4 pr-8">
                 <div>
@@ -419,11 +425,11 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                 </div>
               )}
 
-              {!viewOnly && !reportData?.generated_report_path ? (
+              {!effectiveViewOnly && !reportData?.generated_report_path ? (
                 <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   No report submitted yet. Go to <button onClick={() => router.push(`${basePath}/report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">Report Tab</button> to submit.
                 </div>
-              ) : !viewOnly ? (
+              ) : !effectiveViewOnly ? (
                 <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
                   <input type="file" ref={reportInputRef} className="hidden" onChange={async (e) => {
                     const file = e.target.files?.[0];
@@ -475,11 +481,11 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                 </div>
               )}
 
-              {!viewOnly && !rndReportData?.generated_report_path ? (
+              {!effectiveViewOnly && !rndReportData?.generated_report_path ? (
                 <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   No RnD report submitted yet. Go to <button onClick={() => router.push(`${basePath}/rnd-report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">RnD Report Tab</button> to submit.
                 </div>
-              ) : !viewOnly ? (
+              ) : !effectiveViewOnly ? (
                 <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
                   <input type="file" ref={rndReportInputRef} className="hidden" onChange={async (e) => {
                     const file = e.target.files?.[0];

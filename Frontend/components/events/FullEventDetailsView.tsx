@@ -10,7 +10,7 @@ import { formatDateTime } from '@/lib/utils';
 import { StatusBadge, EventTypeBadge } from '@/components/shared/StatusBadge';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
-import { eventService, approvalService } from '@/lib/services';
+import { eventService, approvalService, reportService, rndReportService } from '@/lib/services';
 import { Button, Modal, Textarea, Alert } from '@/components/ui';
 import toast from 'react-hot-toast';
 import { extractApiError } from '@/lib/transformers';
@@ -41,10 +41,8 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
     }
 
     // Fetch report to get attendance document
-    import('@/lib/services').then(mod => {
-      mod.reportService.get(event.id).then(setReportData).catch(() => { });
-      mod.rndReportService.get(event.id).then(setRndReportData).catch(() => { });
-    });
+    reportService.get(event.id).then(setReportData).catch(() => { });
+    rndReportService.get(event.id).then(setRndReportData).catch(() => { });
 
     if (user?.role === 'director' || user?.role === 'associate_dean' || user?.role === 'club_coordinator') {
       approvalService.getPending().then(res => {

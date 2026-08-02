@@ -129,6 +129,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             className="input-field py-1.5 px-3 min-w-[140px] text-sm"
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
+            aria-label="Filter events by school or department"
           >
             <option value="all">🏢 All Schools</option>
             {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
@@ -138,6 +139,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             className="input-field py-1.5 px-3 min-w-[140px] text-sm"
             value={selectedClub}
             onChange={(e) => setSelectedClub(e.target.value)}
+            aria-label="Filter events by club"
           >
             <option value="all">👥 All Clubs</option>
             {clubs.map(c => <option key={c.id} value={c.id.toString()}>{c.name}</option>)}
@@ -148,6 +150,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               className="input-field py-1.5 px-3 min-w-[140px] text-sm"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
+              aria-label="Filter events by status"
             >
               <option value="all">⚡ All Statuses</option>
               <option value="approved">✅ Approved</option>

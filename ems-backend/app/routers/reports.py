@@ -17,7 +17,7 @@ from app.utils.additional_perms import has_perm
 
 router = APIRouter()
 
-REPORT_WRITE_ROLES = {"club_coordinator", "super_admin"}
+REPORT_WRITE_ROLES = {"club_coordinator"}
 REPORT_READ_ROLES  = {"club_coordinator", "super_admin", "associate_dean", "director"}
 
 

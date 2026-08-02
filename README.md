@@ -148,6 +148,17 @@ docker compose exec backend python seed_all_test_data.py
 - **Backend API:** `http://localhost:8000`
 - **Interactive Swagger Docs:** `http://localhost:8000/docs`
 
+### Production Deployment
+
+The development `docker-compose.yml` uses hot reload and source mounts. For production, copy `.env.production.example` to `.env.production`, replace every placeholder secret and set the public HTTPS URL, then run:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+```
+
+The production stack uses the Next.js standalone runner, non-reload Uvicorn workers, internal-only PostgreSQL/Redis, persistent storage volumes, and health checks. Place a TLS-enabled reverse proxy or load balancer in front of Nginx before exposing the application publicly.
+
 ---
 
 ## User Roles & Key Workflows

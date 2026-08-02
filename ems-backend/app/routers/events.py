@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, cast, String
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 logger = logging.getLogger(__name__)
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_roles
+from app.dependencies import get_current_user, get_optional_user, require_roles
 from app.models.user import User
 from app.models.event_registration import EventRegistration
 from app.models.event import (
@@ -41,44 +41,52 @@ router = APIRouter()
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
-
-
-
 def _apply_student_filter(query, user: User):
-    """Apply student-specific visibility rules."""
-    from app.models.event import Event
-    visible_statuses = ["approved", "ongoing", "completed", "archived"]
-    query = query.where(Event.status.in_(visible_statuses))
+    """
+    Filter for student role:
+    1. Only approved or ongoing events where registration is currently open.
+    2. Eligible based on event's department/school eligibility or College-Wide.
+    """
+    now = datetime.now(timezone.utc)
+    visible_statuses = ["approved", "ongoing"]
+    query = query.where(
+        Event.status.in_(visible_statuses),
+        or_(
+            and_(Event.registration_deadline.isnot(None), Event.registration_deadline >= now),
+            and_(Event.registration_deadline.is_(None), Event.start_datetime >= now),
+        ),
+    )
     
     dept_code = user.department.code.strip().lower() if user.department and user.department.code else ""
     dept_name = user.department.name.strip().lower() if user.department and user.department.name else ""
+    dept_inv_str = cast(Event.departments_involved, String)
     logger.info(f"Student event filter — dept_code='{dept_code}', dept_name='{dept_name}' (User ID: {user.id})")
     
-    # Always-visible conditions: college-wide / all / empty target
     conditions = [
-        Event.target_audience.ilike("college%"),
-        Event.target_audience.ilike("all%"),
+        Event.target_audience.ilike("%college%"),
+        Event.target_audience.ilike("%all%"),
         Event.target_audience == "",
         Event.target_audience.is_(None),
-        Event.school_department.ilike("college%"),
-        Event.school_department.ilike("all%"),
+        Event.school_department.ilike("%college%"),
+        Event.school_department.ilike("%all%"),
+        dept_inv_str.ilike("%college%"),
+        dept_inv_str.ilike("%all%"),
     ]
     
-    # Department-specific conditions — check BOTH code and name against BOTH fields
     if dept_code:
         conditions.append(Event.target_audience.ilike(f"%{dept_code}%"))
         conditions.append(Event.school_department.ilike(f"%{dept_code}%"))
+        conditions.append(dept_inv_str.ilike(f"%{dept_code}%"))
     if dept_name:
         conditions.append(Event.target_audience.ilike(f"%{dept_name}%"))
         conditions.append(Event.school_department.ilike(f"%{dept_name}%"))
+        conditions.append(dept_inv_str.ilike(f"%{dept_name}%"))
         
     query = query.where(or_(*conditions))
     return query
 
 
 # ─── List / Detail ──────────────────────────────────────────────────────────
-
-from app.dependencies import get_current_user, get_optional_user, require_roles
 
 @router.get("/")
 async def list_events(
@@ -91,7 +99,7 @@ async def list_events(
     my_events: bool = Query(False),
     manage_only: bool = Query(False),
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=2000),
+    size: int = Query(20, ge=1, le=200),
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -777,7 +785,8 @@ async def update_event(
                     editor_name = current_user.name or current_user.email
                     notify_collab_chain_restarted(event, all_coords, editor_name)
             else:
-                event.status = "pending_associate_dean"
+                from app.services.approval_service import set_non_collab_pending_status
+                await set_non_collab_pending_status(db, event)
         elif post_director and not after_start:
             # Save snapshot for diff
             new_snap = take_event_snapshot(event)
@@ -802,7 +811,8 @@ async def update_event(
                     editor_name = current_user.name or current_user.email
                     notify_collab_chain_restarted(event, all_coords, editor_name)
             else:
-                event.status = "pending_associate_dean"
+                from app.services.approval_service import set_non_collab_pending_status
+                await set_non_collab_pending_status(db, event)
 
             # Notify registered students
             from app.models.event_registration import EventRegistration
@@ -923,9 +933,10 @@ async def submit_event(
                         from app.services.email_service import notify_collab_approval_needed
                         notify_collab_approval_needed(event, coordinator)
         else:
-            event.status = "pending_associate_dean"
+            from app.services.approval_service import set_non_collab_pending_status
+            await set_non_collab_pending_status(db, event)
             # Notify associate_dean
-            if event.club:
+            if False: # replaced by set_non_collab_pending_status
                 from app.models.club import Club
                 club = await db.get(Club, event.club_id)
                 if club and club.department_id:
@@ -1149,7 +1160,7 @@ async def upload_sponsor_doc(
     event_id: int,
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id, options=[
@@ -1159,7 +1170,7 @@ async def upload_sponsor_doc(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     
-    # Allow creator, super_admin, or any collaborating coordinator
+    # Allow creator or any collaborating coordinator
     collab_club_ids = [c.club_id for c in (event.collaborating_clubs or [])]
     if (
         event.created_by != current_user.id
@@ -1202,7 +1213,7 @@ async def upload_other_doc(
     event_id: int,
     title: str = Query(default=""),
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id, options=[selectinload(Event.other_docs)])
@@ -1228,7 +1239,7 @@ async def upload_other_doc(
 async def delete_other_doc(
     event_id: int,
     doc_id: int,
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -1247,14 +1258,35 @@ async def delete_other_doc(
 
 # ─── Internal Documents ──────────────────────────────────────────────────────
 
+@router.get("/{event_id}/documents")
+async def get_internal_documents(
+    event_id: int,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await db.get(Event, event_id, options=[selectinload(Event.documents)])
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return [
+        {
+            "id": d.id,
+            "event_id": d.event_id,
+            "title": d.title,
+            "file_path": d.file_path,
+            "url": d.url,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
+        }
+        for d in (event.documents or [])
+    ]
+
+
 @router.post("/{event_id}/documents")
 async def add_internal_document(
     event_id: int,
     body: EventDocumentCreate,
     file: Optional[UploadFile] = File(None),
-    current_user: User = Depends(require_roles(
-        "club_coordinator", "super_admin", "associate_dean", "director"
-    )),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id)
@@ -1282,7 +1314,7 @@ async def add_internal_document(
 async def delete_internal_document(
     event_id: int,
     doc_id: int,
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -1302,11 +1334,34 @@ async def delete_internal_document(
 
 # ─── Links ───────────────────────────────────────────────────────────────────
 
+@router.get("/{event_id}/links")
+async def get_event_links(
+    event_id: int,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await db.get(Event, event_id, options=[selectinload(Event.links)])
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return [
+        {
+            "id": l.id,
+            "event_id": l.event_id,
+            "link_type": l.link_type,
+            "url": l.url,
+            "label": l.label,
+            "created_by": l.created_by,
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+        }
+        for l in (event.links or [])
+    ]
+
+
 @router.post("/{event_id}/links", response_model=EventLinkOut)
 async def add_link(
     event_id: int,
     body: EventLinkCreate,
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id)

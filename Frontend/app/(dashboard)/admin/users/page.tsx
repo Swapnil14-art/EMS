@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Plus, Search, RefreshCw, UserCheck, UserX, Edit2, Trash2, Shield, Users, Filter, CheckSquare, Square } from 'lucide-react';
-import { userService } from '@/lib/services';
+import { userService, departmentService } from '@/lib/services';
 import { Button, Input, Select, Modal, Alert, Pagination, EmptyState, Spinner } from '@/components/ui';
 import { RoleBadge } from '@/components/shared/StatusBadge';
 import { ROLE_LABELS } from '@/lib/utils';
@@ -30,11 +30,11 @@ const YEARS = [
 ];
 
 const createSchema = z.object({
-  name: z.string().min(2, 'Name required'),
-  email: z.string().email().endsWith('@nmims.in', 'Must be @nmims.in'),
-  role: z.string().min(1, 'Select role'),
+  name: z.string().min(2, 'Full name is required'),
+  email: z.string().min(1, 'Email is required').email('Invalid email address').endsWith('@nmims.in', 'Must be @nmims.in email'),
+  role: z.string().min(1, 'Role selection is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  department_id: z.coerce.number().optional().nullable().transform(v => v === 0 ? null : v),
+  department_id: z.coerce.number({ invalid_type_error: 'School selection is required' }).min(1, 'School selection is required'),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
@@ -92,6 +92,15 @@ export default function AdminUsersPage() {
     } catch { setUsers([]); }
     finally { setLoading(false); }
   };
+
+  const [deptOptions, setDeptOptions] = useState<{value: string; label: string}[]>([]);
+
+  useEffect(() => {
+    departmentService.list().then(depts => {
+      const arr = Array.isArray(depts) ? depts : [];
+      setDeptOptions(arr.map((d: any) => ({ value: String(d.id), label: `${d.name} (${d.code})` })));
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => { fetchUsers(); }, [roleFilter, page]);
 
@@ -273,7 +282,7 @@ export default function AdminUsersPage() {
       <div className="card p-4 flex flex-wrap gap-3">
         <Input placeholder="Search name or email…" leftIcon={<Search className="w-4 h-4" />}
           value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-        <Select options={ROLES} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} className="w-40" />
+        <Select options={ROLES} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} aria-label="Filter by user role" className="w-40" />
         <Button variant="secondary" icon={<RefreshCw className="w-4 h-4" />} onClick={fetchUsers}>Refresh</Button>
       </div>
 
@@ -353,13 +362,13 @@ export default function AdminUsersPage() {
           <Alert type="info">
             <span>This will immediately create the user. They can log in using the email and password you set here.</span>
           </Alert>
-          <Input label="Full Name" placeholder="Firstname Lastname" error={errors.name?.message} {...register('name')} />
-          <Input label="Email" type="email" placeholder="user@nmims.in" error={errors.email?.message} {...register('email')} />
-          <Input label="Password" type="text" placeholder="Type password here..." error={errors.password?.message} {...register('password')} />
-          <Select label="Role" options={ROLES.filter(r => r.value)} placeholder="Select role"
+          <Input label="Full Name *" placeholder="Firstname Lastname" error={errors.name?.message} {...register('name')} />
+          <Input label="Email *" type="email" placeholder="user@nmims.in" error={errors.email?.message} {...register('email')} />
+          <Input label="Password *" type="text" placeholder="Type password here..." error={errors.password?.message} {...register('password')} />
+          <Select label="Role *" options={ROLES.filter(r => r.value)} placeholder="Select role..."
             error={errors.role?.message} {...register('role')} />
-          <Input label="School ID (leave blank for Director/Admin)" type="number"
-            placeholder="1=ENGG, 2=AGRI, 3=PHRM" {...register('department_id')} />
+          <Select label="School *" options={deptOptions} placeholder="Select school..."
+            error={errors.department_id?.message} {...register('department_id')} />
         </div>
       </Modal>
 
@@ -379,7 +388,7 @@ export default function AdminUsersPage() {
           </div>
 
           <Select label="Role" options={ROLES.filter(r => r.value)} error={editErrors.role?.message} {...registerEdit('role')} />
-          <Input label="School ID" type="number" placeholder="1=ENGG, 2=AGRI, 3=PHRM" {...registerEdit('department_id')} />
+          <Select label="School" options={deptOptions} placeholder="Select school..." error={editErrors.department_id?.message} {...registerEdit('department_id')} />
         </div>
       </Modal>
 

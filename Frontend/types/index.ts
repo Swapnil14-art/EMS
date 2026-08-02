@@ -71,6 +71,7 @@ export interface Club {
   coordinator_id?: number | null;  // legacy
   coordinator?: User;
   coordinators?: { id: number; name: string; email: string }[];
+  level?: 'department' | 'college_wide';
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

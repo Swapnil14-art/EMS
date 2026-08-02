@@ -11,11 +11,25 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 const schema = z.object({
   name: z.string().min(2, 'Club name required'),
-  department_id: z.coerce.number().min(1, 'School required'),
+  level: z.enum(['department', 'college_wide']).default('department'),
+  department_id: z.coerce.number().optional().nullable().transform(v => (!v || v === 0) ? null : v),
   description: z.string().optional(),
   coordinator_ids: z.array(z.number()).default([]),
+}).refine(data => {
+  if (data.level === 'department') {
+    return !!data.department_id && data.department_id > 0;
+  }
+  return true;
+}, {
+  message: 'School required for Department Level clubs',
+  path: ['department_id'],
 });
 type FormData = z.infer<typeof schema>;
+
+const levelOptions = [
+  { value: 'department', label: 'Department / School Level (Coordinator → Dean → Director)' },
+  { value: 'college_wide', label: 'College-Wide (Coordinator → Director)' },
+];
 
 export default function AdminClubsPage() {
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -32,9 +46,10 @@ export default function AdminClubsPage() {
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { coordinator_ids: [] }
+    defaultValues: { level: 'department', coordinator_ids: [] }
   });
 
+  const watchedLevel = watch('level');
   const watchedDept = watch('department_id');
   const selectedCoordinatorIds = watch('coordinator_ids') || [];
 
@@ -59,10 +74,14 @@ export default function AdminClubsPage() {
     }).catch(() => {});
   }, [page]);
 
-  const availableCoordinators = allCoordinators.filter(u => 
-    (!watchedDept || u.department_id === Number(watchedDept)) && 
-    (!u.club_id || u.club_id === editingClub?.id)
-  );
+  const availableCoordinators = allCoordinators.filter(u => {
+    const isFreeOrMine = !u.club_id || u.club_id === editingClub?.id;
+    if (!isFreeOrMine) return false;
+    if (watchedLevel === 'college_wide') {
+      return true; // Show all unassigned coordinators across the institution
+    }
+    return watchedDept && u.department_id === Number(watchedDept);
+  });
 
   const handleCreateOrUpdate = async (data: FormData) => {
     setSubmitting(true);
@@ -76,7 +95,7 @@ export default function AdminClubsPage() {
       }
       setCreateOpen(false);
       setEditingClub(null);
-      reset({ name: '', department_id: undefined, description: '', coordinator_ids: [] });
+      reset({ name: '', department_id: undefined, description: '', level: 'department', coordinator_ids: [] });
       fetchClubs();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed');
@@ -102,6 +121,7 @@ export default function AdminClubsPage() {
       name: club.name,
       department_id: club.department_id,
       description: club.description || '',
+      level: club.level || 'department',
       coordinator_ids: club.coordinators?.map(c => c.id) || []
     });
     setCreateOpen(true);
@@ -115,7 +135,7 @@ export default function AdminClubsPage() {
         <div><h1 className="page-title">Club Management</h1><p className="page-subtitle">{total} clubs across all schools</p></div>
         <Button icon={<Plus className="w-4 h-4" />} onClick={() => {
           setEditingClub(null);
-          reset({ name: '', department_id: undefined, description: '', coordinator_ids: [] });
+          reset({ name: '', department_id: undefined, description: '', level: 'department', coordinator_ids: [] });
           setCreateOpen(true);
         }}>Create Club</Button>
       </div>
@@ -144,12 +164,17 @@ export default function AdminClubsPage() {
               <div className="w-10 h-10 bg-[var(--card-bg)] rounded-2xl flex items-center justify-center flex-shrink-0">
                 <BookOpen className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
-              <span className={`badge ${club.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
-                {club.is_active ? 'Active' : 'Inactive'}
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`badge ${club.level === 'college_wide' ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
+                  {club.level === 'college_wide' ? 'College-Wide' : 'Department'}
+                </span>
+                <span className={`badge ${club.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
+                  {club.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
             </div>
             <h3 className="font-display font-bold text-[var(--text-primary)] mb-1 pr-16">{club.name}</h3>
-            <p className="text-xs text-[var(--text-muted)] mb-2">{club.department?.name || 'Unknown school'}</p>
+            <p className="text-xs text-[var(--text-muted)] mb-2">{club.level === 'college_wide' ? 'College-Wide' : (club.department?.name || 'Unknown school')}</p>
             
             {club.coordinators && club.coordinators.length > 0 ? (
               <div className="text-xs text-[var(--text-secondary)] mt-2">
@@ -179,14 +204,20 @@ export default function AdminClubsPage() {
         </>}>
         <div className="space-y-4">
           <Input label="Club Name" placeholder="e.g. Robotics Club" error={errors.name?.message} {...register('name')} />
-          <Select label="School" options={deptOptions} placeholder="Select school" error={errors.department_id?.message} {...register('department_id')} />
+          <Select label="Club Level" options={levelOptions} error={errors.level?.message} {...register('level')} />
+
+          {watchedLevel !== 'college_wide' && (
+            <Select label="School" options={deptOptions} placeholder="Select school" error={errors.department_id?.message} {...register('department_id')} />
+          )}
           
           <div className="space-y-1.5">
             <label className="label">Assign Coordinators</label>
-            {!watchedDept ? (
+            {watchedLevel === 'department' && !watchedDept ? (
                <div className="text-sm text-[var(--text-secondary)] italic p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border-subtle)]">First select a school/department...</div>
             ) : availableCoordinators.length === 0 ? (
-               <div className="text-sm text-[var(--text-secondary)] italic p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border-subtle)]">No free coordinators found in this school.</div>
+               <div className="text-sm text-[var(--text-secondary)] italic p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border-subtle)]">
+                 {watchedLevel === 'college_wide' ? 'No unassigned club coordinators found in the college.' : 'No free coordinators found in this school.'}
+               </div>
             ) : (
               <div className="max-h-[160px] overflow-y-auto border border-[var(--border-subtle)] rounded-xl p-2 space-y-1">
                 {availableCoordinators.map(user => {

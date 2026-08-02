@@ -270,7 +270,7 @@ export const eventService = {
   }) => {
     const res = await api.get('/events/', { params });
     const data = res.data;
-    let dataArray = [];
+    let dataArray: Event[] = [];
     if (data?.data && Array.isArray(data.data)) {
       dataArray = data.data.map(mapEventFromApi);
     } else if (Array.isArray(data)) {

@@ -71,7 +71,7 @@ export default function AdminEventsPage() {
       <div className="card p-4 flex flex-wrap gap-3 items-center">
         <Input placeholder="Search events…" leftIcon={<Search className="w-4 h-4" />}
           value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-        <select className="input w-40" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
+        <select className="input w-40" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }} aria-label="Filter events by status">
           {STATUS_TABS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
       </div>
