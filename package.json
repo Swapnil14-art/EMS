@@ -1,7 +1,7 @@
 {
-  "name": "adarsh-before-connection-backend-4-4",
+  "name": "ems-workspace",
   "version": "1.0.0",
-  "description": "",
+  "description": "Event Management System",
   "main": "index.js",
   "scripts": {},
   "repository": {
@@ -16,9 +16,7 @@
     "url": "https://github.com/Swapnil14-art/EMS/issues"
   },
   "homepage": "https://github.com/Swapnil14-art/EMS#readme",
-  "dependencies": {
-    "sqlalchemy": "^10.1.1"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.0"

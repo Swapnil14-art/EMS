@@ -64,6 +64,7 @@ class UserInfo(BaseModel):
     status: str
     is_first_login: bool
     sap_id: Optional[str] = None
+    extra_permissions: Optional[list[str]] = []
 
     class Config:
         from_attributes = True

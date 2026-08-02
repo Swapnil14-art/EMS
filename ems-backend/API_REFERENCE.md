@@ -14,6 +14,7 @@
 | `associate_dean` | First-level approver for events in their department |
 | `club_coordinator` | Creates and manages events for their assigned club |
 | `student` | Views approved events, registers for events |
+| `additional` | Custom access role — assigned dynamic extra_permissions (e.g. view events, submit/view reports, manage permissions) |
 
 ---
 
@@ -801,6 +802,76 @@ _No request body required._
 | Field | Type | Description |
 |-------|------|-------------|
 | `file` | file | Pre-made report document |
+
+---
+
+## 🧪 RnD Reports (`/rnd-reports`)
+
+### `POST /rnd-reports/{event_id}/submit`
+**Access:** `club_coordinator`, `super_admin`, or `additional` (with `submit_rnd_reports`)
+**Description:** Submit an RnD post-event report. Does not alter main event lifecycle status.
+
+### `POST /rnd-reports/{event_id}/upload-photos`
+**Access:** `club_coordinator`, `super_admin`, or `additional` (with `submit_rnd_reports`)
+**Description:** Upload RnD report photos.
+
+### `POST /rnd-reports/{event_id}/upload-attendance`
+**Access:** `club_coordinator`, `super_admin`, or `additional` (with `submit_rnd_reports`)
+**Description:** Upload RnD report attendance document.
+
+### `GET /rnd-reports/{event_id}/generate`
+**Access:** `super_admin`, `director`, `associate_dean`, `club_coordinator`, or `additional` (with `view_rnd_reports`)
+**Description:** Download auto-generated RnD `.docx` report.
+
+### `GET /rnd-reports/{event_id}`
+**Access:** `super_admin`, `director`, `associate_dean`, `club_coordinator`, or `additional` (with `view_rnd_reports`)
+**Description:** Get RnD report details and metadata.
+
+### `POST /rnd-reports/{event_id}/upload-doc`
+**Access:** `club_coordinator`, `super_admin`, or `additional` (with `submit_rnd_reports`)
+**Description:** Upload a custom pre-made RnD report document.
+
+---
+
+## 🛡️ Permissions (`/permissions`)
+
+### `GET /permissions/catalog`
+**Access:** `super_admin` or `additional` (with `manage_permissions`)
+**Description:** Get all available permission keys and human-readable descriptions.
+
+### `GET /permissions/users`
+**Access:** `super_admin` or `additional` (with `manage_permissions`)
+**Description:** List all users holding the `additional` role along with their assigned `extra_permissions`.
+
+### `PUT /permissions/{user_id}`
+**Access:** `super_admin` or `additional` (with `manage_permissions`)
+**Description:** Bulk update `extra_permissions` list for an `additional` role user.
+
+```json
+{
+  "permissions": ["view_events", "view_reports", "submit_reports"]
+}
+```
+
+### `POST /permissions/{user_id}/grant`
+**Access:** `super_admin` or `additional` (with `manage_permissions`)
+**Description:** Grant a single permission to an `additional` user.
+
+```json
+{
+  "permission": "view_rnd_reports"
+}
+```
+
+### `DELETE /permissions/{user_id}/revoke`
+**Access:** `super_admin` or `additional` (with `manage_permissions`)
+**Description:** Revoke a single permission from an `additional` user.
+
+```json
+{
+  "permission": "view_rnd_reports"
+}
+```
 
 ---
 

@@ -6,7 +6,7 @@ import {
   Users, BookOpen, Target, MessageSquare, List, Mic,
 } from 'lucide-react';
 import { Button, Alert } from '@/components/ui';
-import { reportService } from '@/lib/services';
+import { reportService, rndReportService } from '@/lib/services';
 import { formatDateTime } from '@/lib/utils';
 import type { Event } from '@/types';
 import toast from 'react-hot-toast';
@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 interface ReportGeneratorProps {
   event: Event;
   onComplete: () => void;
+  isRnD?: boolean;
 }
 
 interface PhotoFile {
@@ -186,7 +187,9 @@ function CharCount({ value, max }: { value: string; max: number }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function ReportGenerator({ event, onComplete }: ReportGeneratorProps) {
+export default function ReportGenerator({ event, onComplete, isRnD = false }: ReportGeneratorProps) {
+  const activeService = isRnD ? rndReportService : reportService;
+
   // ── Form state ─────────────────────────────────────────────────────────────
   const [programType, setProgramType] = useState('');
   const [modeOfDelivery, setModeOfDelivery] = useState<'offline' | 'online' | ''>('');
@@ -538,7 +541,7 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
       // ── Title block ───────────────────────────────────────────────────────
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: 'REPORT ON', bold: true, size: 24, font: 'Times New Roman' })],
+        children: [new TextRun({ text: isRnD ? 'RnD REPORT ON' : 'REPORT ON', bold: true, size: 24, font: 'Times New Roman' })],
         spacing: { before: 200, after: 60 },
       }),
       new Paragraph({
@@ -891,12 +894,12 @@ export default function ReportGenerator({ event, onComplete }: ReportGeneratorPr
     setSubmitting(true);
     try {
       // 1. Upload flier
-      await reportService.uploadFlier(event.id, flier.file);
+      await activeService.uploadFlier(event.id, flier.file);
       // 2. Upload photos
-      await reportService.uploadPhotos(event.id, photos.map(p => p.file));
+      await activeService.uploadPhotos(event.id, photos.map(p => p.file));
       // 3. Submit structured report
-      await reportService.submitReport(event.id, buildPayload());
-      toast.success('Report submitted! Event archived.');
+      await activeService.submitReport(event.id, buildPayload());
+      toast.success(isRnD ? 'RnD Report submitted successfully!' : 'Report submitted! Event archived.');
       onComplete();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || err?.message || 'Submission failed');
