@@ -42,10 +42,10 @@ export default function EmailLogPage() {
               <tr key={log.id}>
                 <td>
                   {log.status === 'sent'
-                    ? <span className="flex items-center gap-1 text-emerald-600 text-xs font-semibold"><CheckCircle2 className="w-3.5 h-3.5" />Sent</span>
+                    ? <span className="flex items-center gap-1 text-[var(--status-success-text)] text-xs font-semibold"><CheckCircle2 className="w-3.5 h-3.5" />Sent</span>
                     : <span className="flex items-center gap-1 text-[var(--text-danger)] text-xs font-semibold"><XCircle className="w-3.5 h-3.5" />Failed</span>}
                 </td>
-                <td><span className="badge bg-muted text-slate-700 font-mono text-[10px]">{log.type}</span></td>
+                <td><span className="badge bg-muted text-[var(--text-primary)] font-mono text-[10px]">{log.type}</span></td>
                 <td className="text-xs text-[var(--text-secondary)] max-w-[200px] truncate">{log.recipient}</td>
                 <td className="text-xs text-[var(--text-muted)]">{log.event_id ? '#' + log.event_id : '—'}</td>
                 <td className="text-xs text-[var(--text-muted)]">{formatDateTime(log.sent_at)}</td>

@@ -43,7 +43,7 @@ export default function OverrideRequestsPage() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">
         <div><h1 className="page-title">Override Requests</h1><p className="page-subtitle">Venue clash override approvals requiring written justification</p></div>
-        <span className="badge bg-amber-100 text-amber-700 text-sm px-3 py-1">{events?.length} pending</span>
+        <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] text-sm px-3 py-1">{events?.length} pending</span>
       </div>
 
       <Alert type="warning">
@@ -56,14 +56,14 @@ export default function OverrideRequestsPage() {
       ) : events?.length === 0 ? (
         <div className="card"><EmptyState icon={<Shield />} title="No override requests" subtitle="All events have valid venue bookings" /></div>
       ) : events?.map(ev => (
-        <div key={ev.id} className="card p-6 border-l-4 border-amber-400">
+        <div key={ev.id} className="card p-6 border-l-4 border-[var(--status-warning-text)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-1">{ev.title}</h3>
               <div className="flex flex-wrap gap-4 text-xs text-[var(--text-muted)] mb-3">
                 <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{formatDate(ev.start_datetime)}</span>
                 {(ev.venue?.name || ev.venue_custom) && (
-                  <span className="flex items-center gap-1 text-amber-600 font-medium"><MapPin className="w-3.5 h-3.5" />⚠ {ev.venue?.name || ev.venue_custom} — clash detected</span>
+                  <span className="flex items-center gap-1 text-[var(--status-warning-text)] font-medium"><MapPin className="w-3.5 h-3.5" />⚠ {ev.venue?.name || ev.venue_custom} — clash detected</span>
                 )}
               </div>
             </div>
@@ -83,9 +83,9 @@ export default function OverrideRequestsPage() {
           <Button loading={submitting} onClick={handleOverride}>Confirm Override</Button>
         </>}>
         <div className="space-y-4">
-          <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-            <p className="font-semibold text-amber-800">{selected?.title}</p>
-            <p className="text-xs text-amber-700 mt-1">Venue: {selected?.venue?.name || selected?.venue_custom}</p>
+          <div className="p-4 bg-[var(--status-warning-bg)] rounded-xl border border-[var(--status-warning-text)]">
+            <p className="font-semibold text-[var(--status-warning-text)]">{selected?.title}</p>
+            <p className="text-xs text-[var(--status-warning-text)] mt-1">Venue: {selected?.venue?.name || selected?.venue_custom}</p>
           </div>
           <Alert type="warning"><AlertTriangle className="w-4 h-4" /><span>Written reason is mandatory and will be visible to all subsequent approvers.</span></Alert>
           <Textarea label="Override Justification (required)" placeholder="Explain why this venue clash can be accepted…"

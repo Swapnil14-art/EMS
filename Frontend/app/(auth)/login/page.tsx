@@ -11,6 +11,7 @@ import { Button, Input, Alert } from '@/components/ui';
 import { ROLE_DASHBOARD } from '@/lib/utils';
 import { extractApiError } from '@/lib/transformers';
 import toast from 'react-hot-toast';
+import { BrandMark } from '@/components/layout/BrandMark';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -83,12 +84,10 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 blue-section relative overflow-hidden flex-col items-center justify-center p-12">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-48 h-48 bg-yellow-300 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-20 w-48 h-48 bg-[var(--status-warning-bg)] rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 text-center">
-          <div className="w-20 h-20 bg-white/15 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/20">
-            <span className="text-[var(--btn-primary-text)] font-display font-bold text-3xl">E</span>
-          </div>
+          <div className="mx-auto mb-6 w-fit rounded-3xl bg-white/15 p-3 backdrop-blur-sm"><BrandMark compact link={false} /></div>
           <h1 className="font-display font-bold text-[var(--btn-primary-text)] text-4xl mb-3">EMS</h1>
           <p className="text-[rgb(var(--color-primary))]/20 text-lg mb-2">Event Management System</p>
           <p className="text-[rgb(var(--color-primary))]/20 text-sm">SVKM's NMIMS MPTP, Shirpur</p>
@@ -108,12 +107,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 bg-[var(--card-bg)] overflow-y-auto">
         <div className="w-full max-w-md py-8">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-[var(--btn-primary-bg)] rounded-xl flex items-center justify-center">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display">E</span>
-            </div>
-            <div><p className="font-display font-bold text-[var(--text-primary)]">EMS</p><p className="text-xs text-[var(--text-muted)]">NMIMS Shirpur</p></div>
-          </div>
+          <div className="lg:hidden mb-8"><BrandMark link={false} /></div>
 
           <div className="mb-6">
             <h2 className="font-display font-bold text-[var(--text-primary)] text-3xl">Welcome back</h2>

@@ -116,7 +116,7 @@ export default function StudentEventRegisterPage() {
       </div>
 
       {/* PDF Viewer Area */}
-      <div className="flex-1 w-full bg-slate-50 relative overflow-hidden">
+      <div className="flex-1 w-full bg-[var(--surface-subtle)] relative overflow-hidden">
         {hasDoc && !pdfError ? (
           <iframe 
             src={`${event.participant_doc_url}#toolbar=0`} 

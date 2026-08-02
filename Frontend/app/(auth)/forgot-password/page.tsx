@@ -94,8 +94,8 @@ export default function ForgotPasswordPage() {
           {success ? (
             <div className="space-y-6 animate-slide-up">
               <div className="bg-[rgb(var(--alert-success-bg)/0.1)] border border-[rgb(var(--alert-success-border)/0.2)] text-[var(--alert-success-text)] p-6 rounded-2xl">
-                <CheckCircle2 className="w-10 h-10 mb-4 text-green-500" />
-                <h3 className="font-bold text-lg mb-2 text-green-700">Check your inbox</h3>
+                <CheckCircle2 className="w-10 h-10 mb-4 text-[var(--status-success-text)]" />
+                <h3 className="font-bold text-lg mb-2 text-[var(--status-success-text)]">Check your inbox</h3>
                 <p className="text-sm font-medium">If an account with that email exists, we have sent a temporary password to it. Please check your inbox and spam folders.</p>
               </div>
               <Link href="/login">

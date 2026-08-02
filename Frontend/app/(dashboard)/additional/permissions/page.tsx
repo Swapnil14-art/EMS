@@ -22,7 +22,7 @@ export default function AdditionalPermissionsPage() {
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="page-title flex items-center gap-2">
-          <ShieldCheck className="w-6 h-6 text-amber-500" /> Permission Manager
+          <ShieldCheck className="w-6 h-6 text-[var(--status-warning-text)]" /> Permission Manager
         </h1>
         <p className="page-subtitle">
           Grant or revoke access for Additional role users. Note: you cannot grant <strong>manage_permissions</strong> — only a super admin can do that.

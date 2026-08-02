@@ -262,7 +262,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                 <div key={e.id} onClick={() => setSelectedEventId(e.id)} className="card p-4 hover:shadow-lg cursor-pointer transition-all border border-transparent hover:border-[rgb(var(--color-primary))]">
                   <div className="flex justify-between items-start mb-2 gap-2">
                     <h3 className="font-semibold text-[var(--text-primary)] line-clamp-2 flex-1">{e.title}</h3>
-                    <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-600 uppercase tracking-wider">{e.status}</span>
+                    <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-[var(--surface-subtle)] text-[var(--text-secondary)] uppercase tracking-wider">{e.status}</span>
                   </div>
                   <p className="text-sm text-[var(--text-muted)] line-clamp-2 uppercase tracking-wide">{e.event_type} • {e.target_audience?.replace('_', ' ') || 'General'}</p>
                   <p className="text-xs text-[var(--text-muted)] mt-4 font-medium">{new Date(e.start_datetime).toLocaleDateString()}</p>
@@ -297,7 +297,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                         </div>
                         {!viewOnly && (
                           <button onClick={() => handleDeleteLink(link.id)}
-                            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-red-50 rounded-lg transition-colors">
+                            className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}
@@ -318,7 +318,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                   <h3 className="section-title">Participation Document</h3>
                   <p className="text-xs text-[var(--text-muted)] mt-1">This document is visible to students on the event registration page.</p>
                 </div>
-                {selectedEvent.participant_doc_url && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                {selectedEvent.participant_doc_url && <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)]" />}
               </div>
 
               {selectedEvent.participant_doc_url && (
@@ -338,7 +338,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                   <p className="text-[10px] text-[var(--text-muted)] mt-2">PDF files only. Replaces existing file.</p>
                 </div>
               ) : !viewOnly ? (
-                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-slate-200">
+                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   Upload restricted (Event has ended)
                 </div>
               ) : null}
@@ -353,7 +353,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                 </div>
                 {/* checkmark driven by unified attendanceDocPath */}
                 {attendanceDocPath && (
-                  <CheckCircle2 className="w-5 h-5 text-green-500 absolute top-6 right-6" />
+                  <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
                 )}
               </div>
 
@@ -388,7 +388,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                   )}
                 </div>
               ) : !viewOnly ? (
-                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-slate-200">
+                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   Upload restricted (Report Submitted)
                 </div>
               ) : null}
@@ -402,7 +402,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                   <p className="text-xs text-[var(--text-muted)] mt-1">Final report submitted/generated for this event.</p>
                 </div>
                 {reportData?.generated_report_path && (
-                  <CheckCircle2 className="w-5 h-5 text-green-500 absolute top-6 right-6" />
+                  <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
                 )}
               </div>
 
@@ -420,7 +420,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
               )}
 
               {!viewOnly && !reportData?.generated_report_path ? (
-                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-slate-200">
+                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   No report submitted yet. Go to <button onClick={() => router.push(`${basePath}/report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">Report Tab</button> to submit.
                 </div>
               ) : !viewOnly ? (
@@ -458,7 +458,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
                   <p className="text-xs text-[var(--text-muted)] mt-1">Final RnD report submitted/generated for this event.</p>
                 </div>
                 {rndReportData?.generated_report_path && (
-                  <CheckCircle2 className="w-5 h-5 text-green-500 absolute top-6 right-6" />
+                  <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
                 )}
               </div>
 
@@ -476,7 +476,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
               )}
 
               {!viewOnly && !rndReportData?.generated_report_path ? (
-                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-slate-200">
+                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
                   No RnD report submitted yet. Go to <button onClick={() => router.push(`${basePath}/rnd-report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">RnD Report Tab</button> to submit.
                 </div>
               ) : !viewOnly ? (

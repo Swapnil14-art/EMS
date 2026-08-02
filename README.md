@@ -113,6 +113,22 @@ cd "4 Faculty Meeting Version"
 # 2. Configure Environment Files
 cp ems-backend/.env.example ems-backend/.env
 cp Frontend/.env.example Frontend/.env.local  # If applicable
+```
+
+---
+
+### Automated Testing (Playwright)
+
+```bash
+npm run test           # Run main Chromium tests
+npm run test:auth      # Auth tests (Login, Signup, Reset)
+npm run test:admin     # Admin dashboard & management tests
+npm run test:health    # API health & automated page crawler
+npm run test:rbac      # Role-based access control tests
+npm run test:a11y      # Accessibility (axe-core) scan
+npm run test:visual    # Visual regression screenshot tests
+npm run test:all       # Full multi-browser test suite
+```
 
 # 3. Build and launch all containers
 docker compose up -d --build

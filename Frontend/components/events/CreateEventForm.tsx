@@ -483,7 +483,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                           if (selected) field.onChange(curr.filter((n: string) => n !== d.value));
                           else field.onChange([...curr, d.value]);
                         }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-100'} border`}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-text)]' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--surface-subtle)]'} border`}
                       >
                         {d.label}
                       </button>
@@ -520,7 +520,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                               if (selected) field.onChange(curr.filter((id: number) => id !== c.id));
                               else field.onChange([...curr, c.id]);
                             }}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'} border`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-info-bg)] text-[var(--status-info-text)] border-[var(--status-info-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]'} border`}
                           >
                             {c.name}
                           </button>
@@ -528,7 +528,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                       })}
                     </div>
                   )} />
-                  {errors.collaborating_club_ids && <p className="text-xs text-red-500">{errors.collaborating_club_ids.message}</p>}
+                  {errors.collaborating_club_ids && <p className="text-xs text-[var(--status-danger-text)]">{errors.collaborating_club_ids.message}</p>}
                 </div>
               )}
               <Controller name="is_sponsored" control={control} render={({ field }) => (
@@ -539,12 +539,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                   <Input label="Sponsor Name" placeholder="e.g. Acme Corp" error={errors.sponsor_name?.message} {...register('sponsor_name')} />
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-[rgb(var(--color-primary))]">Sponsor Document <span className="text-[var(--text-danger)]">*</span></label>
-                    <div className={`flex items-center gap-2 p-2 border rounded-xl bg-white ${!sponsorFile ? 'border-red-300' : 'border-[var(--card-border)]'}`}>
+                    <div className={`flex items-center gap-2 p-2 border rounded-xl bg-white ${!sponsorFile ? 'border-[var(--status-danger-text)]' : 'border-[var(--card-border)]'}`}>
                       <input type="file" ref={sponsorRef} className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={e => {
                         if (e.target.files && e.target.files[0]) setSponsorFile(e.target.files[0]);
                       }} />
                       <Button variant="secondary" type="button" className="text-xs py-1.5" onClick={() => sponsorRef.current?.click()}>Choose File</Button>
-                      <span className="text-xs truncate max-w-[140px] text-gray-600 font-medium">{sponsorFile ? sponsorFile.name : 'No file chosen'}</span>
+                      <span className="text-xs truncate max-w-[140px] text-[var(--text-secondary)] font-medium">{sponsorFile ? sponsorFile.name : 'No file chosen'}</span>
                     </div>
                   </div>
                 </div>
@@ -567,7 +567,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                     />
                   </div>
                   {objectiveFields.length > 3 && (
-                    <button type="button" onClick={() => removeObjective(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-red-50 hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
+                    <button type="button" onClick={() => removeObjective(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -626,7 +626,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                       <button 
                         type="button" 
                         onClick={() => removeVenue(index)} 
-                        className="absolute -top-2 -right-2 p-1.5 bg-white border border-red-200 text-red-500 rounded-full hover:bg-red-50 shadow-sm opacity-0 group-hover/venue:opacity-100 transition-opacity"
+                        className="absolute -top-2 -right-2 p-1.5 bg-white border border-[var(--status-danger-text)] text-[var(--status-danger-text)] rounded-full hover:bg-[var(--status-danger-bg)] shadow-sm opacity-0 group-hover/venue:opacity-100 transition-opacity"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -695,7 +695,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                                               if (selected) idsField.onChange(curr.filter((id: number) => id !== v.id));
                                               else idsField.onChange([...curr, v.id]);
                                             }}
-                                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${selected ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'} border`}
+                                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${selected ? 'bg-[var(--status-info-bg)] text-[var(--status-info-text)] border-[var(--status-info-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]'} border`}
                                           >
                                             {v.name}
                                           </button>

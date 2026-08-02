@@ -13,12 +13,12 @@ interface EventCardProps {
 }
 
 const GRADIENT_FALLBACKS = [
-  'from-blue-400 to-blue-700',
-  'from-indigo-400 to-indigo-700',
-  'from-sky-400 to-sky-700',
-  'from-violet-400 to-violet-700',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
   'from-cyan-400 to-cyan-600',
-  'from-blue-500 to-indigo-700',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
 ];
 
 function fallbackGradient(id: number) {
@@ -45,7 +45,7 @@ export function EventCard({ event, showStatus = true }: EventCardProps) {
         {/* Status overlay */}
         <div className="absolute top-3 left-3 flex gap-2">
           {isOngoing && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--status-success-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               LIVE
             </span>

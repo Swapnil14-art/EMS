@@ -107,7 +107,7 @@ export default function AdditionalReportsPage() {
                   <div key={ev.id} onClick={() => setSelectedId(ev.id)} className="card p-4 hover:shadow-lg cursor-pointer transition-all border border-transparent hover:border-[rgb(var(--color-primary))]">
                     <div className="flex justify-between items-start mb-2 gap-2">
                       <h3 className="font-semibold text-[var(--text-primary)] line-clamp-2 flex-1">{ev.title}</h3>
-                      <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-600 uppercase">{ev.status}</span>
+                      <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-[var(--surface-subtle)] text-[var(--text-secondary)] uppercase">{ev.status}</span>
                     </div>
                     <p className="text-sm text-[var(--text-muted)] mt-2">{formatDate(ev.start_datetime)}</p>
                   </div>
@@ -118,7 +118,7 @@ export default function AdditionalReportsPage() {
         ) : (
           <div className="space-y-5">
             {/* Selected event banner */}
-            <div className="p-4 bg-[var(--page-bg)] rounded-xl relative border border-slate-200">
+            <div className="p-4 bg-[var(--page-bg)] rounded-xl relative border border-[var(--border-subtle)]">
               <button onClick={() => { setSelectedId(null); setSelectedFile(null); }} className="absolute top-4 right-4 text-xs font-semibold text-[rgb(var(--color-primary))] hover:underline">Change</button>
               <p className="font-semibold text-[var(--text-primary)] pr-24">{selectedEvent?.title}</p>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">{formatDate(selectedEvent?.start_datetime ?? '')}</p>
@@ -135,7 +135,7 @@ export default function AdditionalReportsPage() {
                       {reportPath ? 'A report has been submitted for this event.' : 'No report submitted yet.'}
                     </p>
                   </div>
-                  {reportPath && <CheckCircle2 className="w-5 h-5 text-green-500 absolute top-6 right-6" />}
+                  {reportPath && <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />}
                 </div>
 
                 {canView && reportPath && (
@@ -149,12 +149,12 @@ export default function AdditionalReportsPage() {
                     <input ref={fileRef} type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={e => setSelectedFile(e.target.files?.[0] ?? null)} />
                     {selectedFile ? (
                       <div className="space-y-3">
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex flex-col items-center">
-                          <FileText className="w-6 h-6 text-blue-600 mb-1" />
-                          <p className="text-sm font-medium text-blue-900 truncate max-w-full px-2">{selectedFile.name}</p>
-                          <button onClick={() => { setSelectedFile(null); if (fileRef.current) fileRef.current.value = ''; }} className="text-xs text-blue-600 hover:underline mt-1">Change File</button>
+                        <div className="p-3 bg-[var(--status-info-bg)] border border-[var(--status-info-text)] rounded-lg flex flex-col items-center">
+                          <FileText className="w-6 h-6 text-[var(--status-info-text)] mb-1" />
+                          <p className="text-sm font-medium text-[var(--status-info-text)] truncate max-w-full px-2">{selectedFile.name}</p>
+                          <button onClick={() => { setSelectedFile(null); if (fileRef.current) fileRef.current.value = ''; }} className="text-xs text-[var(--status-info-text)] hover:underline mt-1">Change File</button>
                         </div>
-                        <Button loading={uploading} onClick={handleUpload} className="w-full justify-center h-11 bg-green-600 hover:bg-green-700 text-white border-0" icon={<CheckCircle2 className="w-4 h-4" />}>
+                        <Button loading={uploading} onClick={handleUpload} className="w-full justify-center h-11 bg-[var(--status-success-bg)] hover:bg-[var(--status-success-bg)] text-white border-0" icon={<CheckCircle2 className="w-4 h-4" />}>
                           APPROVE AND SUBMIT
                         </Button>
                       </div>

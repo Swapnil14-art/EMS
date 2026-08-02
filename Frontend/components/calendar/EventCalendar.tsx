@@ -159,26 +159,26 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
       </div>
 
       {/* Calendar Area */}
-      <div className="calendar-container overflow-hidden rounded-xl border border-[var(--card-border)] bg-white relative">
+      <div className="calendar-container overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--surface-bg)] relative">
         <style dangerouslySetInnerHTML={{__html: `
           .fc {
-            --fc-border-color: #e2e8f0;
-            --fc-button-bg-color: #ffffff;
-            --fc-button-border-color: #cbd5e1;
-            --fc-button-text-color: #334155;
-            --fc-button-hover-bg-color: #f1f5f9;
-            --fc-button-hover-border-color: #cbd5e1;
-            --fc-button-active-bg-color: #e2e8f0;
-            --fc-button-active-border-color: #cbd5e1;
+            --fc-border-color: var(--border-subtle);
+            --fc-button-bg-color: var(--surface-bg);
+            --fc-button-border-color: var(--border-strong);
+            --fc-button-text-color: var(--text-secondary);
+            --fc-button-hover-bg-color: var(--surface-subtle);
+            --fc-button-hover-border-color: var(--border-strong);
+            --fc-button-active-bg-color: var(--brand-soft);
+            --fc-button-active-border-color: var(--brand-primary);
             --fc-event-border-color: transparent;
-            --fc-today-bg-color: #eff6ff; 
+            --fc-today-bg-color: var(--brand-soft); 
             font-family: inherit;
           }
           .fc-header-toolbar {
             padding: 1rem 1.25rem !important;
             margin-bottom: 0 !important;
-            border-bottom: 1px solid #e2e8f0;
-            background: #f8fafc;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--surface-subtle);
           }
           @media (max-width: 640px) {
             .fc-header-toolbar {
@@ -196,13 +196,13 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           .fc-toolbar-title { 
             font-size: 1.125rem !important; 
             font-weight: 700 !important; 
-            color: #1e293b; 
+            color: var(--text-primary); 
           }
           .fc-button-primary { 
             border-radius: 0.5rem !important; 
             font-weight: 600 !important; 
             font-size: 0.8125rem !important; 
-            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); 
+            box-shadow: var(--shadow-card); 
             text-transform: capitalize;
             padding: 0.375rem 0.75rem !important;
           }
@@ -210,7 +210,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             padding: 0.75rem 0.5rem !important; 
             font-weight: 600; 
             font-size: 0.875rem;
-            color: #475569; 
+            color: var(--text-secondary); 
             text-transform: uppercase;
             letter-spacing: 0.025em;
           }
@@ -218,10 +218,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             padding: 0.5rem !important; 
             font-weight: 600; 
             font-size: 0.875rem;
-            color: #334155; 
+            color: var(--text-secondary); 
           }
           .fc-day-other .fc-daygrid-day-number {
-             color: #94a3b8;
+             color: var(--text-muted);
              font-weight: 500;
           }
           .fc-event { 
@@ -230,13 +230,13 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             margin: 1px 4px !important;
             cursor: pointer; 
             transition: all 0.2s ease; 
-            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            box-shadow: var(--shadow-card);
             border: none !important;
           }
           .fc-event:hover { 
             transform: translateY(-1px); 
             filter: brightness(1.05); 
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            box-shadow: var(--shadow-card-md);
             z-index: 10;
           }
           .fc-daygrid-event-dot { display: none; }
@@ -321,9 +321,9 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
       {/* Legend */}
       <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 px-2">
          <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider hidden sm:block">Legend</span>
-         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Upcoming / Approved</span></div>
+         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[var(--status-success-bg)] shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Upcoming / Approved</span></div>
          <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[var(--btn-primary-bg)] shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Ongoing</span></div>
-         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-gray-500 shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Completed / Past</span></div>
+         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[var(--surface-subtle)] shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Completed / Past</span></div>
       </div>
     </div>
   );

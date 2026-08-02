@@ -174,7 +174,7 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap gap-2 mb-1">
                 <EventTypeBadge type={ev.event_type} /><StatusBadge status={ev.status} />
-                {ev.is_collaborative && <span className="badge bg-indigo-100 text-indigo-700">Collaborative</span>}
+                {ev.is_collaborative && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>}
               </div>
               <h3 className="font-display font-bold text-[var(--text-primary)] truncate">{ev.title}</h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">{formatDate(ev.start_datetime)} · {ev.venue?.name || ev.venue_custom || 'Venue TBD'}</p>
@@ -222,8 +222,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
           <Button variant="danger" loading={cancelling} onClick={handleCancel}>Confirm Cancellation</Button>
         </>}>
         <div className="space-y-4">
-          <div className="p-4 bg-red-50 rounded-xl">
-            <p className="font-semibold text-red-800">{cancelEvent?.title}</p>
+          <div className="p-4 bg-[var(--status-danger-bg)] rounded-xl">
+            <p className="font-semibold text-[var(--status-danger-text)]">{cancelEvent?.title}</p>
             <p className="text-xs text-[var(--text-danger)] mt-0.5">All registered students will be notified via email.</p>
           </div>
           <Textarea label="Cancellation Reason (required)" placeholder="Explain why this event is being cancelled…"
@@ -245,8 +245,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
           <Button loading={savingDeadline} onClick={handleUpdateDeadline}>Save Deadline</Button>
         </>}>
         <div className="space-y-4">
-          <div className="p-4 bg-orange-50 rounded-xl border border-orange-200">
-            <p className="text-xs text-orange-800">
+          <div className="p-4 bg-[var(--status-warning-bg)] rounded-xl border border-[var(--status-warning-text)]">
+            <p className="text-xs text-[var(--status-warning-text)]">
               <strong>Warning:</strong> Changing the deadline will trigger the approval chain again from the start.
             </p>
           </div>

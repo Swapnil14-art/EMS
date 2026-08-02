@@ -15,9 +15,9 @@ const PERM_TILES = [
     desc: 'Browse and view event details',
     href: '/additional/events',
     icon: Calendar,
-    color: 'from-blue-500 to-indigo-600',
-    bg: 'bg-blue-50',
-    text: 'text-blue-700',
+    color: 'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+    bg: 'bg-[var(--status-info-bg)]',
+    text: 'text-[var(--status-info-text)]',
   },
   {
     perms: ['view_reports', 'submit_reports'],
@@ -25,9 +25,9 @@ const PERM_TILES = [
     desc: 'View or submit post-event reports',
     href: '/additional/reports',
     icon: FileText,
-    color: 'from-emerald-500 to-teal-600',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
+    color: 'from-[var(--status-success-text)] to-[var(--status-info-text)]',
+    bg: 'bg-[var(--status-success-bg)]',
+    text: 'text-[var(--status-success-text)]',
   },
   {
     perms: ['view_rnd_reports', 'submit_rnd_reports'],
@@ -35,9 +35,9 @@ const PERM_TILES = [
     desc: 'View or submit RnD reports',
     href: '/additional/rnd-reports',
     icon: FlaskConical,
-    color: 'from-violet-500 to-purple-600',
-    bg: 'bg-violet-50',
-    text: 'text-violet-700',
+    color: 'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+    bg: 'bg-[var(--status-info-bg)]',
+    text: 'text-[var(--status-info-text)]',
   },
   {
     perms: ['manage_permissions'],
@@ -45,9 +45,9 @@ const PERM_TILES = [
     desc: 'Grant or revoke access for Additional users',
     href: '/additional/permissions',
     icon: ShieldCheck,
-    color: 'from-amber-500 to-orange-600',
-    bg: 'bg-amber-50',
-    text: 'text-amber-700',
+    color: 'from-[var(--status-warning-text)] to-[var(--status-warning-text)]',
+    bg: 'bg-[var(--status-warning-bg)]',
+    text: 'text-[var(--status-warning-text)]',
   },
 ];
 
@@ -75,8 +75,8 @@ export default function AdditionalDashboard() {
 
       {grantedTiles.length === 0 ? (
         <div className="card p-12 text-center flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-            <Lock className="w-8 h-8 text-slate-400" />
+          <div className="w-16 h-16 rounded-2xl bg-[var(--surface-subtle)] flex items-center justify-center">
+            <Lock className="w-8 h-8 text-[var(--text-muted)]" />
           </div>
           <div>
             <h3 className="font-semibold text-[var(--text-primary)]">No permissions assigned yet</h3>
@@ -121,14 +121,14 @@ export default function AdditionalDashboard() {
               return (
                 <div key={tile.label} className="card p-5 opacity-40 select-none">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center">
-                      <Icon className="w-5 h-5 text-slate-400" />
+                    <div className="w-10 h-10 rounded-xl bg-[var(--surface-subtle)] flex items-center justify-center">
+                      <Icon className="w-5 h-5 text-[var(--text-muted)]" />
                     </div>
                     <div>
                       <p className="font-semibold text-[var(--text-primary)] text-sm">{tile.label}</p>
                       <p className="text-xs text-[var(--text-muted)]">{tile.desc}</p>
                     </div>
-                    <Lock className="w-4 h-4 text-slate-300 ml-auto" />
+                    <Lock className="w-4 h-4 text-[var(--text-muted)] ml-auto" />
                   </div>
                 </div>
               );

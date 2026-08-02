@@ -301,7 +301,7 @@ export default function AdminUsersPage() {
                     </div>
                     <span className="font-medium">{u.name || '—'}</span>
                     {u.force_password_change && (
-                      <span className="badge bg-amber-100 text-amber-700 text-[10px]">Temp pwd</span>
+                      <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] text-[10px]">Temp pwd</span>
                     )}
                   </div>
                 </td>
@@ -309,29 +309,29 @@ export default function AdminUsersPage() {
                 <td><RoleBadge role={u.role} /></td>
                 <td className="text-[var(--text-secondary)] text-xs">{u.department?.name || '—'}</td>
                 <td>
-                  <span className={`badge ${u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+                  <span className={`badge ${u.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
                     {u.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 <td>
                   <div className="flex gap-1">
                     <button onClick={() => openEdit(u)}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit User">
+                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--status-info-text)] hover:bg-[var(--status-info-bg)] rounded-lg transition-colors" title="Edit User">
                       <Edit2 className="w-4 h-4" />
                     </button>
                     {u.is_active ? (
                       <button onClick={() => setDeactivateUser(u)}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-red-50 rounded-lg transition-colors" title="Deactivate">
+                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors" title="Deactivate">
                         <UserX className="w-4 h-4" />
                       </button>
                     ) : (
                       <button onClick={async () => { await userService.activate(u.id); fetchUsers(); toast.success('User activated'); }}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Activate">
+                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--status-success-text)] hover:bg-[var(--status-success-bg)] rounded-lg transition-colors" title="Activate">
                         <UserCheck className="w-4 h-4" />
                       </button>
                     )}
                     <button onClick={() => setDeleteUser(u)}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-red-50 rounded-lg transition-colors" title="Delete permanently">
+                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors" title="Delete permanently">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -477,9 +477,9 @@ export default function AdminUsersPage() {
                   <p className="text-xs text-[var(--text-muted)]">{s.email} {s.sap_id ? `· ${s.sap_id}` : ''}</p>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
-                  {s.year_of_study && <span className="badge bg-blue-100 text-blue-700 text-[10px]">{s.year_of_study}</span>}
-                  {s.branch && <span className="badge bg-purple-100 text-purple-700 text-[10px]">{s.branch}</span>}
-                  <span className={`badge text-[10px] ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+                  {s.year_of_study && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)] text-[10px]">{s.year_of_study}</span>}
+                  {s.branch && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)] text-[10px]">{s.branch}</span>}
+                  <span className={`badge text-[10px] ${s.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
                     {s.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>

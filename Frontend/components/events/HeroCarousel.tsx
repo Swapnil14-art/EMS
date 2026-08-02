@@ -12,16 +12,16 @@ interface HeroCarouselProps {
 }
 
 const PLACEHOLDER_COLORS = [
-  'from-blue-600 to-blue-900',
-  'from-indigo-600 to-indigo-900',
-  'from-sky-600 to-sky-900',
-  'from-violet-600 to-violet-900',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
   'from-cyan-600 to-cyan-900',
 ];
 
 function StatusPill({ status }: { status: string }) {
   if (status === 'ongoing') return (
-    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow-lg">
+    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--status-success-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow-lg">
       <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
       LIVE NOW
     </span>
@@ -33,7 +33,7 @@ function StatusPill({ status }: { status: string }) {
     </span>
   );
   return (
-    <span className="px-3 py-1.5 bg-slate-500 text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow-lg">
+    <span className="px-3 py-1.5 bg-[var(--surface-subtle)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow-lg">
       {status.toUpperCase()}
     </span>
   );

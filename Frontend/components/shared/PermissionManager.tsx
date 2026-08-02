@@ -108,7 +108,7 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
             className="w-full h-10 pl-10 pr-4 bg-white border border-[var(--input-border)] text-[var(--text-primary)] rounded-xl outline-none focus:border-[var(--input-focus-ring)] transition-colors text-sm" />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
         </div>
-        <button onClick={load} className="p-2.5 rounded-xl border border-[var(--card-border)] hover:bg-slate-50 transition-colors text-[var(--text-muted)]" title="Refresh">
+        <button onClick={load} className="p-2.5 rounded-xl border border-[var(--card-border)] hover:bg-[var(--surface-subtle)] transition-colors text-[var(--text-muted)]" title="Refresh">
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
@@ -124,11 +124,11 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
             const dirty = isDirty(u.id);
 
             return (
-              <div key={u.id} className={`card p-5 transition-all ${dirty ? 'border-amber-300 shadow-md' : ''}`}>
+              <div key={u.id} className={`card p-5 transition-all ${dirty ? 'border-[var(--status-warning-text)] shadow-md' : ''}`}>
                 {/* User header */}
                 <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--status-info-text)] to-[var(--status-info-text)] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                       {u.name ? u.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : '??'}
                     </div>
                     <div>
@@ -138,7 +138,7 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
                   </div>
                   <div className="flex items-center gap-2">
                     {dirty && (
-                      <span className="text-xs text-amber-600 font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+                      <span className="text-xs text-[var(--status-warning-text)] font-semibold bg-[var(--status-warning-bg)] border border-[var(--status-warning-text)] px-2.5 py-1 rounded-full">
                         Unsaved changes
                       </span>
                     )}
@@ -165,17 +165,17 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
                         onClick={() => toggle(u.id, code)}
                         className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all hover:shadow-sm ${
                           granted
-                            ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-[var(--status-success-bg)] border-[var(--status-success-text)] hover:bg-[var(--status-success-bg)]'
+                            : 'bg-[var(--surface-subtle)] border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]'
                         }`}
                       >
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 border transition-colors ${
-                          granted ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white'
+                          granted ? 'bg-[var(--status-success-bg)] border-[var(--status-success-text)]' : 'border-[var(--border-subtle)] bg-white'
                         }`}>
                           {granted && <Check className="w-3 h-3 text-white" />}
                         </div>
                         <div className="min-w-0">
-                          <p className={`text-sm font-semibold leading-tight ${granted ? 'text-emerald-800' : 'text-[var(--text-primary)]'}`}>
+                          <p className={`text-sm font-semibold leading-tight ${granted ? 'text-[var(--status-success-text)]' : 'text-[var(--text-primary)]'}`}>
                             {title}
                           </p>
                           {desc && <p className="text-xs text-[var(--text-muted)] mt-0.5 leading-snug">{desc}</p>}
@@ -191,7 +191,7 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
                     <span className="text-xs text-[var(--text-muted)] italic">No permissions granted</span>
                   ) : (
                     Array.from(userPerms).map(p => (
-                      <span key={p} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-wide">
+                      <span key={p} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--status-success-bg)] text-[var(--status-success-text)] uppercase tracking-wide">
                         {p.replace(/_/g, ' ')}
                       </span>
                     ))

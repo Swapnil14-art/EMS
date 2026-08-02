@@ -1,130 +1,104 @@
 :root {
-  /* Base Colors (RGB Format for opacity support) */
-  --color-primary: 37 99 235;
-  /* Main brand color used for primary buttons and highlights */
-  --color-secondary: 71 85 105;
-  /* Secondary brand color used for borders and ghost buttons */
-  --color-background: 248 250 255;
-  /* Main page background color */
-  --color-surface: 255 255 255;
-  /* Surface color used for cards, modals, and dropdowns */
-  --color-text: 15 23 42;
-  /* Default primary text color */
-  --color-muted: 148 163 184;
-  /* Muted color used for secondary text and borders */
-  --color-danger: 220 38 38;
-  /* Danger color used for errors and destructive actions */
+  /* NMIMS-inspired neutral system. Keep raw RGB values here so opacity variants stay reusable. */
+  --nmims-navy: 18 47 83;
+  --nmims-navy-strong: 13 37 66;
+  --nmims-gold: 174 134 50;
+  --neutral-0: 255 255 255;
+  --neutral-25: 250 251 252;
+  --neutral-50: 246 247 249;
+  --neutral-100: 238 240 243;
+  --neutral-200: 222 226 231;
+  --neutral-300: 201 207 214;
+  --neutral-500: 101 112 125;
+  --neutral-700: 55 65 81;
+  --neutral-900: 27 36 48;
+  --success: 46 125 91;
+  --warning: 166 112 38;
+  --danger: 174 60 60;
 
-  /* Typography */
-  --text-primary: rgb(var(--color-text));
-  /* Main reading text color */
-  --text-secondary: rgb(var(--color-secondary));
-  /* Secondary text like subtitles */
-  --text-muted: rgb(var(--color-muted));
-  /* Muted text for placeholders or minor details */
-  --text-danger: rgb(var(--color-danger));
-  /* Red text for error messages */
+  --color-primary: var(--nmims-navy);
+  --color-secondary: var(--neutral-700);
+  --color-background: var(--neutral-50);
+  --color-surface: var(--neutral-0);
+  --color-text: var(--neutral-900);
+  --color-muted: var(--neutral-500);
+  --color-danger: var(--danger);
 
-  /* Backgrounds */
-  --page-bg: rgb(var(--color-background));
-  /* Default background for the whole application */
+  --text-primary: rgb(var(--neutral-900));
+  --text-secondary: rgb(var(--neutral-700));
+  --text-muted: rgb(var(--neutral-500));
+  --text-danger: rgb(var(--danger));
+  --text-on-brand: rgb(var(--neutral-0));
+  --page-bg: rgb(var(--neutral-50));
+  --page-text: var(--text-primary);
+  --surface-bg: rgb(var(--neutral-0));
+  --surface-subtle: rgb(var(--neutral-25));
 
-  /* Buttons */
-  --btn-primary-bg: rgb(var(--color-primary));
-  /* Background color for primary buttons */
-  --btn-primary-text: rgb(var(--color-surface));
-  /* Text color for primary buttons */
-  --btn-secondary-bg: rgb(var(--color-surface));
-  /* Background color for secondary/outline buttons */
-  --btn-secondary-border: rgb(var(--color-muted));
-  /* Border color for secondary/outline buttons */
-  --btn-secondary-text: rgb(var(--color-text));
-  /* Text color for secondary/outline buttons */
-  --btn-secondary-hover-bg: rgb(var(--color-background));
-  /* Hover background for secondary buttons */
-  --btn-ghost-text: rgb(var(--color-secondary));
-  /* Text color for ghost/transparent buttons */
-  --btn-ghost-hover-bg: rgb(var(--color-muted));
-  /* Hover background for ghost buttons */
-  --btn-danger-bg: rgb(var(--color-danger));
-  /* Background for destructive buttons */
-  --btn-danger-text: rgb(var(--color-surface));
-  /* Text color for destructive buttons */
+  --brand-primary: rgb(var(--nmims-navy));
+  --brand-primary-strong: rgb(var(--nmims-navy-strong));
+  --brand-accent: rgb(var(--nmims-gold));
+  --brand-soft: rgb(var(--nmims-navy) / 0.08);
+  --border-subtle: rgb(var(--neutral-200));
+  --border-strong: rgb(var(--neutral-300));
 
-  /* Cards */
-  --card-bg: rgb(var(--color-surface));
-  /* Background color for card containers */
-  --card-border: rgb(var(--color-muted));
-  /* Border color for card containers */
+  --btn-primary-bg: var(--brand-primary);
+  --btn-primary-hover-bg: var(--brand-primary-strong);
+  --btn-primary-text: var(--text-on-brand);
+  --btn-secondary-bg: var(--surface-bg);
+  --btn-secondary-border: var(--border-strong);
+  --btn-secondary-text: var(--text-primary);
+  --btn-secondary-hover-bg: var(--surface-subtle);
+  --btn-ghost-text: var(--text-secondary);
+  --btn-ghost-hover-bg: var(--brand-soft);
+  --btn-danger-bg: rgb(var(--danger));
+  --btn-danger-text: var(--text-on-brand);
 
-  /* Inputs */
-  --input-bg: rgb(var(--color-surface));
-  /* Background color for form inputs */
-  --input-border: rgb(var(--color-secondary));
-  /* Border color for form inputs */
-  --input-text: rgb(var(--color-text));
-  /* Text color typed inside form inputs */
-  --input-placeholder: rgb(var(--color-muted));
-  /* Placeholder text color in inputs */
-  --input-focus-ring: rgb(var(--color-primary));
-  /* Color of the focus ring around active inputs */
-  --input-error-border: rgb(var(--color-danger));
-  /* Border color when an input has an error */
+  --card-bg: var(--surface-bg);
+  --card-border: var(--border-subtle);
+  --input-bg: var(--surface-bg);
+  --input-border: var(--border-strong);
+  --input-text: var(--text-primary);
+  --input-placeholder: var(--text-muted);
+  --input-focus-ring: var(--brand-primary);
+  --input-error-border: rgb(var(--danger));
 
-  /* Navigation / Sidebar */
-  --nav-bg: rgb(var(--color-surface));
-  /* Background color of the navigation bar/sidebar */
-  --nav-item-text: rgb(var(--color-secondary));
-  /* Text color for inactive navigation items */
-  --nav-item-hover-bg: rgb(var(--color-surface));
-  /* Background color when hovering over a nav item */
-  --nav-item-hover-text: rgb(var(--color-primary));
-  /* Text color when hovering over a nav item */
-  --nav-item-active-bg: rgb(var(--color-surface));
-  /* Background color for the currently active nav item */
-  --nav-item-active-text: rgb(var(--color-primary));
-  /* Text color for the currently active nav item */
+  --nav-bg: var(--surface-bg);
+  --nav-item-text: var(--text-secondary);
+  --nav-item-hover-bg: var(--brand-soft);
+  --nav-item-hover-text: var(--brand-primary);
+  --nav-item-active-bg: var(--brand-soft);
+  --nav-item-active-text: var(--brand-primary);
 
-  /* Tables */
-  --table-header-bg: rgb(var(--color-background));
-  /* Background color for table header rows */
-  --table-header-text: rgb(var(--color-muted));
-  /* Text color for table column titles */
-  --table-bg: rgb(var(--color-surface));
-  /* Background color for normal table rows */
-  --table-text: rgb(var(--color-text));
-  /* Text color for table cell contents */
-  --table-border: rgb(var(--color-muted));
-  /* Border color between table rows/cells */
-  --table-row-hover: rgb(var(--color-surface));
-  /* Background color when hovering over a table row */
+  --table-header-bg: var(--surface-subtle);
+  --table-header-text: var(--text-secondary);
+  --table-bg: var(--surface-bg);
+  --table-text: var(--text-primary);
+  --table-border: var(--border-subtle);
+  --table-row-hover: rgb(var(--nmims-navy) / 0.035);
 
-  /* Alerts */
-  --alert-info-bg: rgb(var(--color-primary));
-  /* Background color for informative alerts */
-  --alert-info-border: rgb(var(--color-primary));
-  /* Border color for informative alerts */
-  --alert-info-text: rgb(var(--color-text));
-  /* Text color inside informative alerts */
+  --status-success-bg: rgb(var(--success) / 0.1);
+  --status-success-text: rgb(var(--success));
+  --status-warning-bg: rgb(var(--warning) / 0.12);
+  --status-warning-text: rgb(var(--warning));
+  --status-danger-bg: rgb(var(--danger) / 0.1);
+  --status-danger-text: rgb(var(--danger));
+  --status-info-bg: var(--brand-soft);
+  --status-info-text: var(--brand-primary);
 
-  --alert-success-bg: rgb(var(--color-primary));
-  /* Background color for success alerts */
-  --alert-success-border: rgb(var(--color-primary));
-  /* Border color for success alerts */
-  --alert-success-text: rgb(var(--color-text));
-  /* Text color inside success alerts */
+  --alert-info-bg: var(--nmims-navy);
+  --alert-info-border: var(--nmims-navy);
+  --alert-info-text: var(--brand-primary);
+  --alert-success-bg: var(--success);
+  --alert-success-border: var(--success);
+  --alert-success-text: rgb(var(--success));
+  --alert-warning-bg: var(--warning);
+  --alert-warning-border: var(--warning);
+  --alert-warning-text: rgb(var(--warning));
+  --alert-error-bg: var(--danger);
+  --alert-error-border: var(--danger);
+  --alert-error-text: rgb(var(--danger));
 
-  --alert-warning-bg: rgb(var(--color-secondary));
-  /* Background color for warning alerts */
-  --alert-warning-border: rgb(var(--color-secondary));
-  /* Border color for warning alerts */
-  --alert-warning-text: rgb(var(--color-secondary));
-  /* Text color inside warning alerts */
-
-  --alert-error-bg: rgb(var(--color-danger));
-  /* Background color for error alerts */
-  --alert-error-border: rgb(var(--color-danger));
-  /* Border color for error alerts */
-  --alert-error-text: rgb(var(--color-danger));
-  /* Text color inside error alerts */
+  --shadow-card: 0 1px 2px rgb(var(--neutral-900) / 0.04), 0 4px 14px rgb(var(--neutral-900) / 0.04);
+  --shadow-card-md: 0 8px 24px rgb(var(--neutral-900) / 0.08);
+  --shadow-card-lg: 0 16px 36px rgb(var(--neutral-900) / 0.12);
 }

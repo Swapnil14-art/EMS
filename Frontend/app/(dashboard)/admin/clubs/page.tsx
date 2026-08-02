@@ -133,10 +133,10 @@ export default function AdminClubsPage() {
         ) : filtered?.map(club => (
           <div key={club.id} className="card-hover p-5 relative">
             <div className="absolute top-4 right-4 flex gap-1">
-              <button onClick={() => handleEdit(club)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+              <button onClick={() => handleEdit(club)} className="p-2 text-[var(--text-muted)] hover:text-[var(--status-info-text)] hover:bg-[var(--status-info-bg)] rounded-lg transition-colors" title="Edit">
                 <Edit2 className="w-4 h-4" />
               </button>
-              <button onClick={() => setDeleteClub(club)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+              <button onClick={() => setDeleteClub(club)} className="p-2 text-[var(--text-muted)] hover:text-[var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors" title="Delete">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -144,7 +144,7 @@ export default function AdminClubsPage() {
               <div className="w-10 h-10 bg-[var(--card-bg)] rounded-2xl flex items-center justify-center flex-shrink-0">
                 <BookOpen className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
-              <span className={`badge ${club.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+              <span className={`badge ${club.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-muted text-[var(--text-muted)]'}`}>
                 {club.is_active ? 'Active' : 'Inactive'}
               </span>
             </div>
@@ -156,7 +156,7 @@ export default function AdminClubsPage() {
                 <div className="flex items-center gap-1 font-semibold mb-1"><Users className="w-3 h-3" /> Coordinators:</div>
                 <div className="flex flex-wrap gap-1">
                   {club.coordinators.map(c => (
-                    <span key={c.id} className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-100">{c.name || c.email}</span>
+                    <span key={c.id} className="bg-[var(--status-info-bg)] text-[var(--status-info-text)] px-2 py-0.5 rounded-md border border-[var(--status-info-text)]">{c.name || c.email}</span>
                   ))}
                 </div>
               </div>
@@ -184,18 +184,18 @@ export default function AdminClubsPage() {
           <div className="space-y-1.5">
             <label className="label">Assign Coordinators</label>
             {!watchedDept ? (
-               <div className="text-sm text-slate-500 italic p-3 bg-slate-50 rounded-lg border border-slate-200">First select a school/department...</div>
+               <div className="text-sm text-[var(--text-secondary)] italic p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border-subtle)]">First select a school/department...</div>
             ) : availableCoordinators.length === 0 ? (
-               <div className="text-sm text-slate-500 italic p-3 bg-slate-50 rounded-lg border border-slate-200">No free coordinators found in this school.</div>
+               <div className="text-sm text-[var(--text-secondary)] italic p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border-subtle)]">No free coordinators found in this school.</div>
             ) : (
-              <div className="max-h-[160px] overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1">
+              <div className="max-h-[160px] overflow-y-auto border border-[var(--border-subtle)] rounded-xl p-2 space-y-1">
                 {availableCoordinators.map(user => {
                   const isChecked = selectedCoordinatorIds.includes(user.id);
                   return (
-                    <label key={user.id} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-blue-50 border-blue-100' : 'hover:bg-slate-50 border-transparent'} border`}>
+                    <label key={user.id} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-[var(--status-info-bg)] border-[var(--status-info-text)]' : 'hover:bg-[var(--surface-subtle)] border-transparent'} border`}>
                       <input 
                         type="checkbox" 
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        className="w-4 h-4 rounded text-[var(--status-info-text)] focus:ring-[var(--status-info-text)]"
                         checked={isChecked}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -206,8 +206,8 @@ export default function AdminClubsPage() {
                         }}
                       />
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-slate-800">{user.name || user.email}</span>
-                        {user.name && <span className="text-xs text-slate-500 ml-2 block sm:inline">({user.email})</span>}
+                        <span className="text-sm font-semibold text-[var(--text-primary)]">{user.name || user.email}</span>
+                        {user.name && <span className="text-xs text-[var(--text-secondary)] ml-2 block sm:inline">({user.email})</span>}
                       </div>
                     </label>
                   );
@@ -230,7 +230,7 @@ export default function AdminClubsPage() {
           <p className="text-sm text-[var(--text-secondary)]">
             Are you sure you want to permanently delete <strong>{deleteClub?.name}</strong>?
           </p>
-          <p className="text-sm font-semibold text-red-600">
+          <p className="text-sm font-semibold text-[var(--status-danger-text)]">
             Note: Clubs with existing events cannot be deleted directly.
           </p>
         </div>

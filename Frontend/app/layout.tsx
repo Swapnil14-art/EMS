@@ -28,9 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             position="bottom-right"
             toastOptions={{
               duration: 4000,
-              style: { fontFamily: 'Inter, system-ui', fontSize: '14px', borderRadius: '12px', border: '1px solid #E2E8F0' },
-              success: { iconTheme: { primary: '#2563EB', secondary: '#fff' } },
-              error:   { iconTheme: { primary: '#DC2626', secondary: '#fff' } },
+              style: { fontFamily: 'Inter, system-ui', fontSize: '14px', borderRadius: '12px', border: '1px solid var(--border-subtle)', background: 'var(--surface-bg)', color: 'var(--text-primary)' },
+              success: { iconTheme: { primary: 'rgb(var(--success))', secondary: 'rgb(var(--neutral-0))' } },
+              error:   { iconTheme: { primary: 'rgb(var(--danger))', secondary: 'rgb(var(--neutral-0))' } },
             }}
           />
         </Providers>

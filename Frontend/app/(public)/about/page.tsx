@@ -5,6 +5,7 @@ import {
   Zap, Shield, Bell, BarChart3, ChevronRight
 } from 'lucide-react';
 import PublicNavbar from '@/components/layout/PublicNavbar';
+import { AppFooter } from '@/components/layout/AppFooter';
 
 const FEATURES = [
   {
@@ -85,29 +86,7 @@ export default function AboutPage() {
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-[var(--card-border)] bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-[var(--btn-primary-bg)] rounded-xl flex items-center justify-center">
-                <span className="text-[var(--btn-primary-text)] font-bold text-xs font-display">E</span>
-              </div>
-              <div>
-                <p className="font-display font-bold text-[var(--text-primary)] text-sm">EMS — Event Management System</p>
-                <p className="text-xs text-[var(--text-muted)]">SVKM&apos;s NMIMS, Shirpur Campus</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-6 text-xs text-[var(--text-muted)]">
-              <Link href="/" className="hover:text-[rgb(var(--color-primary))] transition-colors">Home</Link>
-              <Link href="/login" className="hover:text-[rgb(var(--color-primary))] transition-colors">Log In</Link>
-              <Link href="/signup" className="hover:text-[rgb(var(--color-primary))] transition-colors">Sign Up</Link>
-              <span>© {new Date().getFullYear()} NMIMS Shirpur</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }

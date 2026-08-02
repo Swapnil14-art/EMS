@@ -12,7 +12,7 @@ import dynamic from 'next/dynamic';
 const ReportGenerator = dynamic(() => import('@/components/events/ReportGenerator'), {
   loading: () => (
     <div className="flex items-center justify-center py-12">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="w-6 h-6 border-2 border-[var(--status-info-text)] border-t-transparent rounded-full animate-spin" />
     </div>
   ),
 });
@@ -151,7 +151,7 @@ export default function ClubCoordinatorReportPage() {
                    <div key={e.id} onClick={() => setSelectedId(e.id)} className="card p-4 hover:shadow-lg cursor-pointer transition-all border border-transparent hover:border-[rgb(var(--color-primary))]">
                       <div className="flex justify-between items-start mb-2 gap-2">
                         <h3 className="font-semibold text-[var(--text-primary)] line-clamp-2 flex-1">{e.title}</h3>
-                        <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-slate-100 text-slate-600 uppercase tracking-wider">{e.status}</span>
+                        <span className="text-[10px] font-bold px-2 py-1 rounded-md bg-[var(--surface-subtle)] text-[var(--text-secondary)] uppercase tracking-wider">{e.status}</span>
                       </div>
                       <p className="text-sm text-[var(--text-muted)] mt-4 font-medium">{formatDate(e.start_datetime)} · {e.venue?.name || e.venue_custom || '—'}</p>
                    </div>
@@ -160,12 +160,12 @@ export default function ClubCoordinatorReportPage() {
             )}
           </div>
         ) : selectedEvent && (
-          <div className="p-4 bg-[var(--page-bg)] rounded-xl relative border border-slate-200">
+          <div className="p-4 bg-[var(--page-bg)] rounded-xl relative border border-[var(--border-subtle)]">
             <button onClick={() => { setSelectedId(null); setUploaded(false); setShowGenerator(false); }} className="absolute top-4 right-4 text-xs font-semibold text-[rgb(var(--color-primary))] hover:underline pr-1">Change Event</button>
             <p className="font-semibold text-[var(--text-primary)] pr-24">{selectedEvent.title}</p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">{formatDate(selectedEvent.start_datetime)} · {selectedEvent.venue?.name || selectedEvent.venue_custom || '—'}</p>
             {selectedEvent.report_path && (
-              <div className="mt-2 flex items-center gap-1.5 text-emerald-600 text-xs font-semibold">
+              <div className="mt-2 flex items-center gap-1.5 text-[var(--status-success-text)] text-xs font-semibold">
                 <CheckCircle2 className="w-3.5 h-3.5" />Report already submitted
               </div>
             )}
@@ -186,7 +186,7 @@ export default function ClubCoordinatorReportPage() {
                     {reportData?.is_submitted ? "The post-event report has been submitted and the event is archived." : "A report has been generated. Ensure all details are correct before finalizing."}
                   </p>
                 </div>
-                <CheckCircle2 className="w-5 h-5 text-green-500 absolute top-6 right-6" />
+                <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
               </div>
 
               <div className="mb-4">
@@ -207,14 +207,14 @@ export default function ClubCoordinatorReportPage() {
                 
                 {selectedFile ? (
                   <div className="space-y-3 pt-2">
-                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex flex-col items-center justify-center">
-                      <FileText className="w-6 h-6 text-blue-600 mb-1" />
-                      <p className="text-sm font-medium text-blue-900 truncate max-w-full px-2" title={selectedFile.name}>
+                    <div className="p-3 bg-[var(--status-info-bg)] border border-[var(--status-info-text)] rounded-lg flex flex-col items-center justify-center">
+                      <FileText className="w-6 h-6 text-[var(--status-info-text)] mb-1" />
+                      <p className="text-sm font-medium text-[var(--status-info-text)] truncate max-w-full px-2" title={selectedFile.name}>
                         {selectedFile.name}
                       </p>
                       <button 
                         onClick={() => { setSelectedFile(null); if(fileRef.current) fileRef.current.value=''; }}
-                        className="text-xs text-blue-600 hover:underline mt-1 font-medium"
+                        className="text-xs text-[var(--status-info-text)] hover:underline mt-1 font-medium"
                       >
                         Change File
                       </button>
@@ -222,7 +222,7 @@ export default function ClubCoordinatorReportPage() {
                     <Button
                       loading={uploading}
                       onClick={handleConfirmUpload}
-                      className="w-full justify-center h-11 bg-green-600 hover:bg-green-700 text-white border-0"
+                      className="w-full justify-center h-11 bg-[var(--status-success-bg)] hover:bg-[var(--status-success-bg)] text-white border-0"
                       icon={<CheckCircle2 className="w-4 h-4" />}
                       disabled={!selectedId}
                     >
@@ -263,7 +263,7 @@ export default function ClubCoordinatorReportPage() {
                 </div>
                 {/* ── FIX: checkmark appears once a file has been uploaded */}
                 {reportFilePath && (
-                  <CheckCircle2 className="w-5 h-5 text-green-500 absolute top-6 right-6" />
+                  <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
                 )}
               </div>
 
@@ -292,14 +292,14 @@ export default function ClubCoordinatorReportPage() {
                 
                 {selectedFile ? (
                   <div className="space-y-3 pt-2">
-                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex flex-col items-center justify-center">
-                      <FileText className="w-6 h-6 text-blue-600 mb-1" />
-                      <p className="text-sm font-medium text-blue-900 truncate max-w-full px-2" title={selectedFile.name}>
+                    <div className="p-3 bg-[var(--status-info-bg)] border border-[var(--status-info-text)] rounded-lg flex flex-col items-center justify-center">
+                      <FileText className="w-6 h-6 text-[var(--status-info-text)] mb-1" />
+                      <p className="text-sm font-medium text-[var(--status-info-text)] truncate max-w-full px-2" title={selectedFile.name}>
                         {selectedFile.name}
                       </p>
                       <button 
                         onClick={() => { setSelectedFile(null); if(fileRef.current) fileRef.current.value=''; }}
-                        className="text-xs text-blue-600 hover:underline mt-1 font-medium"
+                        className="text-xs text-[var(--status-info-text)] hover:underline mt-1 font-medium"
                       >
                         Change File
                       </button>
@@ -307,7 +307,7 @@ export default function ClubCoordinatorReportPage() {
                     <Button
                       loading={uploading}
                       onClick={handleConfirmUpload}
-                      className="w-full justify-center h-11 bg-green-600 hover:bg-green-700 text-white border-0"
+                      className="w-full justify-center h-11 bg-[var(--status-success-bg)] hover:bg-[var(--status-success-bg)] text-white border-0"
                       icon={<CheckCircle2 className="w-4 h-4" />}
                       disabled={!selectedId}
                     >
@@ -356,8 +356,8 @@ export default function ClubCoordinatorReportPage() {
                 onClick={() => setShowGenerator(prev => !prev)}
                 className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-[0.98] ${
                   !selectedId
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-500 text-white shadow-lg hover:shadow-xl hover:from-indigo-700 hover:via-blue-700 hover:to-cyan-600'
+                    ? 'bg-[var(--surface-subtle)] text-[var(--text-muted)] cursor-not-allowed'
+                    : 'bg-gradient-to-r from-[var(--status-info-text)] via-[var(--status-info-text)] to-cyan-500 text-white shadow-lg hover:shadow-xl hover:from-[var(--status-info-text)] hover:via-[var(--status-info-text)] hover:to-cyan-600'
                 }`}
               >
                 <Sparkles className="w-4 h-4" />

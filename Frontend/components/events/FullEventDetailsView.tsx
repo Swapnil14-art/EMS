@@ -114,7 +114,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
     return (
       <div className="flex flex-col gap-1.5 p-3.5 bg-[var(--page-bg)] rounded-xl relative overflow-hidden group">
         <p className="text-[11px] uppercase tracking-wider font-semibold text-[rgb(var(--color-primary))]">{label}</p>
-        <p className="font-medium text-[var(--text-primary)] text-sm">{value === true ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : value}</p>
+        <p className="font-medium text-[var(--text-primary)] text-sm">{value === true ? <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)]" /> : value}</p>
       </div>
     );
   };
@@ -133,9 +133,9 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             <div className="flex items-center gap-2 mb-2">
               <StatusBadge status={event.status} />
               <EventTypeBadge type={event.event_type} />
-              {event.is_club_event && <span className="badge bg-purple-100 text-purple-700">Club Event</span>}
-              {event.is_collaborative && <span className="badge bg-indigo-100 text-indigo-700">Collaborative</span>}
-              {event.is_sponsored && <span className="badge bg-amber-100 text-amber-700">Sponsored</span>}
+              {event.is_club_event && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Club Event</span>}
+              {event.is_collaborative && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>}
+              {event.is_sponsored && <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">Sponsored</span>}
             </div>
             <h1 className="font-display font-black text-[var(--text-primary)] text-3xl md:text-5xl leading-tight">
               {event.title}
@@ -223,7 +223,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
         {event.comments && (
           <div className="space-y-4">
             <h2 className="section-title text-lg">Additional Comments</h2>
-            <div className="p-4 bg-orange-50 border border-orange-100 rounded-2xl text-sm text-orange-900 leading-relaxed">
+            <div className="p-4 bg-[var(--status-warning-bg)] border border-[var(--status-warning-text)] rounded-2xl text-sm text-[var(--status-warning-text)] leading-relaxed">
               {event.comments}
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                   <div className="flex flex-wrap gap-2 mt-1">
                     {(event as any).collaborating_clubs && (event as any).collaborating_clubs.length > 0 ? (
                       (event as any).collaborating_clubs.map((c: any) => (
-                        <span key={c.id} className="inline-flex flex-col items-start badge bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1.5 rounded-lg">
+                        <span key={c.id} className="inline-flex flex-col items-start badge bg-[var(--status-info-bg)] text-[var(--status-info-text)] border border-[var(--status-info-text)] px-3 py-1.5 rounded-lg">
                           <span className="font-bold">{c.name}</span>
                           {c.coordinators && c.coordinators.length > 0 && (
                             <span className="text-xs font-medium opacity-80 mt-0.5">{c.coordinators.map((coord: any) => coord.email).join(', ')}</span>
@@ -248,7 +248,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                         </span>
                       ))
                     ) : (
-                      <span className="text-sm text-gray-500 font-medium">None specified</span>
+                      <span className="text-sm text-[var(--text-secondary)] font-medium">None specified</span>
                     )}
                   </div>
                 </div>
@@ -259,17 +259,17 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                   <div className="flex flex-wrap gap-2 mt-1">
                     {event.sponsors && event.sponsors.length > 0 ? (
                       event.sponsors.map((s: any) => (
-                        <div key={s.id} className="flex items-center gap-2 font-medium text-sm w-full bg-white px-3 py-2 rounded-lg border border-gray-100">
+                        <div key={s.id} className="flex items-center gap-2 font-medium text-sm w-full bg-white px-3 py-2 rounded-lg border border-[var(--border-subtle)]">
                           <span className="flex-1 truncate">{s.name}</span>
                           {s.logo_path && (
-                            <a href={s.logo_path} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md text-xs font-semibold hover:bg-blue-100 transition-colors shrink-0">
+                            <a href={s.logo_path} target="_blank" rel="noopener noreferrer" className="text-[var(--status-info-text)] hover:text-[var(--status-info-text)] flex items-center gap-1 bg-[var(--status-info-bg)] px-2.5 py-1 rounded-md text-xs font-semibold hover:bg-[var(--status-info-bg)] transition-colors shrink-0">
                               <Download className="w-3.5 h-3.5" /> Doc
                             </a>
                           )}
                         </div>
                       ))
                     ) : (
-                      <span className="text-sm text-gray-500 font-medium">None specified</span>
+                      <span className="text-sm text-[var(--text-secondary)] font-medium">None specified</span>
                     )}
                   </div>
                 </div>
@@ -383,12 +383,12 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
 
             {event.links && event.links.length > 0 && event.links.map(l => (
               <a key={l.id} href={l.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 p-4 bg-white border border-[var(--card-border)] rounded-2xl hover:border-[rgb(var(--color-primary))] transition-colors group">
-                <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                <div className="w-10 h-10 rounded-lg bg-[var(--status-info-bg)] flex items-center justify-center text-[var(--status-info-text)] group-hover:scale-110 transition-transform">
                   <LinkIcon className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="font-semibold text-[var(--text-primary)]">{l.label || l.link_type}</p>
-                  <p className="text-xs text-indigo-600">{l.url}</p>
+                  <p className="text-xs text-[var(--status-info-text)]">{l.url}</p>
                 </div>
               </a>
             ))}
@@ -403,7 +403,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
               <button
                 onClick={handleExport}
                 disabled={exporting || registrations.length === 0}
-                className="btn-outline flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 disabled:opacity-50 text-sm font-medium border border-gray-200 rounded-lg shadow-sm"
+                className="btn-outline flex items-center gap-2 px-4 py-2 bg-white hover:bg-[var(--surface-subtle)] disabled:opacity-50 text-sm font-medium border border-[var(--border-subtle)] rounded-lg shadow-sm"
               >
                 {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 {exporting ? "Exporting..." : "Download Excel"}
@@ -422,27 +422,27 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
               ) : (
                 <div className="overflow-x-auto max-h-[400px] overflow-y-auto hidden-scrollbar">
                   <table className="w-full text-left border-collapse whitespace-nowrap">
-                    <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.05)] z-10 text-xs uppercase text-gray-500 font-semibold tracking-wider">
+                    <thead className="bg-[var(--surface-subtle)] sticky top-0 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.05)] z-10 text-xs uppercase text-[var(--text-secondary)] font-semibold tracking-wider">
                       <tr>
-                        <th className="px-6 py-4 border-b border-gray-100">Name</th>
-                        <th className="px-6 py-4 border-b border-gray-100">Email</th>
-                        <th className="px-6 py-4 border-b border-gray-100">School</th>
-                        <th className="px-6 py-4 border-b border-gray-100 text-center">Year</th>
-                        <th className="px-6 py-4 border-b border-gray-100 text-center">Branch</th>
-                        <th className="px-6 py-4 border-b border-gray-100 text-center">Course</th>
-                        <th className="px-6 py-4 border-b border-gray-100">Registration Time</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)]">Name</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)]">Email</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)]">School</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Year</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Branch</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Course</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)]">Registration Time</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {registrations.map((r, i) => (
-                        <tr key={r.id || i} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900">{r.name}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{r.email}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600">{r.department}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600 text-center"><span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-medium border border-gray-200">{r.year}</span></td>
-                          <td className="px-6 py-4 text-sm text-gray-600 text-center">{r.branch}</td>
-                          <td className="px-6 py-4 text-sm text-gray-600 text-center">{r.course}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap text-tabular-nums">{r.registered_at ? formatDateTime(r.registered_at.replace("T", " ").replace("Z", "")) : 'N/A'}</td>
+                        <tr key={r.id || i} className="hover:bg-[var(--surface-subtle)] transition-colors">
+                          <td className="px-6 py-4 text-sm font-medium text-[var(--text-primary)]">{r.name}</td>
+                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.email}</td>
+                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.department}</td>
+                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center"><span className="px-2.5 py-1 bg-[var(--surface-subtle)] text-[var(--text-primary)] rounded-md text-xs font-medium border border-[var(--border-subtle)]">{r.year}</span></td>
+                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center">{r.branch}</td>
+                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center">{r.course}</td>
+                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] whitespace-nowrap text-tabular-nums">{r.registered_at ? formatDateTime(r.registered_at.replace("T", " ").replace("Z", "")) : 'N/A'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -455,8 +455,8 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
 
         {/* Approval Flow Bottom Anchor */}
         {isPendingAction && (
-          <div className="mt-12 pt-8 border-t border-[var(--card-border)] bg-slate-50 -mx-6 px-6 -mb-12 pb-12 rounded-b-3xl">
-            <h2 className="section-title text-xl mb-6 text-center text-slate-800">Review Complete? Ready to decide?</h2>
+          <div className="mt-12 pt-8 border-t border-[var(--card-border)] bg-[var(--surface-subtle)] -mx-6 px-6 -mb-12 pb-12 rounded-b-3xl">
+            <h2 className="section-title text-xl mb-6 text-center text-[var(--text-primary)]">Review Complete? Ready to decide?</h2>
             <div className="flex flex-wrap justify-center gap-4">
               <Button
                 variant="danger"
@@ -478,7 +478,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                 size="lg"
                 icon={<CheckCircle2 className="w-5 h-5" />}
                 onClick={() => handleAction('approve')}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-[var(--status-success-bg)] hover:bg-[var(--status-success-bg)] text-white"
               >
                 Approve Event
               </Button>

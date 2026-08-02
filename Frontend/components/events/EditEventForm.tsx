@@ -325,8 +325,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
         </div>
       </div>
 
-      <Alert type="warning" className="border-orange-200 bg-orange-50 text-orange-800">
-        <AlertTriangle className="w-5 h-5 text-orange-500 mr-2 inline-block" />
+      <Alert type="warning" className="border-[var(--status-warning-text)] bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">
+        <AlertTriangle className="w-5 h-5 text-[var(--status-warning-text)] mr-2 inline-block" />
         <strong>Warning:</strong> Modifying details of this event will trigger the approval chain from the start.
       </Alert>
 
@@ -373,7 +373,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
                           if (selected) field.onChange(curr.filter((n: string) => n !== d.value));
                           else field.onChange([...curr, d.value]);
                         }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-100'} border`}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-text)]' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--surface-subtle)]'} border`}
                       >
                         {d.label}
                       </button>
@@ -419,7 +419,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
                     />
                   </div>
                   {fields.length > 3 && (
-                    <button type="button" onClick={() => remove(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-red-50 hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
+                    <button type="button" onClick={() => remove(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -585,13 +585,13 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
                 {existingPoster ? 'Replace Event Poster' : 'Upload Event Poster'}
               </Button>
               {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] mt-2 font-semibold">New poster: {posterFile.name}</span>}
-              {!posterFile && existingPoster && <span className="text-xs text-emerald-600 mt-2 font-semibold">✓ Existing poster on file</span>}
+              {!posterFile && existingPoster && <span className="text-xs text-[var(--status-success-text)] mt-2 font-semibold">✓ Existing poster on file</span>}
               {!posterFile && !existingPoster && <p className="text-xs text-[var(--text-muted)] mt-2 font-semibold">No poster uploaded — default will be used if none is uploaded</p>}
             </div>
             <Input label="Estimated Budget (₹)" type="number" placeholder="e.g. 25000" {...register('budget')} />
             <Textarea label="Additional Comments" placeholder="Any other notes for the approvers…" {...register('comments')} rows={4} />
 
-            <div className="p-4 bg-red-50 rounded-2xl">
+            <div className="p-4 bg-[var(--status-danger-bg)] rounded-2xl">
               <p className="text-sm font-semibold text-[var(--text-danger)] mb-2">Final Review</p>
               <p className="text-xs text-[var(--text-danger)]">
                 Clicking "Save Changes" will submit this updated event to the approval queue.

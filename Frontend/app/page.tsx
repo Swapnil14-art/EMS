@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   Calendar, Users, MapPin, TrendingUp, ArrowRight,
   Zap, BookOpen, Award, ChevronRight
@@ -11,6 +10,7 @@ import HeroCarousel from '@/components/events/HeroCarousel';
 import { EventCard, EventCardSkeleton } from '@/components/events/EventCard';
 import { Tabs } from '@/components/ui';
 import EventCalendar from '@/components/calendar/EventCalendar';
+import { AppFooter } from '@/components/layout/AppFooter';
 import { eventService, venueService } from '@/lib/services';
 import type { Event, Venue } from '@/types';
 
@@ -257,7 +257,7 @@ export default function LandingPage() {
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Zap className="w-5 h-5 text-yellow-400" />
+                <Zap className="w-5 h-5 text-[var(--status-warning-text)]" />
                 <span className="text-[rgb(var(--color-primary))]/20 text-sm font-semibold uppercase tracking-wider">For Students</span>
               </div>
               <h2 className="font-display font-bold text-[var(--btn-primary-text)] text-3xl md:text-4xl mb-3">
@@ -280,28 +280,7 @@ export default function LandingPage() {
           </div>
         </section>
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-[var(--card-border)] bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-16 h-16 flex items-center justify-center">
-                <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={64} height={64} className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <p className="font-display font-bold text-[var(--text-primary)] text-sm">EMS — Event Management System</p>
-                <p className="text-xs text-[var(--text-muted)]">SVKM&apos;s NMIMS, Shirpur Campus</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-6 text-xs text-[var(--text-muted)]">
-              <Link href="/login" className="hover:text-[rgb(var(--color-primary))] transition-colors">Log In</Link>
-              <Link href="/signup" className="hover:text-[rgb(var(--color-primary))] transition-colors">Sign Up</Link>
-              <span>© {new Date().getFullYear()} NMIMS Shirpur</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }

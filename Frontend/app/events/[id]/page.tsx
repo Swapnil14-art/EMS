@@ -16,6 +16,7 @@ import { formatDateTime, formatDate } from '@/lib/utils';
 import type { Event, EventLink } from '@/types';
 import toast from 'react-hot-toast';
 import FullEventDetailsView from '@/components/events/FullEventDetailsView';
+import { AppFooter } from '@/components/layout/AppFooter';
 
 export default function PublicEventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -118,7 +119,7 @@ export default function PublicEventDetailPage() {
             <div className="flex flex-wrap gap-2 mb-3">
               <EventTypeBadge type={event.event_type} className="bg-white/20 text-[var(--btn-primary-text)] border border-white/20 backdrop-blur-sm" />
               {isOngoing && (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-[var(--btn-primary-text)] rounded-full text-xs font-bold">
+                <span className="flex items-center gap-1.5 px-3 py-1 bg-[var(--status-success-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold">
                   <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" /> LIVE NOW
                 </span>
               )}
@@ -141,8 +142,8 @@ export default function PublicEventDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status={event.status} />
                   <EventTypeBadge type={event.event_type} />
-                  {event.is_collaborative && <span className="badge bg-indigo-100 text-indigo-700">Collaborative</span>}
-                  {event.is_sponsored && <span className="badge bg-amber-100 text-amber-700">Sponsored</span>}
+                  {event.is_collaborative && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>}
+                  {event.is_sponsored && <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">Sponsored</span>}
                 </div>
               </div>
 
@@ -200,8 +201,8 @@ export default function PublicEventDetailPage() {
               {event.report_path && (
                 <div className="card p-6">
                   <h2 className="section-title mb-3">Post-Event Report</h2>
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-emerald-50/80 to-green-50/50 border border-emerald-200 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-[var(--status-success-text)] to-[var(--status-success-text)] border border-[var(--status-success-text)] rounded-xl">
+                    <div className="w-10 h-10 rounded-lg bg-[var(--status-success-bg)] flex items-center justify-center text-[var(--status-success-text)] shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -212,7 +213,7 @@ export default function PublicEventDetailPage() {
                       href={event.report_url || event.report_path}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 active:scale-[0.98] transition-all shadow-md shrink-0"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--status-success-bg)] text-white rounded-xl font-semibold text-sm hover:bg-[var(--status-success-bg)] active:scale-[0.98] transition-all shadow-md shrink-0"
                     >
                       <Download className="w-4 h-4" />
                       Download
@@ -233,14 +234,14 @@ export default function PublicEventDetailPage() {
                     <p className="text-sm text-[var(--text-muted)] mb-4">
                       {registered ? 'You have successfully registered. Check your email for details.' : 'Join this event — it\'s free!'}
                     </p>
-                    {registered && <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-4" />}
+                    {registered && <CheckCircle2 className="w-10 h-10 text-[var(--status-success-text)] mb-4" />}
                     {registered ? (
                       <Button
                         disabled
                         variant="secondary"
                         className="w-full justify-center opacity-80 cursor-not-allowed"
                       >
-                        <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-500" />
+                        <CheckCircle2 className="w-4 h-4 mr-2 text-[var(--status-success-text)]" />
                         Already Registered
                       </Button>
                     ) : (
@@ -276,7 +277,7 @@ export default function PublicEventDetailPage() {
                 {/* Registration disabled message */}
                 {registrationDisabled && user?.role === 'student' && ['approved', 'ongoing'].includes(event.status) && (
                   <div className="text-center">
-                    <p className="text-sm text-orange-600 font-medium">
+                    <p className="text-sm text-[var(--status-warning-text)] font-medium">
                       Event registration is currently disabled.
                     </p>
                   </div>
@@ -301,13 +302,7 @@ export default function PublicEventDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-[var(--card-border)] bg-white mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-6 text-center text-xs text-[var(--text-muted)]">
-          SVKM's NMIMS MPTP, Shirpur Campus · Event Management System
-        </div>
-      </footer>
+      <div className='mt-12'><AppFooter /></div>
     </div>
   );
 }

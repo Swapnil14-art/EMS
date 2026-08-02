@@ -97,7 +97,7 @@ export default function AdminEventsPage() {
                     <Link href={"/events/" + ev.id} className="p-1.5 text-[var(--text-muted)] hover:text-[rgb(var(--color-primary))] hover:bg-[var(--card-bg)] rounded-lg transition-colors inline-flex" title="View">
                       <Eye className="w-4 h-4" />
                     </Link>
-                    <button onClick={() => setEventToDelete(ev)} className="p-1.5 text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors inline-flex" title="Delete">
+                    <button onClick={() => setEventToDelete(ev)} className="p-1.5 text-[var(--text-muted)] hover:text-[var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors inline-flex" title="Delete">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -122,7 +122,7 @@ export default function AdminEventsPage() {
         }
       >
         <div className="space-y-4">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 text-red-600 mx-auto">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] mx-auto">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <p className="text-center text-[var(--text-primary)]">

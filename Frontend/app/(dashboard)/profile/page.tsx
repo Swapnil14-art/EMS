@@ -146,7 +146,7 @@ export default function ProfilePage() {
         {/* Left Column: Summary Card */}
         <div className="md:col-span-1">
           <div className="card text-center p-6 space-y-4">
-            <div className="w-24 h-24 mx-auto bg-slate-100 text-slate-400 rounded-full flex items-center justify-center text-4xl font-bold uppercase overflow-hidden border-4 border-white shadow-md">
+            <div className="w-24 h-24 mx-auto bg-[var(--surface-subtle)] text-[var(--text-muted)] rounded-full flex items-center justify-center text-4xl font-bold uppercase overflow-hidden border-4 border-white shadow-md">
               {profile.name ? profile.name.slice(0,2) : '?'}
             </div>
             
@@ -290,8 +290,8 @@ export default function ProfilePage() {
                 </div>
                 
                 {/* Information Callout */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-blue-800 mt-6">
-                  <Info className="w-5 h-5 flex-shrink-0 text-blue-600" />
+                <div className="bg-[var(--status-info-bg)] border border-[var(--status-info-text)] rounded-xl p-4 flex gap-3 text-[var(--status-info-text)] mt-6">
+                  <Info className="w-5 h-5 flex-shrink-0 text-[var(--status-info-text)]" />
                   <p className="text-sm">
                     <strong>Email and Role are managed by the system.</strong> If you need to change your registered email, role, or club assignment, please contact the Super Admin.
                   </p>
@@ -310,7 +310,7 @@ function ProfileField({ label, value }: { label: string, value?: string }) {
     <div>
       <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{label}</p>
       <p className="text-sm font-medium text-[var(--text-primary)]">
-        {value || <span className="text-slate-400 italic">Not provided</span>}
+        {value || <span className="text-[var(--text-muted)] italic">Not provided</span>}
       </p>
     </div>
   );

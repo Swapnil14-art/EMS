@@ -2,7 +2,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import {
   LogOut, KeyRound, ChevronDown, Menu, X, User,
   LayoutDashboard, Bell, Settings, Shield, BookOpen,
@@ -13,6 +12,7 @@ import { authService } from '@/lib/services';
 import { ROLE_LABELS, ROLE_DASHBOARD, getInitials } from '@/lib/utils';
 import { RoleBadge } from '@/components/shared/StatusBadge';
 import toast from 'react-hot-toast';
+import { BrandMark } from './BrandMark';
 
 // Role-based menu items for mobile menu only
 const ROLE_MENU_ITEMS: Record<string, { label: string; href: string; icon: React.ReactNode }[]> = {
@@ -86,15 +86,7 @@ export default function PublicNavbar() {
         <div className="flex items-center justify-between h-16">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-12 h-12 relative flex items-center justify-center group-hover:scale-105 transition-transform">
-              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={56} height={56} className="w-full h-full object-contain" priority />
-            </div>
-            <div className="hidden sm:block">
-              <div className="font-display font-bold text-[var(--text-primary)] text-lg leading-none">EMS</div>
-              <div className="text-[10px] text-[var(--text-muted)] leading-none mt-0.5">NMIMS Shirpur</div>
-            </div>
-          </Link>
+          <BrandMark className="max-w-[13rem] sm:max-w-none" />
 
           {/* Center nav links (public) */}
           <div className="hidden md:flex items-center gap-1">
@@ -153,7 +145,7 @@ export default function PublicNavbar() {
                         </Link>
                         <button
                           onClick={handleLogout}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-danger)] hover:bg-red-50 transition-colors"
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] transition-colors"
                         >
                           <LogOut className="w-4 h-4" /> Log Out
                         </button>
@@ -208,7 +200,7 @@ export default function PublicNavbar() {
                   <Link href="/change-password" className="nav-item" onClick={() => setMobileOpen(false)}>
                     <KeyRound className="w-4 h-4" /> Change Password
                   </Link>
-                  <button onClick={handleLogout} className="nav-item w-full text-[var(--text-danger)] hover:bg-red-50 hover:text-[var(--text-danger)]">
+                  <button onClick={handleLogout} className="nav-item w-full text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--text-danger)]">
                     <LogOut className="w-4 h-4" /> Log Out
                   </button>
                 </div>

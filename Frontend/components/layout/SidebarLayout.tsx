@@ -4,15 +4,16 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, BookOpen, Calendar, MapPin, Mail, Settings,
-  Bell, BarChart3, Shield, ChevronLeft, ChevronRight, LogOut, KeyRound,
-  ChevronDown, GraduationCap, Building2, SlidersHorizontal, Home, Menu, X,
-  Eye, FileText, FlaskConical, ShieldCheck
+  Bell, BarChart3, Shield, LogOut, KeyRound, GraduationCap, Building2, SlidersHorizontal, Home, Menu,
+  FileText, FlaskConical, ShieldCheck, X
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { authService } from '@/lib/services';
-import { ROLE_LABELS, getInitials, cn } from '@/lib/utils';
+import { getInitials, cn } from '@/lib/utils';
 import { RoleBadge } from '@/components/shared/StatusBadge';
 import toast from 'react-hot-toast';
+import { BrandMark } from './BrandMark';
+import { AppFooter } from './AppFooter';
 
 type NavItem = { label: string; href: string; icon: React.ReactNode; badge?: number };
 
@@ -92,9 +93,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const { user, clearAuth } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -125,143 +126,96 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   };
 
   const NavLink = ({ item }: { item: NavItem }) => {
-    const isActive = pathname === item.href || (!DASHBOARD_ROOTS.includes(item.href) && pathname.startsWith(item.href));
+    const isActive = item.href === '/' || DASHBOARD_ROOTS.includes(item.href)
+      ? pathname === item.href
+      : pathname === item.href || pathname.startsWith(`${item.href}/`);
     return (
       <Link href={item.href}
-        className={cn('nav-item relative', isActive && 'nav-item-active')}>
+        title={sidebarCollapsed ? item.label : undefined}
+        className={cn('nav-item relative', sidebarCollapsed && 'lg:px-2', isActive && 'nav-item-active')}>
         <span className="flex-shrink-0">{item.icon}</span>
-        {!collapsed && <span className="truncate">{item.label}</span>}
-        {item.badge && !collapsed && (
-          <span className="ml-auto px-1.5 py-0.5 bg-[var(--btn-danger-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold">{item.badge}</span>
-        )}
-        {collapsed && item.badge && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--btn-danger-bg)] text-[var(--btn-primary-text)] rounded-full text-[10px] font-bold flex items-center justify-center">{item.badge}</span>
+        <span className={cn('truncate', sidebarCollapsed && 'lg:sr-only')}>{item.label}</span>
+        {item.badge && (
+          <span className={cn('ml-auto px-1.5 py-0.5 bg-[var(--btn-danger-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold', sidebarCollapsed && 'lg:absolute lg:right-1 lg:top-1')}>{item.badge}</span>
         )}
       </Link>
     );
   };
 
-  const SidebarContent = () => (
-    <div className="flex flex-col h-full">
-      {/* Logo + collapse */}
-      <div className={cn("flex items-center p-4 border-b border-[var(--card-border)]", collapsed ? "flex-col justify-center gap-4" : "justify-between")}>
-        {!collapsed && (
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-[var(--btn-primary-bg)] rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display text-sm">E</span>
-            </div>
-            <div>
-              <p className="font-display font-bold text-[var(--text-primary)] text-sm leading-none">EMS</p>
-              <p className="text-[10px] text-[var(--text-muted)] leading-none mt-0.5">NMIMS Shirpur</p>
-            </div>
-          </Link>
-        )}
-        {collapsed && (
-          <Link href="/" className="w-8 h-8 bg-[var(--btn-primary-bg)] rounded-lg flex items-center justify-center">
-            <span className="text-[var(--btn-primary-text)] font-bold font-display text-sm">E</span>
-          </Link>
-        )}
-        <button onClick={() => setCollapsed(!collapsed)}
-          className="hidden lg:flex p-1.5 rounded-lg hover:bg-muted text-[var(--text-muted)] transition-colors">
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-        <button onClick={() => setMobileOpen(false)}
-          className="lg:hidden p-1.5 -mr-1.5 rounded-lg hover:bg-slate-100 text-[var(--text-muted)] transition-colors">
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
-        {navItems?.map(item => <NavLink key={item.href} item={item} />)}
-      </nav>
-
-      {/* Bottom user section */}
-      <div className="border-t border-[var(--card-border)] p-3">
-        <div className={cn('relative', collapsed && 'flex justify-center')}>
-          <button onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className={cn('flex items-center gap-2.5 w-full rounded-xl p-2 hover:bg-slate-50 transition-colors', collapsed && 'justify-center w-auto')}>
-            <div className="w-8 h-8 bg-[var(--card-bg)] text-[rgb(var(--color-primary))] rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-              {getInitials(user.name)}
-            </div>
-            {!collapsed && (
-              <>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{user.name}</p>
-                  <p className="text-[10px] text-[var(--text-muted)] truncate">{user.email}</p>
-                </div>
-                <ChevronDown className={`w-3.5 h-3.5 text-[var(--text-muted)] transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
-              </>
-            )}
-          </button>
-
-          {userMenuOpen && (
-            <div className={cn(
-              'absolute bottom-full mb-2 bg-white rounded-2xl shadow-card-lg border border-[var(--card-border)] py-2 z-50 w-56',
-              collapsed ? 'left-full ml-2' : 'left-0 right-0'
-            )}>
-              <Link href="/profile" onClick={() => setUserMenuOpen(false)} className="block px-4 py-3 border-b border-[var(--card-border)] hover:bg-[var(--card-bg)] transition-colors cursor-pointer group">
-                <p className="text-sm font-semibold text-[var(--text-primary)] truncate group-hover:text-[rgb(var(--color-primary))]">{user.name}</p>
-                <p className="text-xs text-[var(--text-muted)]">{user.email}</p>
-                <RoleBadge role={user.role} className="mt-1.5" />
-              </Link>
-              <Link href="/change-password" onClick={() => setUserMenuOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--card-bg)] hover:text-[rgb(var(--color-primary))] transition-colors">
-                <KeyRound className="w-4 h-4" /> Change Password
-              </Link>
-              <button onClick={handleLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-danger)] hover:bg-red-50 transition-colors">
-                <LogOut className="w-4 h-4" /> Log Out
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const SidebarContent = () => <nav className={cn('min-h-0 flex-1 overflow-y-auto px-3 py-3 space-y-1', sidebarCollapsed && 'lg:px-2')} aria-label="Main navigation">{navItems.map(item => <NavLink key={item.href} item={item} />)}</nav>;
 
   return (
-    <div className="flex h-screen bg-[var(--card-bg)] overflow-hidden relative">
+    <div className="flex h-screen flex-col overflow-hidden bg-[var(--page-bg)]">
+      {/* Full-width dashboard header */}
+      <header className="z-30 flex h-16 flex-shrink-0 items-center gap-3 border-b border-[var(--card-border)] bg-[var(--surface-bg)] px-4 sm:gap-5 lg:px-6">
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation"
+          className="-ml-1.5 rounded-lg p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] lg:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <BrandMark abbreviated link={false} className="min-w-0 flex-1" />
+        <div className="relative flex items-center gap-3">
+          <p className="hidden text-sm font-medium text-[var(--text-secondary)] lg:block">Welcome, <span className="font-semibold text-[var(--text-primary)]">{user.name?.split(' ')[0] || 'User'}</span></p>
+          <button onClick={() => setUserMenuOpen(!userMenuOpen)} aria-expanded={userMenuOpen} aria-label="Open profile menu" className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--brand-soft)] text-xs font-bold text-[var(--brand-primary)] ring-1 ring-[rgb(var(--nmims-navy)/0.12)] transition-colors hover:bg-[var(--status-info-bg)]">
+            {getInitials(user.name)}
+          </button>
+          {userMenuOpen && <div className="absolute right-0 top-full z-50 mt-3 w-60 overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--surface-bg)] py-1.5 shadow-card-lg">
+            <Link href="/profile" onClick={() => setUserMenuOpen(false)} className="block border-b border-[var(--card-border)] px-4 py-3 transition-colors hover:bg-[var(--surface-subtle)]"><p className="truncate text-sm font-semibold text-[var(--text-primary)]">{user.name}</p><p className="truncate text-xs text-[var(--text-muted)]">{user.email}</p><RoleBadge role={user.role} className="mt-2" /></Link>
+            <Link href="/change-password" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-primary)]"><KeyRound className="h-4 w-4" />Change Password</Link>
+            <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-[var(--text-danger)] transition-colors hover:bg-[var(--status-danger-bg)]"><LogOut className="h-4 w-4" />Log Out</button>
+          </div>}
+        </div>
+      </header>
+
+      <div className="relative flex min-h-0 flex-1">
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden" 
-          onClick={() => setMobileOpen(false)} 
+        <div
+          className="fixed inset-0 bg-[rgb(var(--neutral-900)/0.35)] backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        'flex flex-col flex-shrink-0 bg-white border-r border-[var(--card-border)] sidebar-transition h-full',
+        'flex h-full flex-shrink-0 flex-col border-r border-[var(--card-border)] bg-[var(--surface-bg)]',
         'fixed lg:relative z-50 lg:z-auto top-0 left-0 bottom-0',
-        'transition-transform duration-300 ease-in-out',
+        'w-72 transition-[transform,width] duration-300 ease-in-out lg:w-60',
         !mobileOpen && '-translate-x-full lg:translate-x-0',
-        collapsed ? 'w-60 lg:w-16' : 'w-60'
+        sidebarCollapsed && 'lg:w-[4.75rem]'
       )}>
+        <div className={cn('border-b border-[var(--card-border)] px-4 py-3', sidebarCollapsed && 'lg:px-3')}>
+          <div className="flex items-center justify-start">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              aria-label="Toggle navigation menu"
+              aria-pressed={sidebarCollapsed}
+              title="Menu"
+              className="hidden cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-primary)] lg:flex"
+            >
+              <span className="relative h-4 w-4" aria-hidden="true">
+                <span className={cn('absolute left-0 top-1 block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'top-[7px] rotate-45')} />
+                <span className={cn('absolute left-0 top-[7px] block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'scale-x-0 opacity-0')} />
+                <span className={cn('absolute left-0 top-3 block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'top-[7px] -rotate-45')} />
+              </span>
+              <span className={cn(sidebarCollapsed && 'lg:sr-only')}>Menu</span>
+            </button>
+            <button onClick={() => setMobileOpen(false)} aria-label="Close navigation" className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] lg:hidden">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
         <SidebarContent />
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="bg-white border-b border-[var(--card-border)] px-4 lg:px-6 h-14 flex items-center gap-4 flex-shrink-0">
-          <button 
-            onClick={() => setMobileOpen(true)}
-            className="lg:hidden p-1.5 -ml-1.5 rounded-lg hover:bg-slate-100 text-[var(--text-secondary)] transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex-1" />
-          <div className="text-sm font-medium text-[var(--text-primary)]">
-            Welcome, {user.name?.split(' ')[0] || 'User'}
-          </div>
-        </header>
-
-        {/* Scrollable page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 relative">
-          {children}
-        </main>
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="p-4 lg:p-6">{children}</div>
+      </main>
       </div>
+      <AppFooter compact />
     </div>
   );
 }
