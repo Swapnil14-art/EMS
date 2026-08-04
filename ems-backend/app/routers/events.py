@@ -169,6 +169,7 @@ async def list_events(
     from_date: Optional[datetime] = Query(None),
     to_date: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
+    is_rnd: Optional[bool] = Query(None),
     my_events: bool = Query(False),
     manage_only: bool = Query(False),
     page: int = Query(1, ge=1),
@@ -185,6 +186,7 @@ async def list_events(
     if hasattr(search, "default"): search = None
     if hasattr(my_events, "default"): my_events = False
     if hasattr(manage_only, "default"): manage_only = False
+    if hasattr(is_rnd, "default"): is_rnd = None
 
     query = select(Event)
 
@@ -299,6 +301,8 @@ async def list_events(
         query = query.where(Event.end_datetime <= to_date)
     if search:
         query = query.where(Event.title.ilike(f"%{search}%"))
+    if is_rnd is not None:
+        query = query.where(Event.is_rnd_event == is_rnd)
     if my_events and current_user:
         if current_user.role == "club_coordinator" and current_user.club_id:
             coord_events = select(EventCoordinator.event_id).where(
@@ -503,6 +507,11 @@ async def get_event(
         "created_by": event.created_by,
         "created_at": event.created_at,
         "updated_at": event.updated_at,
+        "is_rnd_event": event.is_rnd_event,
+        "rnd_activity_theme": event.rnd_activity_theme,
+        "rnd_prescribed_activity": event.rnd_prescribed_activity,
+        "rnd_semester_quarter": event.rnd_semester_quarter,
+        "rnd_tentative_date": event.rnd_tentative_date.isoformat() if event.rnd_tentative_date else None,
         "registration_count": registration_count,
         "is_registered": is_registered,
         "links": [{"id": l.id, "link_type": l.link_type, "url": l.url, "label": l.label}
@@ -684,6 +693,11 @@ async def create_event(
             poster_path=random_poster_path,
             created_by=current_user.id,
             status="draft",
+            is_rnd_event=body.is_rnd_event,
+            rnd_activity_theme=body.rnd_activity_theme if body.is_rnd_event else None,
+            rnd_prescribed_activity=body.rnd_prescribed_activity if body.is_rnd_event else None,
+            rnd_semester_quarter=body.rnd_semester_quarter if body.is_rnd_event else None,
+            rnd_tentative_date=body.rnd_tentative_date if body.is_rnd_event else None,
         )
         db.add(event)
         await db.flush()

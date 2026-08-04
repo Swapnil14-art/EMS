@@ -264,6 +264,13 @@ export interface Event {
   report_url?: string;
   rnd_report?: EventRndReport;
 
+  // R&D classification
+  is_rnd_event?: boolean;
+  rnd_activity_theme?: string;
+  rnd_prescribed_activity?: string;
+  rnd_semester_quarter?: string;
+  rnd_tentative_date?: string;
+
   status: EventStatus;
   created_by: number;
   creator?: User;

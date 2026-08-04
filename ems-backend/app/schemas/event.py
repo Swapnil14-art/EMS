@@ -58,6 +58,12 @@ class EventCreate(BaseModel):
     other_requirements: Optional[str] = None
     budget: Decimal
     comments: Optional[str] = None
+    # R&D fields
+    is_rnd_event: bool = False
+    rnd_activity_theme: Optional[str] = None
+    rnd_prescribed_activity: Optional[str] = None
+    rnd_semester_quarter: Optional[str] = None
+    rnd_tentative_date: Optional[date] = None
 
 
 class EventUpdate(BaseModel):
@@ -111,6 +117,12 @@ class EventUpdate(BaseModel):
     other_requirements: Optional[str] = None
     budget: Optional[Decimal] = None
     comments: Optional[str] = None
+    # R&D fields
+    is_rnd_event: Optional[bool] = None
+    rnd_activity_theme: Optional[str] = None
+    rnd_prescribed_activity: Optional[str] = None
+    rnd_semester_quarter: Optional[str] = None
+    rnd_tentative_date: Optional[date] = None
     # Post-start editable fields only
     registration_link: Optional[str] = None
     payment_link: Optional[str] = None
@@ -208,6 +220,12 @@ class EventOut(BaseModel):
     created_by: int
     created_at: datetime
     updated_at: Optional[datetime]
+    # R&D fields
+    is_rnd_event: bool = False
+    rnd_activity_theme: Optional[str] = None
+    rnd_prescribed_activity: Optional[str] = None
+    rnd_semester_quarter: Optional[str] = None
+    rnd_tentative_date: Optional[date] = None
 
     class Config:
         from_attributes = True

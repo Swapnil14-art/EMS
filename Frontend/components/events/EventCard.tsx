@@ -43,7 +43,12 @@ export function EventCard({ event, showStatus = true }: EventCardProps) {
           </div>
         )}
         {/* Status overlay */}
-        <div className="absolute top-3 left-3 flex gap-2">
+        <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
+          {event.is_rnd_event && (
+            <span className="flex items-center gap-1 px-2.5 py-1 bg-purple-600 text-white rounded-full text-xs font-bold shadow">
+              R&D
+            </span>
+          )}
           {isOngoing && (
             <span className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--status-success-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />

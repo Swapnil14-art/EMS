@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Info, Calendar, MapPin, Monitor, UtensilsCrossed,
-  Package, FileText, ChevronRight, ChevronLeft, Save, Send, ArrowLeft, Plus, Trash2
+  Package, FileText, ChevronRight, ChevronLeft, Save, Send, ArrowLeft, Plus, Trash2, FlaskConical
 } from 'lucide-react';
 import { Button, Input, Select, Textarea, Toggle, Alert, Combobox } from '@/components/ui';
 import { eventService, venueService, clubService, departmentService } from '@/lib/services';
@@ -86,6 +86,12 @@ const schema = z.object({
   // Section G
   budget: z.coerce.number().optional(),
   comments: z.string().optional(),
+  // R&D
+  is_rnd_event: z.boolean().default(false),
+  rnd_activity_theme: z.string().optional(),
+  rnd_prescribed_activity: z.string().optional(),
+  rnd_semester_quarter: z.string().optional(),
+  rnd_tentative_date: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.start_datetime && data.end_datetime) {
     const start = new Date(data.start_datetime);
@@ -143,6 +149,15 @@ const schema = z.object({
   if (data.venue_type === 'Other' && (!data.venue_custom || data.venue_custom.trim() === '')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Custom venue details are required', path: ['venue_custom'] });
   }
+
+  if (data.is_rnd_event) {
+    if (!data.rnd_activity_theme || data.rnd_activity_theme.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Activity Theme is required for R&D Events', path: ['rnd_activity_theme'] });
+    }
+    if (!data.rnd_prescribed_activity || data.rnd_prescribed_activity.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Prescribed Activity is required for R&D Events', path: ['rnd_prescribed_activity'] });
+    }
+  }
   
   data.venue_selections.forEach((sel, idx) => {
     if (sel.venue_type !== 'Other' && (!sel.venue_ids || sel.venue_ids.length === 0)) {
@@ -155,14 +170,63 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-const SECTIONS = [
+const BASE_SECTIONS = [
   { id: 1, label: 'Basic Info', icon: <Info className="w-4 h-4" /> },
   { id: 2, label: 'Schedule', icon: <Calendar className="w-4 h-4" /> },
   { id: 3, label: 'Venue & Setup', icon: <MapPin className="w-4 h-4" /> },
   { id: 4, label: 'IT & Tech', icon: <Monitor className="w-4 h-4" /> },
   { id: 5, label: 'Food & Catering', icon: <UtensilsCrossed className="w-4 h-4" /> },
   { id: 6, label: 'Additional', icon: <Package className="w-4 h-4" /> },
-  { id: 7, label: 'Poster & Budget', icon: <FileText className="w-4 h-4" /> },
+];
+const RND_SECTION = { id: 7, label: 'R&D', icon: <FlaskConical className="w-4 h-4" /> };
+const FINAL_SECTION_BASE = { label: 'Poster & Budget', icon: <FileText className="w-4 h-4" /> };
+
+const RND_ACTIVITY_THEMES = [
+  'R&D Awareness and Capacity Building',
+  'Cross Disciplinary Thematic Research and Output Enhancement',
+  'Intellectual Property (IP) Generation and Commercialization',
+  'Promotion of Deep-Tech based Research & Innovation',
+  'Strengthening the Industry-Academia for R&D Collaboration',
+  'Research Publication and Dissemination',
+  'Monitoring, Evaluation, and Recognition of Research',
+];
+
+const RND_PRESCRIBED_ACTIVITIES: Record<string, string[]> = {
+  'R&D Awareness and Capacity Building': [
+    'Faculty & Student R&D Orientation Program',
+    'Annual Research Conclave/Symposium',
+    'Training on Technology Readiness Level (TRL) and Manufacturing Readiness Level (MRL)',
+    'Training on Technology Commercialisation, Licensing and Transfer Practices & Strategy',
+  ],
+  'Cross Disciplinary Thematic Research and Output Enhancement': [
+    'Thematic Research based Hackathon/Ideathon in Campus',
+    'Sponsored/Seed Grant Proposal Writing Workshops',
+  ],
+  'Intellectual Property (IP) Generation and Commercialization': [
+    'IP Awareness and Patent Filing Workshops',
+    'Innovation to Commercialization Boot Camps',
+  ],
+  'Promotion of Deep-Tech based Research & Innovation': [
+    'Deep-Tech Innovation Challenge',
+    'Prototype Development & Validation Clinic',
+  ],
+  'Strengthening the Industry-Academia for R&D Collaboration': [
+    'Industry R&D Roundtables/Meetups',
+  ],
+  'Research Publication and Dissemination': [
+    'Research Paper Writing and Journal Publication Support Workshops',
+  ],
+  'Monitoring, Evaluation, and Recognition of Research': [
+    'Annual Research Awards & Recognition Ceremony',
+  ],
+};
+
+const SEMESTER_QUARTERS = [
+  { value: 'All Quarter', label: 'All Quarter' },
+  { value: 'Semester 1 – Quarter I', label: 'Semester 1 – Quarter I' },
+  { value: 'Semester 1 – Quarter II', label: 'Semester 1 – Quarter II' },
+  { value: 'Semester 2 – Quarter III', label: 'Semester 2 – Quarter III' },
+  { value: 'Semester 2 – Quarter IV', label: 'Semester 2 – Quarter IV' },
 ];
 
 const EVENT_TYPES = [
@@ -233,8 +297,24 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       transport: false, security: false, printing: false, volunteers: false,
       transport_details: '', security_details: '', printing_details: '', volunteers_details: '',
       objectives: ['', '', ''],
+      is_rnd_event: false,
+      rnd_activity_theme: '',
+      rnd_prescribed_activity: '',
+      rnd_semester_quarter: '',
+      rnd_tentative_date: '',
     },
   });
+
+  const watchIsRnd = watch('is_rnd_event');
+  const watchRndTheme = watch('rnd_activity_theme');
+
+  const SECTIONS = [
+    ...BASE_SECTIONS,
+    ...(watchIsRnd ? [RND_SECTION] : []),
+    { id: watchIsRnd ? 8 : 7, ...FINAL_SECTION_BASE },
+  ];
+  const TOTAL_STEPS = SECTIONS.length;
+  const FINAL_STEP = SECTIONS[SECTIONS.length - 1].id;
 
   const { fields: objectiveFields, append: appendObjective, remove: removeObjective } = useFieldArray({
     control, name: 'objectives' as never
@@ -260,13 +340,15 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
     2: ['start_datetime', 'end_datetime', 'registration_start_datetime', 'registration_deadline'],
-    3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [], 7: [],
+    3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [],
+    7: watchIsRnd ? ['rnd_activity_theme', 'rnd_prescribed_activity'] : [],
+    8: [],
   };
 
   const nextStep = async () => {
     const ok = await trigger(STEP_FIELDS[step] || []);
     if (ok) {
-      setStep(s => Math.min(s + 1, 7));
+      setStep(s => Math.min(s + 1, FINAL_STEP));
     } else {
       toast.error("Please fill all required fields correctly before proceeding.", { id: 'validation-error' });
     }
@@ -303,7 +385,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         transport_details: data.transport ? data.transport_details : null,
         security_details: data.security ? data.security_details : null,
         printing_details: data.printing ? data.printing_details : null,
-        volunteers_details: data.volunteers ? data.volunteers_details : null
+        volunteers_details: data.volunteers ? data.volunteers_details : null,
+        is_rnd_event: data.is_rnd_event,
+        rnd_activity_theme: data.is_rnd_event ? data.rnd_activity_theme : null,
+        rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
+        rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
+        rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
       };
       let id = createdId;
       if (!id) {
@@ -356,7 +443,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         transport_details: data.transport ? data.transport_details : null,
         security_details: data.security ? data.security_details : null,
         printing_details: data.printing ? data.printing_details : null,
-        volunteers_details: data.volunteers ? data.volunteers_details : null
+        volunteers_details: data.volunteers ? data.volunteers_details : null,
+        is_rnd_event: data.is_rnd_event,
+        rnd_activity_theme: data.is_rnd_event ? data.rnd_activity_theme : null,
+        rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
+        rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
+        rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
       };
         let id = createdId;
         if (!id) {
@@ -417,7 +509,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         transport_details: bufferedData.transport ? bufferedData.transport_details : null,
         security_details: bufferedData.security ? bufferedData.security_details : null,
         printing_details: bufferedData.printing ? bufferedData.printing_details : null,
-        volunteers_details: bufferedData.volunteers ? bufferedData.volunteers_details : null
+        volunteers_details: bufferedData.volunteers ? bufferedData.volunteers_details : null,
+        is_rnd_event: bufferedData.is_rnd_event,
+        rnd_activity_theme: bufferedData.is_rnd_event ? bufferedData.rnd_activity_theme : null,
+        rnd_prescribed_activity: bufferedData.is_rnd_event ? bufferedData.rnd_prescribed_activity : null,
+        rnd_semester_quarter: bufferedData.is_rnd_event ? bufferedData.rnd_semester_quarter : null,
+        rnd_tentative_date: bufferedData.is_rnd_event ? bufferedData.rnd_tentative_date : null,
       };
       
       let id = createdId;
@@ -470,7 +567,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             </button>
           ))}
         </div>
-        <SectionProgress current={step} total={7} />
+        <SectionProgress current={step} total={TOTAL_STEPS} />
       </div>
 
       <form className="card p-6 space-y-6">
@@ -478,6 +575,14 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><Info className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Basic Information</h2>
+            {/* R&D Event Toggle */}
+            <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-2xl border border-indigo-200 dark:border-indigo-800 mb-2">
+              <Controller name="is_rnd_event" control={control} render={({ field }) => (
+                <Toggle checked={field.value} onChange={(val) => { field.onChange(val); if (!val) { setValue('rnd_activity_theme', ''); setValue('rnd_prescribed_activity', ''); setValue('rnd_semester_quarter', ''); setValue('rnd_tentative_date', ''); } }} label="R&D Event" />
+              )} />
+              <p className="text-xs text-[var(--text-muted)] mt-1 ml-1">Enable this to classify the event under the R&D framework. An additional mandatory R&D tab will appear.</p>
+            </div>
+
             <Input label="Event Title" placeholder="e.g. TechFest 2025 — Day 1" error={errors.title?.message} {...register('title')} />
             <div className="grid grid-cols-2 gap-4">
               <Controller name="event_type" control={control} render={({ field }) => (
@@ -867,8 +972,76 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
           </div>
         )}
 
+        {/* Section R&D: Mandatory fields when toggle is ON */}
+        {step === 7 && watchIsRnd && (
+          <div className="space-y-5 animate-fade-in">
+            <h2 className="section-title flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-[rgb(var(--color-primary))]" /> R&D Information
+            </h2>
+            <Alert type="info">
+              <span>Specify the research & development framework details for this event.</span>
+            </Alert>
+
+            <Controller
+              name="rnd_activity_theme"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Activity Theme *"
+                  options={RND_ACTIVITY_THEMES.map(t => ({ value: t, label: t }))}
+                  placeholder="Select activity theme"
+                  error={errors.rnd_activity_theme?.message}
+                  value={field.value}
+                  onChange={(val) => {
+                    field.onChange(val);
+                    setValue('rnd_prescribed_activity', '');
+                  }}
+                />
+              )}
+            />
+
+            {watchRndTheme && RND_PRESCRIBED_ACTIVITIES[watchRndTheme] && (
+              <Controller
+                name="rnd_prescribed_activity"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Prescribed Activity *"
+                    options={RND_PRESCRIBED_ACTIVITIES[watchRndTheme].map(a => ({ value: a, label: a }))}
+                    placeholder="Select prescribed activity"
+                    error={errors.rnd_prescribed_activity?.message}
+                    {...field}
+                  />
+                )}
+              />
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Controller
+                name="rnd_semester_quarter"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Semester / Quarter"
+                    options={SEMESTER_QUARTERS}
+                    placeholder="Select semester / quarter"
+                    error={errors.rnd_semester_quarter?.message}
+                    {...field}
+                  />
+                )}
+              />
+              <Input
+                label="Tentative Date"
+                type="date"
+                error={errors.rnd_tentative_date?.message}
+                {...register('rnd_tentative_date')}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Section G: Docs & Budget */}
-        {step === 7 && (
+        {step === FINAL_STEP && (
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><FileText className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Event Poster & Budget</h2>
             <Alert type="info">
@@ -907,7 +1080,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             )}
           </div>
           <div className="flex gap-3">
-            {step === 7 ? (
+            {step === FINAL_STEP ? (
               <>
                 <Button type="button" variant="secondary" loading={saving} icon={<Save className="w-4 h-4" />}
                   onClick={handleSubmit(saveAsDraft, () => toast.error("Please check previous sections for missing valid data."))}>

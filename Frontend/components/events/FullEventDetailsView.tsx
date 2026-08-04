@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import {
   Info, Calendar, MapPin, Monitor, UtensilsCrossed,
-  Package, FileText, CheckCircle2, Ticket, Users,
+  Package, FileText, CheckCircle2, Ticket, Users, FlaskConical,
   ArrowLeft, Download, ExternalLink, Link as LinkIcon, Loader2, XCircle, MessageSquare, AlertTriangle
 } from 'lucide-react';
 import type { Event } from '@/types';
@@ -136,6 +136,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
               <EventTypeBadge type={event.event_type} />
               {event.is_club_event && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Club Event</span>}
               {event.is_collaborative && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>}
+              {event.is_rnd_event && <span className="badge bg-purple-100 text-purple-800 border border-purple-300 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-800">R&D Event</span>}
               {event.is_sponsored && <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">Sponsored</span>}
             </div>
             <h1 className="font-display font-black text-[var(--text-primary)] text-3xl md:text-5xl leading-tight">
@@ -143,6 +144,21 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             </h1>
           </div>
         </div>
+
+        {/* R&D Information Section */}
+        {event.is_rnd_event && (
+          <div className="space-y-4 p-5 bg-gradient-to-r from-purple-50/50 to-indigo-50/50 dark:from-purple-950/20 dark:to-indigo-950/20 rounded-2xl border border-purple-200 dark:border-purple-800">
+            <h2 className="section-title flex items-center gap-2 text-lg text-purple-900 dark:text-purple-200">
+              <FlaskConical className="w-5 h-5 text-purple-600 dark:text-purple-400" /> R&D Framework Classification
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Activity Theme" value={event.rnd_activity_theme} />
+              <Field label="Prescribed Activity" value={event.rnd_prescribed_activity} />
+              <Field label="Semester / Quarter" value={event.rnd_semester_quarter} />
+              <Field label="Tentative Date" value={event.rnd_tentative_date} />
+            </div>
+          </div>
+        )}
 
         {/* Section A: Basic Info */}
         <div className="space-y-4">

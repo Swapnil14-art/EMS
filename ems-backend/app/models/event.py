@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, TIMESTAMP, ForeignKey, Boolean,
-    Text, Numeric,
+    Text, Numeric, Date,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -79,6 +79,13 @@ class Event(Base):
     budget = Column(Numeric(10, 2), nullable=False)
     comments = Column(Text, nullable=True)
     participant_doc_path = Column(Text, nullable=True)
+
+    # Section R&D — R&D Event Classification
+    is_rnd_event = Column(Boolean, nullable=False, default=False)
+    rnd_activity_theme = Column(String(255), nullable=True)
+    rnd_prescribed_activity = Column(String(255), nullable=True)
+    rnd_semester_quarter = Column(String(100), nullable=True)
+    rnd_tentative_date = Column(Date, nullable=True)
 
     # Tracking
     status = Column(String(60), nullable=False, default="draft", index=True)

@@ -32,7 +32,7 @@ export default function ClubCoordinatorRnDReportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const fetchEvents = () => {
-    eventService.list({ status: 'completed,archived', size: 50, manage_only: true })
+    eventService.list({ status: 'completed,archived', size: 50, manage_only: true, is_rnd: true })
       .then(r => setEvents(r.data || []))
       .catch(() => {});
   };

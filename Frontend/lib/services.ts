@@ -263,6 +263,7 @@ export const eventService = {
     from_date?: string;
     to_date?: string;
     search?: string;
+    is_rnd?: boolean;
     my_events?: boolean;
     manage_only?: boolean;
     page?: number;
