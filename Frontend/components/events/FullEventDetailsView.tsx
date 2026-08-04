@@ -404,6 +404,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                       <tr>
                         <th className="px-6 py-4 border-b border-gray-100">Name</th>
                         <th className="px-6 py-4 border-b border-gray-100">Email</th>
+                        <th className="px-6 py-4 border-b border-gray-100">Phone Number</th>
                         <th className="px-6 py-4 border-b border-gray-100">School</th>
                         <th className="px-6 py-4 border-b border-gray-100 text-center">Year</th>
                         <th className="px-6 py-4 border-b border-gray-100 text-center">Branch</th>
@@ -416,6 +417,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                         <tr key={r.id || i} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-6 py-4 text-sm font-medium text-gray-900">{r.name}</td>
                           <td className="px-6 py-4 text-sm text-gray-500">{r.email}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{r.phone_number || 'N/A'}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">{r.department}</td>
                           <td className="px-6 py-4 text-sm text-gray-600 text-center"><span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-medium border border-gray-200">{r.year}</span></td>
                           <td className="px-6 py-4 text-sm text-gray-600 text-center">{r.branch}</td>

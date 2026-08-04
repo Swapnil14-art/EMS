@@ -1474,6 +1474,7 @@ async def get_event_registrations(
             "name": user.name,
             "email": user.email,
             "department": user.department.name if user.department else "N/A",
+            "phone_number": user.phone_number or "N/A",
             "year": user.year_of_study or "N/A",
             "branch": user.branch or "N/A",
             "course": user.course or "N/A",
@@ -1498,7 +1499,7 @@ async def export_event_registrations(
     ws.title = "Registered Students"
     
     # Header
-    headers = ["Name", "Email", "Department", "Year", "Branch", "Course", "Registration Time"]
+    headers = ["Name", "Email", "Phone Number", "Department", "Year", "Branch", "Course", "Registration Time"]
     ws.append(headers)
     
     # Rows
@@ -1506,6 +1507,7 @@ async def export_event_registrations(
         ws.append([
             r["name"],
             r["email"],
+            r["phone_number"],
             r["department"],
             r["year"],
             r["branch"],
