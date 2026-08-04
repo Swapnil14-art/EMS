@@ -49,17 +49,17 @@ export function TermsModal({ open, onClose, onConfirm, loading }: TermsModalProp
       }
     >
       <div className="space-y-4">
-        <div className="bg-amber-50 rounded-xl p-4 flex gap-3 text-amber-800">
-          <ShieldAlert className="w-5 h-5 flex-shrink-0 text-amber-600" />
+        <div className="bg-[var(--status-warning-bg)] rounded-xl p-4 flex gap-3 text-[var(--status-warning-text)]">
+          <ShieldAlert className="w-5 h-5 flex-shrink-0 text-[var(--status-warning-text)]" />
           <div className="text-sm">
             <p className="font-semibold mb-1">Final Submission Required</p>
-            <p className="text-amber-700/90 leading-relaxed">
+            <p className="text-[var(--status-warning-text)] leading-relaxed">
               Before submitting this event for official institutional approval, you must review and accept the standard event guidelines and policies.
             </p>
           </div>
         </div>
 
-        <div className="p-4 bg-slate-50 border border-[var(--card-border)] rounded-xl text-sm text-[var(--text-secondary)] h-40 overflow-y-auto">
+        <div className="p-4 bg-[var(--surface-subtle)] border border-[var(--card-border)] rounded-xl text-sm text-[var(--text-secondary)] h-40 overflow-y-auto">
           <h4 className="font-semibold text-[var(--text-primary)] mb-2">SVKM's NMIMS Event Policy</h4>
           <ol className="list-decimal pl-4 space-y-2">
             <li>I confirm that all details provided in this event proposal are accurate and truthful.</li>
@@ -71,7 +71,7 @@ export function TermsModal({ open, onClose, onConfirm, loading }: TermsModalProp
         </div>
 
         <div className="pt-2">
-          <label className="flex items-center gap-3 p-3 border border-[var(--card-border)] rounded-xl bg-white cursor-pointer hover:bg-slate-50 transition-colors">
+          <label className="flex items-center gap-3 p-3 border border-[var(--card-border)] rounded-xl bg-white cursor-pointer hover:bg-[var(--surface-subtle)] transition-colors">
             <Toggle
               checked={accepted}
               onChange={setAccepted}

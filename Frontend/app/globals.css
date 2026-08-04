@@ -1,8 +1,9 @@
+@import './styles/theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import './styles/theme.css';
+
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
@@ -10,20 +11,23 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   background: var(--page-bg);
   color: var(--page-text);
+  caret-color: transparent;
   -webkit-font-smoothing: antialiased;
 }
+
+input, textarea, select, [contenteditable='true'] { caret-color: auto; }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--btn-primary-bg); }
-::selection { background: rgba(37,99,235,0.12); }
+::selection { background: var(--brand-soft); color: var(--text-primary); }
 :focus-visible { outline: 2px solid var(--input-focus-ring); outline-offset: 2px; }
 
 @layer components {
   .btn-primary {
     @apply inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] rounded-xl
-           font-semibold text-sm hover:bg-[var(--btn-primary-bg)] active:scale-[0.98]
+           font-semibold text-sm hover:bg-[var(--btn-primary-hover-bg)] active:scale-[0.98]
            transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg;
   }
   .btn-secondary {
@@ -55,16 +59,16 @@ body {
   .error-msg { @apply text-xs text-[var(--text-danger)] mt-1; }
 
   .nav-item {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[var(--nav-item-text)] hover:bg-[var(--nav-item-hover-bg)] hover:text-[var(--nav-item-hover-text)] transition-colors cursor-pointer;
+    @apply flex min-h-10 items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-[var(--nav-item-text)] hover:bg-[var(--nav-item-hover-bg)] hover:text-[var(--nav-item-hover-text)] transition-colors duration-150 cursor-pointer;
   }
-  .nav-item-active { @apply bg-[var(--nav-item-active-bg)] text-[var(--nav-item-active-text)] font-semibold; }
+  .nav-item-active { @apply bg-[var(--nav-item-active-bg)] text-[var(--nav-item-active-text)] font-semibold shadow-[inset_3px_0_0_var(--brand-primary)]; }
 
   .badge {
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
 
   .skeleton {
-    @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200
+    @apply bg-gradient-to-r from-[var(--border-subtle)] via-[var(--surface-subtle)] to-[var(--border-subtle)]
            bg-[length:200%_100%] animate-shimmer rounded-lg;
   }
 
@@ -101,7 +105,7 @@ body {
 
 /* Gradient hero text */
 .hero-gradient-text {
-  background: linear-gradient(135deg, rgb(var(--color-primary) / 0.9) 0%, rgb(var(--color-primary)) 40%, #0EA5E9 100%);
+  background: linear-gradient(135deg, var(--brand-primary-strong) 0%, var(--brand-primary) 55%, var(--brand-accent) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -110,23 +114,53 @@ body {
 /* Mesh background for hero */
 .hero-mesh {
   background:
-    radial-gradient(ellipse 80% 60% at 20% -10%, rgba(37,99,235,0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 80% 110%, rgba(14,165,233,0.08) 0%, transparent 60%),
-    #F8FAFF;
+    radial-gradient(ellipse 80% 60% at 20% -10%, rgb(var(--nmims-navy) / 0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 110%, rgb(var(--nmims-gold) / 0.08) 0%, transparent 60%),
+    var(--page-bg);
 }
 
 /* Blue section */
 .blue-section {
-  background: linear-gradient(135deg, rgb(var(--color-primary) / 0.8) 0%, rgb(var(--color-primary) / 0.9) 50%, rgb(var(--color-primary)) 100%);
+  background: linear-gradient(135deg, var(--brand-primary-strong) 0%, var(--brand-primary) 65%, rgb(var(--nmims-navy) / 0.92) 100%);
 }
 
 /* Card glass */
 .glass-card {
-  background: rgba(255,255,255,0.85);
+  background: rgb(var(--neutral-0) / 0.88);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.6);
+  border: 1px solid rgb(var(--neutral-0) / 0.6);
 }
 
 /* Dot indicator */
 .dot-active { @apply bg-primary w-6; }
 .dot-inactive { @apply bg-primary w-2; }
+
+/* Compact content density on phones. Header, footer, and navigation are intentionally excluded. */
+@media (max-width: 639px) {
+  main .page-title { font-size: 1.35rem; line-height: 1.75rem; }
+  main .section-title { font-size: 1.125rem; line-height: 1.5rem; }
+  main .page-subtitle { font-size: 0.8125rem; }
+  main h1.text-2xl, main h2.text-2xl { font-size: 1.35rem; line-height: 1.75rem; }
+  main .text-xl { font-size: 1.125rem; line-height: 1.5rem; }
+
+  main .card.p-8, main .card-hover.p-8 { padding: 1.25rem; }
+  main .card.p-6, main .card-hover.p-6 { padding: 1rem; }
+  main .card.p-5, main .card-hover.p-5 { padding: 1rem; }
+  main .card.p-4, main .card-hover.p-4 { padding: 0.875rem; }
+  main .card { border-radius: 1rem; }
+  main .gap-6 { gap: 1rem; }
+  main .gap-5 { gap: 0.875rem; }
+  main .space-y-8 > :not([hidden]) ~ :not([hidden]) { margin-top: 1.25rem; }
+  main .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
+  main .badge { padding: 0.2rem 0.55rem; font-size: 0.6875rem; }
+  main .input { padding: 0.55rem 0.75rem; font-size: 0.875rem; }
+  main .input.pl-10 { padding-left: 2.5rem; }
+  main .input.pr-10 { padding-right: 2.5rem; }
+  main .ems-table th { padding: 0.65rem 0.75rem; font-size: 0.65rem; }
+  main .ems-table td { padding: 0.75rem; font-size: 0.8125rem; }
+
+  .landing-page .section-title { font-size: 1.25rem; }
+  .landing-page > .max-w-7xl { padding-top: 2rem; padding-bottom: 2rem; }
+  .landing-page .event-card .p-4 { padding: 0.875rem; }
+  .landing-page .blue-section h2 { font-size: 1.75rem; line-height: 2.1rem; }
+}

@@ -91,13 +91,13 @@ export default function AdminVenuesPage() {
 
     return (
       <div className="flex flex-col gap-2">
-        <div className={`card-hover p-5 ${isChild ? 'border-l-4 border-l-indigo-400 bg-slate-50' : ''}`}>
+        <div className={`card-hover p-5 ${isChild ? 'border-l-4 border-l-indigo-400 bg-[var(--surface-subtle)]' : ''}`}>
           <div className="flex items-start justify-between mb-3">
-            <div className={`w-10 h-10 ${isChild ? 'bg-indigo-100' : 'bg-[var(--card-bg)]'} rounded-2xl flex items-center justify-center`}>
-              <MapPin className={`w-5 h-5 ${isChild ? 'text-indigo-600' : 'text-[rgb(var(--color-primary))]'}`} />
+            <div className={`w-10 h-10 ${isChild ? 'bg-[var(--status-info-bg)]' : 'bg-[var(--card-bg)]'} rounded-2xl flex items-center justify-center`}>
+              <MapPin className={`w-5 h-5 ${isChild ? 'text-[var(--status-info-text)]' : 'text-[rgb(var(--color-primary))]'}`} />
             </div>
             <div className="flex items-center gap-2">
-              <span className={`badge ${venue.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+              <span className={`badge ${venue.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                 {venue.is_active ? 'Active' : 'Inactive'}
               </span>
               <button onClick={() => openEdit(venue)} className="p-1.5 text-[var(--text-muted)] hover:text-[rgb(var(--color-primary))] hover:bg-[var(--card-bg)] rounded-lg transition-colors" title="Edit">
@@ -105,13 +105,13 @@ export default function AdminVenuesPage() {
               </button>
               <button 
                 onClick={() => setDeleteVenue(venue)} 
-                className="p-1.5 text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                className="p-1.5 text-[var(--text-muted)] hover:text-[var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors" title="Delete">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
           <h3 className="font-display font-bold text-[var(--text-primary)] mb-1">
-            {venue.name} {isChild && <span className="text-[10px] font-medium text-indigo-500 ml-1 bg-indigo-50 px-1.5 py-0.5 rounded">Child</span>}
+            {venue.name} {isChild && <span className="text-[10px] font-medium text-[var(--status-info-text)] ml-1 bg-[var(--status-info-bg)] px-1.5 py-0.5 rounded">Child</span>}
           </h3>
           {venue.location && <p className="text-xs text-[var(--text-muted)] mb-2">{venue.location}</p>}
           <div className="flex items-center gap-1 text-xs text-[var(--text-secondary)]">
@@ -123,7 +123,7 @@ export default function AdminVenuesPage() {
             <div className="mt-4 pt-3 border-t border-[var(--border-color)]">
               <button 
                 onClick={() => setExpandedParentId(isExpanded ? null : venue.id)}
-                className="w-full text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
+                className="w-full text-xs font-semibold text-[var(--status-info-text)] bg-[var(--status-info-bg)] hover:bg-[var(--status-info-bg)] py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
               >
                 {isExpanded ? 'Hide Children' : `Show ${childVenues.length} Children`}
               </button>
@@ -132,10 +132,10 @@ export default function AdminVenuesPage() {
         </div>
         
         {isExpanded && !isChild && childVenues.length > 0 && (
-          <div className="pl-6 space-y-2 animate-fade-in relative before:absolute before:left-[19px] before:top-0 before:bottom-6 before:w-px before:bg-indigo-100">
+          <div className="pl-6 space-y-2 animate-fade-in relative before:absolute before:left-[19px] before:top-0 before:bottom-6 before:w-px before:bg-[var(--status-info-bg)]">
             {childVenues.map(child => (
               <div key={child.id} className="relative">
-                <div className="absolute -left-6 top-6 w-5 h-px bg-indigo-100" />
+                <div className="absolute -left-6 top-6 w-5 h-px bg-[var(--status-info-bg)]" />
                 <VenueCard venue={child} isChild={true} />
               </div>
             ))}
@@ -190,7 +190,7 @@ export default function AdminVenuesPage() {
               ))}
             </select>
             <span className="text-xs text-[var(--text-muted)]">Select a parent venue to create a nested hierarchy.</span>
-            {errors.parent_id?.message && <span className="text-xs text-red-500">{String(errors.parent_id.message)}</span>}
+            {errors.parent_id?.message && <span className="text-xs text-[var(--status-danger-text)]">{String(errors.parent_id.message)}</span>}
           </div>
           <Controller name="is_active" control={control} render={({ field }) => (
             <Toggle checked={field.value} onChange={field.onChange} label="Venue is active and bookable" />
@@ -208,7 +208,7 @@ export default function AdminVenuesPage() {
           <p className="text-sm text-[var(--text-secondary)]">
             Are you sure you want to permanently delete <strong>{deleteVenue?.name}</strong>?
           </p>
-          <p className="text-sm font-semibold text-red-600">
+          <p className="text-sm font-semibold text-[var(--status-danger-text)]">
             Note: Venues with existing events or nested child venues cannot be deleted directly.
           </p>
         </div>

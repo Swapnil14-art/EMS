@@ -48,8 +48,8 @@ export default function AdminDashboard() {
         {[
           { label: 'Manage Users', href: '/admin/users', icon: <Users className="w-5 h-5" />, color: 'text-[rgb(var(--color-primary))] bg-[var(--card-bg)]' },
           { label: 'Manage Clubs', href: '/admin/clubs', icon: <BookOpen className="w-5 h-5" />, color: 'text-[var(--text-secondary)] bg-[var(--card-bg)]' },
-          { label: 'Schools', href: '/admin/departments', icon: <Building2 className="w-5 h-5" />, color: 'text-indigo-600 bg-indigo-50' },
-          { label: 'All Events', href: '/admin/events', icon: <Calendar className="w-5 h-5" />, color: 'text-green-600 bg-green-50' },
+          { label: 'Schools', href: '/admin/departments', icon: <Building2 className="w-5 h-5" />, color: 'text-[var(--status-info-text)] bg-[var(--status-info-bg)]' },
+          { label: 'All Events', href: '/admin/events', icon: <Calendar className="w-5 h-5" />, color: 'text-[var(--status-success-text)] bg-[var(--status-success-bg)]' },
         ].map(q => (
           <Link key={q.href} href={q.href}
             className="card-hover p-4 flex flex-col items-center gap-2 text-center group">

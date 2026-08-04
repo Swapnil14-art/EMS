@@ -6,13 +6,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Info, Calendar, MapPin, Monitor, UtensilsCrossed,
-  Package, FileText, ChevronRight, ChevronLeft, Save, Send, ArrowLeft, Plus, Trash2
+  Package, FileText, ChevronRight, ChevronLeft, Save, Send, ArrowLeft, Plus, Trash2, FlaskConical
 } from 'lucide-react';
 import { Button, Input, Select, Textarea, Toggle, Alert, Combobox } from '@/components/ui';
 import { eventService, venueService, clubService, departmentService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import { TermsModal } from '@/components/shared/TermsModal';
-import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import toast from 'react-hot-toast';
 
 /** Convert a datetime-local input value (local time, no TZ) to a UTC ISO string for the API */
@@ -41,6 +40,8 @@ const schema = z.object({
   // Section B
   start_datetime: z.string().min(1, 'Start date/time required'),
   end_datetime: z.string().min(1, 'End date/time required'),
+  registration_start_datetime: z.string().optional(),
+  registration_deadline: z.string().optional(),
   // Section C
   venue_selections: z.array(z.object({
     venue_type: z.string().min(1, 'Select venue type'),
@@ -85,12 +86,25 @@ const schema = z.object({
   // Section G
   budget: z.coerce.number().optional(),
   comments: z.string().optional(),
+  // R&D
+  is_rnd_event: z.boolean().default(false),
+  rnd_activity_theme: z.string().optional(),
+  rnd_prescribed_activity: z.string().optional(),
+  rnd_semester_quarter: z.string().optional(),
+  rnd_tentative_date: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.start_datetime && data.end_datetime) {
     const start = new Date(data.start_datetime);
     const end = new Date(data.end_datetime);
     if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End date & time must be after start date & time', path: ['end_datetime'] });
+    }
+  }
+  if (data.registration_start_datetime && data.registration_deadline) {
+    const regStart = new Date(data.registration_start_datetime);
+    const regEnd = new Date(data.registration_deadline);
+    if (!isNaN(regStart.getTime()) && !isNaN(regEnd.getTime()) && regEnd < regStart) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Student registration end date & time cannot be earlier than start date & time', path: ['registration_deadline'] });
     }
   }
   if (data.it_laptop && (!data.it_laptop_details || data.it_laptop_details.trim() === '')) {
@@ -135,6 +149,15 @@ const schema = z.object({
   if (data.venue_type === 'Other' && (!data.venue_custom || data.venue_custom.trim() === '')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Custom venue details are required', path: ['venue_custom'] });
   }
+
+  if (data.is_rnd_event) {
+    if (!data.rnd_activity_theme || data.rnd_activity_theme.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Activity Theme is required for R&D Events', path: ['rnd_activity_theme'] });
+    }
+    if (!data.rnd_prescribed_activity || data.rnd_prescribed_activity.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Prescribed Activity is required for R&D Events', path: ['rnd_prescribed_activity'] });
+    }
+  }
   
   data.venue_selections.forEach((sel, idx) => {
     if (sel.venue_type !== 'Other' && (!sel.venue_ids || sel.venue_ids.length === 0)) {
@@ -147,14 +170,63 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-const SECTIONS = [
+const BASE_SECTIONS = [
   { id: 1, label: 'Basic Info', icon: <Info className="w-4 h-4" /> },
   { id: 2, label: 'Schedule', icon: <Calendar className="w-4 h-4" /> },
   { id: 3, label: 'Venue & Setup', icon: <MapPin className="w-4 h-4" /> },
   { id: 4, label: 'IT & Tech', icon: <Monitor className="w-4 h-4" /> },
   { id: 5, label: 'Food & Catering', icon: <UtensilsCrossed className="w-4 h-4" /> },
   { id: 6, label: 'Additional', icon: <Package className="w-4 h-4" /> },
-  { id: 7, label: 'Poster & Budget', icon: <FileText className="w-4 h-4" /> },
+];
+const RND_SECTION = { id: 7, label: 'R&D', icon: <FlaskConical className="w-4 h-4" /> };
+const FINAL_SECTION_BASE = { label: 'Poster & Budget', icon: <FileText className="w-4 h-4" /> };
+
+const RND_ACTIVITY_THEMES = [
+  'R&D Awareness and Capacity Building',
+  'Cross Disciplinary Thematic Research and Output Enhancement',
+  'Intellectual Property (IP) Generation and Commercialization',
+  'Promotion of Deep-Tech based Research & Innovation',
+  'Strengthening the Industry-Academia for R&D Collaboration',
+  'Research Publication and Dissemination',
+  'Monitoring, Evaluation, and Recognition of Research',
+];
+
+const RND_PRESCRIBED_ACTIVITIES: Record<string, string[]> = {
+  'R&D Awareness and Capacity Building': [
+    'Faculty & Student R&D Orientation Program',
+    'Annual Research Conclave/Symposium',
+    'Training on Technology Readiness Level (TRL) and Manufacturing Readiness Level (MRL)',
+    'Training on Technology Commercialisation, Licensing and Transfer Practices & Strategy',
+  ],
+  'Cross Disciplinary Thematic Research and Output Enhancement': [
+    'Thematic Research based Hackathon/Ideathon in Campus',
+    'Sponsored/Seed Grant Proposal Writing Workshops',
+  ],
+  'Intellectual Property (IP) Generation and Commercialization': [
+    'IP Awareness and Patent Filing Workshops',
+    'Innovation to Commercialization Boot Camps',
+  ],
+  'Promotion of Deep-Tech based Research & Innovation': [
+    'Deep-Tech Innovation Challenge',
+    'Prototype Development & Validation Clinic',
+  ],
+  'Strengthening the Industry-Academia for R&D Collaboration': [
+    'Industry R&D Roundtables/Meetups',
+  ],
+  'Research Publication and Dissemination': [
+    'Research Paper Writing and Journal Publication Support Workshops',
+  ],
+  'Monitoring, Evaluation, and Recognition of Research': [
+    'Annual Research Awards & Recognition Ceremony',
+  ],
+};
+
+const SEMESTER_QUARTERS = [
+  { value: 'All Quarter', label: 'All Quarter' },
+  { value: 'Semester 1 – Quarter I', label: 'Semester 1 – Quarter I' },
+  { value: 'Semester 1 – Quarter II', label: 'Semester 1 – Quarter II' },
+  { value: 'Semester 2 – Quarter III', label: 'Semester 2 – Quarter III' },
+  { value: 'Semester 2 – Quarter IV', label: 'Semester 2 – Quarter IV' },
 ];
 
 const EVENT_TYPES = [
@@ -174,7 +246,7 @@ function SectionProgress({ current, total }: { current: number; total: number })
   return (
     <div className="flex items-center gap-1 mb-8">
       {Array.from({ length: total }, (_, i) => (
-        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-muted'}`} />
+        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-[var(--surface-subtle)]'}`} />
       ))}
     </div>
   );
@@ -225,8 +297,24 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       transport: false, security: false, printing: false, volunteers: false,
       transport_details: '', security_details: '', printing_details: '', volunteers_details: '',
       objectives: ['', '', ''],
+      is_rnd_event: false,
+      rnd_activity_theme: '',
+      rnd_prescribed_activity: '',
+      rnd_semester_quarter: '',
+      rnd_tentative_date: '',
     },
   });
+
+  const watchIsRnd = watch('is_rnd_event');
+  const watchRndTheme = watch('rnd_activity_theme');
+
+  const SECTIONS = [
+    ...BASE_SECTIONS,
+    ...(watchIsRnd ? [RND_SECTION] : []),
+    { id: watchIsRnd ? 8 : 7, ...FINAL_SECTION_BASE },
+  ];
+  const TOTAL_STEPS = SECTIONS.length;
+  const FINAL_STEP = SECTIONS[SECTIONS.length - 1].id;
 
   const { fields: objectiveFields, append: appendObjective, remove: removeObjective } = useFieldArray({
     control, name: 'objectives' as never
@@ -251,14 +339,16 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
-    2: ['start_datetime', 'end_datetime'],
-    3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [], 7: [],
+    2: ['start_datetime', 'end_datetime', 'registration_start_datetime', 'registration_deadline'],
+    3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [],
+    7: watchIsRnd ? ['rnd_activity_theme', 'rnd_prescribed_activity'] : [],
+    8: [],
   };
 
   const nextStep = async () => {
     const ok = await trigger(STEP_FIELDS[step] || []);
     if (ok) {
-      setStep(s => Math.min(s + 1, 7));
+      setStep(s => Math.min(s + 1, FINAL_STEP));
     } else {
       toast.error("Please fill all required fields correctly before proceeding.", { id: 'validation-error' });
     }
@@ -277,6 +367,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
+        registration_start_datetime: data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -293,7 +385,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         transport_details: data.transport ? data.transport_details : null,
         security_details: data.security ? data.security_details : null,
         printing_details: data.printing ? data.printing_details : null,
-        volunteers_details: data.volunteers ? data.volunteers_details : null
+        volunteers_details: data.volunteers ? data.volunteers_details : null,
+        is_rnd_event: data.is_rnd_event,
+        rnd_activity_theme: data.is_rnd_event ? data.rnd_activity_theme : null,
+        rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
+        rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
+        rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
       };
       let id = createdId;
       if (!id) {
@@ -328,6 +425,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
+        registration_start_datetime: data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -344,7 +443,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         transport_details: data.transport ? data.transport_details : null,
         security_details: data.security ? data.security_details : null,
         printing_details: data.printing ? data.printing_details : null,
-        volunteers_details: data.volunteers ? data.volunteers_details : null
+        volunteers_details: data.volunteers ? data.volunteers_details : null,
+        is_rnd_event: data.is_rnd_event,
+        rnd_activity_theme: data.is_rnd_event ? data.rnd_activity_theme : null,
+        rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
+        rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
+        rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
       };
         let id = createdId;
         if (!id) {
@@ -387,6 +491,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
+        registration_start_datetime: bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
+        registration_deadline: bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: bufferedData.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -403,7 +509,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         transport_details: bufferedData.transport ? bufferedData.transport_details : null,
         security_details: bufferedData.security ? bufferedData.security_details : null,
         printing_details: bufferedData.printing ? bufferedData.printing_details : null,
-        volunteers_details: bufferedData.volunteers ? bufferedData.volunteers_details : null
+        volunteers_details: bufferedData.volunteers ? bufferedData.volunteers_details : null,
+        is_rnd_event: bufferedData.is_rnd_event,
+        rnd_activity_theme: bufferedData.is_rnd_event ? bufferedData.rnd_activity_theme : null,
+        rnd_prescribed_activity: bufferedData.is_rnd_event ? bufferedData.rnd_prescribed_activity : null,
+        rnd_semester_quarter: bufferedData.is_rnd_event ? bufferedData.rnd_semester_quarter : null,
+        rnd_tentative_date: bufferedData.is_rnd_event ? bufferedData.rnd_tentative_date : null,
       };
       
       let id = createdId;
@@ -456,7 +567,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             </button>
           ))}
         </div>
-        <SectionProgress current={step} total={7} />
+        <SectionProgress current={step} total={TOTAL_STEPS} />
       </div>
 
       <form className="card p-6 space-y-6">
@@ -464,6 +575,14 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><Info className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Basic Information</h2>
+            {/* R&D Event Toggle */}
+            <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-2xl border border-indigo-200 dark:border-indigo-800 mb-2">
+              <Controller name="is_rnd_event" control={control} render={({ field }) => (
+                <Toggle checked={field.value} onChange={(val) => { field.onChange(val); if (!val) { setValue('rnd_activity_theme', ''); setValue('rnd_prescribed_activity', ''); setValue('rnd_semester_quarter', ''); setValue('rnd_tentative_date', ''); } }} label="R&D Event" />
+              )} />
+              <p className="text-xs text-[var(--text-muted)] mt-1 ml-1">Enable this to classify the event under the R&D framework. An additional mandatory R&D tab will appear.</p>
+            </div>
+
             <Input label="Event Title" placeholder="e.g. TechFest 2025 — Day 1" error={errors.title?.message} {...register('title')} />
             <div className="grid grid-cols-2 gap-4">
               <Controller name="event_type" control={control} render={({ field }) => (
@@ -472,26 +591,49 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             </div>
             <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
               <p className="text-sm font-semibold text-[var(--text-primary)]">Departments Involved <span className="text-[var(--text-danger)]">*</span></p>
-              <Controller name="departments_involved" control={control} render={({ field }) => (
-                <div className="flex flex-wrap gap-2">
-                  {DEPARTMENTS_INVOLVED_OPTIONS.map(d => {
-                    const selected = field.value?.includes(d.value);
-                    return (
-                      <button
-                        key={d.value} type="button"
-                        onClick={() => {
-                          const curr = field.value || [];
-                          if (selected) field.onChange(curr.filter((n: string) => n !== d.value));
-                          else field.onChange([...curr, d.value]);
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-100'} border`}
-                      >
-                        <SchoolDisplay value={d.value} />
-                      </button>
-                    );
-                  })}
-                </div>
-              )} />
+              <Controller name="departments_involved" control={control} render={({ field }) => {
+                const currentValues = field.value || [];
+                const isCollegeWideSelected = currentValues.some(v => String(v).toUpperCase() === 'COLLEGE WIDE' || String(v).toUpperCase() === 'COLLEGE_WIDE');
+                const deptOptions = [
+                  ...departments.map((d: any) => ({ value: d.name, label: d.name })),
+                  { value: 'COLLEGE WIDE', label: 'COLLEGE WIDE' }
+                ];
+                const visibleOptions = isCollegeWideSelected
+                  ? deptOptions.filter(d => d.value === 'COLLEGE WIDE')
+                  : deptOptions;
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {visibleOptions.map(d => {
+                        const selected = currentValues.includes(d.value);
+                        return (
+                          <button
+                            key={d.value} type="button"
+                            onClick={() => {
+                              if (d.value === 'COLLEGE WIDE') {
+                                if (selected) field.onChange([]);
+                                else field.onChange(['COLLEGE WIDE']);
+                              } else {
+                                let next = currentValues.filter((v: string) => String(v).toUpperCase() !== 'COLLEGE WIDE' && String(v).toUpperCase() !== 'COLLEGE_WIDE');
+                                if (selected) next = next.filter((v: string) => v !== d.value);
+                                else next = [...next, d.value];
+                                field.onChange(next);
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-text)]' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--surface-subtle)]'} border`}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-1.5">
+                      Approval chain is determined automatically based on the selected department(s). Selecting <strong>COLLEGE WIDE</strong> sends the event directly to the Director.
+                    </p>
+                  </div>
+                );
+              }} />
               {errors.departments_involved && <p className="text-xs text-[var(--text-danger)]">{errors.departments_involved.message}</p>}
             </div>
 
@@ -521,7 +663,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                               if (selected) field.onChange(curr.filter((id: number) => id !== c.id));
                               else field.onChange([...curr, c.id]);
                             }}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'} border`}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-info-bg)] text-[var(--status-info-text)] border-[var(--status-info-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]'} border`}
                           >
                             {c.name}
                           </button>
@@ -529,7 +671,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                       })}
                     </div>
                   )} />
-                  {errors.collaborating_club_ids && <p className="text-xs text-red-500">{errors.collaborating_club_ids.message}</p>}
+                  {errors.collaborating_club_ids && <p className="text-xs text-[var(--status-danger-text)]">{errors.collaborating_club_ids.message}</p>}
                 </div>
               )}
               <Controller name="is_sponsored" control={control} render={({ field }) => (
@@ -540,12 +682,12 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                   <Input label="Sponsor Name" placeholder="e.g. Acme Corp" error={errors.sponsor_name?.message} {...register('sponsor_name')} />
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-[rgb(var(--color-primary))]">Sponsor Document <span className="text-[var(--text-danger)]">*</span></label>
-                    <div className={`flex items-center gap-2 p-2 border rounded-xl bg-white ${!sponsorFile ? 'border-red-300' : 'border-[var(--card-border)]'}`}>
+                    <div className={`flex items-center gap-2 p-2 border rounded-xl bg-white ${!sponsorFile ? 'border-[var(--status-danger-text)]' : 'border-[var(--card-border)]'}`}>
                       <input type="file" ref={sponsorRef} className="hidden" accept=".pdf,.png,.jpg,.jpeg" onChange={e => {
                         if (e.target.files && e.target.files[0]) setSponsorFile(e.target.files[0]);
                       }} />
                       <Button variant="secondary" type="button" className="text-xs py-1.5" onClick={() => sponsorRef.current?.click()}>Choose File</Button>
-                      <span className="text-xs truncate max-w-[140px] text-gray-600 font-medium">{sponsorFile ? sponsorFile.name : 'No file chosen'}</span>
+                      <span className="text-xs truncate max-w-[140px] text-[var(--text-secondary)] font-medium">{sponsorFile ? sponsorFile.name : 'No file chosen'}</span>
                     </div>
                   </div>
                 </div>
@@ -568,7 +710,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                     />
                   </div>
                   {objectiveFields.length > 3 && (
-                    <button type="button" onClick={() => removeObjective(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-red-50 hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
+                    <button type="button" onClick={() => removeObjective(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -594,6 +736,17 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             <div className="grid grid-cols-2 gap-4">
               <Input label="Start Date & Time" type="datetime-local" error={errors.start_datetime?.message} {...register('start_datetime')} />
               <Input label="End Date & Time" type="datetime-local" error={errors.end_datetime?.message} {...register('end_datetime')} />
+            </div>
+
+            <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule</h3>
+                <p className="text-xs text-[var(--text-muted)]">Specify when student registration opens and closes for this event.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} />
+                <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} />
+              </div>
             </div>
           </div>
         )}
@@ -627,7 +780,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                       <button 
                         type="button" 
                         onClick={() => removeVenue(index)} 
-                        className="absolute -top-2 -right-2 p-1.5 bg-white border border-red-200 text-red-500 rounded-full hover:bg-red-50 shadow-sm opacity-0 group-hover/venue:opacity-100 transition-opacity"
+                        className="absolute -top-2 -right-2 p-1.5 bg-white border border-[var(--status-danger-text)] text-[var(--status-danger-text)] rounded-full hover:bg-[var(--status-danger-bg)] shadow-sm opacity-0 group-hover/venue:opacity-100 transition-opacity"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -696,7 +849,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                                               if (selected) idsField.onChange(curr.filter((id: number) => id !== v.id));
                                               else idsField.onChange([...curr, v.id]);
                                             }}
-                                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${selected ? 'bg-blue-100 text-blue-700 border-blue-300' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'} border`}
+                                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition-colors ${selected ? 'bg-[var(--status-info-bg)] text-[var(--status-info-text)] border-[var(--status-info-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:bg-[var(--surface-subtle)]'} border`}
                                           >
                                             {v.name}
                                           </button>
@@ -819,8 +972,76 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
           </div>
         )}
 
+        {/* Section R&D: Mandatory fields when toggle is ON */}
+        {step === 7 && watchIsRnd && (
+          <div className="space-y-5 animate-fade-in">
+            <h2 className="section-title flex items-center gap-2">
+              <FlaskConical className="w-5 h-5 text-[rgb(var(--color-primary))]" /> R&D Information
+            </h2>
+            <Alert type="info">
+              <span>Specify the research & development framework details for this event.</span>
+            </Alert>
+
+            <Controller
+              name="rnd_activity_theme"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Activity Theme *"
+                  options={RND_ACTIVITY_THEMES.map(t => ({ value: t, label: t }))}
+                  placeholder="Select activity theme"
+                  error={errors.rnd_activity_theme?.message}
+                  value={field.value}
+                  onChange={(val) => {
+                    field.onChange(val);
+                    setValue('rnd_prescribed_activity', '');
+                  }}
+                />
+              )}
+            />
+
+            {watchRndTheme && RND_PRESCRIBED_ACTIVITIES[watchRndTheme] && (
+              <Controller
+                name="rnd_prescribed_activity"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Prescribed Activity *"
+                    options={RND_PRESCRIBED_ACTIVITIES[watchRndTheme].map(a => ({ value: a, label: a }))}
+                    placeholder="Select prescribed activity"
+                    error={errors.rnd_prescribed_activity?.message}
+                    {...field}
+                  />
+                )}
+              />
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <Controller
+                name="rnd_semester_quarter"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label="Semester / Quarter"
+                    options={SEMESTER_QUARTERS}
+                    placeholder="Select semester / quarter"
+                    error={errors.rnd_semester_quarter?.message}
+                    {...field}
+                  />
+                )}
+              />
+              <Input
+                label="Tentative Date"
+                type="date"
+                error={errors.rnd_tentative_date?.message}
+                {...register('rnd_tentative_date')}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Section G: Docs & Budget */}
-        {step === 7 && (
+        {step === FINAL_STEP && (
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><FileText className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Event Poster & Budget</h2>
             <Alert type="info">
@@ -859,7 +1080,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             )}
           </div>
           <div className="flex gap-3">
-            {step === 7 ? (
+            {step === FINAL_STEP ? (
               <>
                 <Button type="button" variant="secondary" loading={saving} icon={<Save className="w-4 h-4" />}
                   onClick={handleSubmit(saveAsDraft, () => toast.error("Please check previous sections for missing valid data."))}>

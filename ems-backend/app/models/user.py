@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -12,16 +12,18 @@ class User(Base):
     hashed_password = Column(String(255), nullable=True)
     is_first_login = Column(Boolean, nullable=False, default=True)
     name = Column(String(150), nullable=True)
-    role = Column(String(50), nullable=False, default="student")  # super_admin|director|associate_dean|club_coordinator|student
+    role = Column(String(50), nullable=False, default="student", index=True)  # super_admin|director|associate_dean|club_coordinator|student|additional
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     club_id = Column(Integer, ForeignKey("clubs.id"), nullable=True)
-    year_of_study = Column(String(10), nullable=True)  # Y1/Y2/Y3/Y4/Alumni
+    year_of_study = Column(String(10), nullable=True)
     branch = Column(String(100), nullable=True)
     course = Column(String(100), nullable=True)
     sap_id = Column(String(50), nullable=True, unique=True)
     phone_number = Column(String(20), nullable=True)
     club_coordinator_request = Column(Boolean, nullable=False, default=False)
-    
+    # Dynamic permission list for 'additional' role users (JSON array of permission codes)
+    extra_permissions = Column(JSON, nullable=True, default=list)
+
     status = Column(String(20), nullable=False, default="active")  # active|inactive
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
     last_login_at = Column(TIMESTAMP(timezone=True), nullable=True)
@@ -29,6 +31,7 @@ class User(Base):
     # Relationships
     department = relationship("Department", back_populates="users")
     club = relationship("Club", foreign_keys=[club_id])
+
 
 
 class PreApprovedUser(Base):

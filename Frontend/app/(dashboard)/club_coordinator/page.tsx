@@ -5,7 +5,7 @@ import { Calendar, Edit, CheckCircle2, Users, PlusCircle, Search, MapPin, User, 
 import { StatCard, StatCardSkeleton } from '@/components/shared/StatCard';
 import { MyEvents } from '@/components/events/MyEvents';
 import PendingApprovalsPage from '@/components/events/PendingApprovalsPage';
-import { eventService, approvalService } from '@/lib/services';
+import { eventService, approvalService, dashboardService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import type { Event } from '@/types';
 
@@ -14,6 +14,7 @@ export default function ClubCoordinatorDashboard() {
   const [myEvents, setMyEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
+  const [stats, setStats] = useState<any>(null);
   useEffect(() => {
     eventService.list({ size: 5, my_events: true }).then((r: any) => {
       const events = Array.isArray(r) ? r : (r.data || []);
@@ -24,9 +25,11 @@ export default function ClubCoordinatorDashboard() {
       const items = Array.isArray(res) ? res : (res?.data || []);
       setPendingCount(items.length);
     }).catch(() => {});
+    // Fetch dashboard stats
+    dashboardService.getCoordinator().then((res: any) => {
+      setStats(res);
+    }).catch(() => {});
   }, []);
-  const drafts = myEvents.filter(e => e.status === 'draft').length;
-  const approved = myEvents.filter(e => ['approved','ongoing'].includes(e.status)).length;
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">
@@ -40,18 +43,19 @@ export default function ClubCoordinatorDashboard() {
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? Array.from({length:4}).map((_,i)=><StatCardSkeleton key={i}/>) : <>
-          <StatCard title="Total Events" value={myEvents?.length} icon={<Calendar className="w-6 h-6"/>} color="blue"/>
-          <StatCard title="Drafts" value={drafts} icon={<Edit className="w-6 h-6"/>} color="amber"/>
-          <StatCard title="Approved" value={approved} icon={<CheckCircle2 className="w-6 h-6"/>} color="green"/>
+          <StatCard title="Total Events" value={stats?.total_events_created || 0} icon={<Calendar className="w-6 h-6"/>} color="blue"/>
+          <StatCard title="Drafts" value={stats?.events_by_status?.['draft'] || 0} icon={<Edit className="w-6 h-6"/>} color="amber"/>
+          <StatCard title="Approved" value={stats?.events_by_status?.['approved'] || 0} icon={<CheckCircle2 className="w-6 h-6"/>} color="green"/>
           <StatCard title="Pending Approvals" value={pendingCount} icon={<Bell className="w-6 h-6"/>} color="red"/>
         </>}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {[
-          {label:'Browse Events',href:'/events',icon:<Search className="w-5 h-5"/>,color:'text-indigo-600 bg-indigo-50'},
+          {label:'Browse Events',href:'/events',icon:<Search className="w-5 h-5"/>,color:'text-[var(--status-info-text)] bg-[var(--status-info-bg)]'},
           {label:'Create Event',href:'/club_coordinator/events/create',icon:<PlusCircle className="w-5 h-5"/>,color:'text-[rgb(var(--color-primary))] bg-[var(--card-bg)]'},
           {label:'Documents',href:'/club_coordinator/documents',icon:<Edit className="w-5 h-5"/>,color:'text-[var(--text-secondary)] bg-[var(--card-bg)]'},
-          {label:'Submit Report',href:'/club_coordinator/report',icon:<MapPin className="w-5 h-5"/>,color:'text-amber-600 bg-amber-50'},
+          {label:'Submit Report',href:'/club_coordinator/report',icon:<MapPin className="w-5 h-5"/>,color:'text-[var(--status-warning-text)] bg-[var(--status-warning-bg)]'},
+          {label:'RnD Report',href:'/club_coordinator/rnd-report',icon:<MapPin className="w-5 h-5"/>,color:'text-rose-600 bg-rose-50'},
         ].map(q=>(
           <Link key={q.href} href={q.href} className="card-hover p-4 flex flex-col items-center gap-2 text-center group">
             <div className={"w-10 h-10 rounded-2xl flex items-center justify-center "+q.color}>{q.icon}</div>

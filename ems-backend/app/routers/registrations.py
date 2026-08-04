@@ -14,6 +14,7 @@ from app.models.event import Event
 from app.models.event_registration import EventRegistration
 from app.models.system_config import SystemSettings
 from app.services.email_service import notify_registration_confirmation
+from app.routers.events import is_student_eligible_for_event
 
 logger = logging.getLogger(__name__)
 
@@ -48,29 +49,48 @@ async def register_for_event(
             detail="Registration is only open for approved or ongoing events",
         )
 
-    # Registration deadline check
+    # Registration start time & deadline checks
     now = datetime.now(timezone.utc)
-    if event.registration_deadline and now > event.registration_deadline:
-        raise HTTPException(status_code=400, detail="Registration deadline has passed")
-
-    # Audience check — case-insensitive, match both dept code and name
-    ta = (event.target_audience or "").strip().lower()
-    sd = (event.school_department or "").strip().lower()
-    if ta not in ("college_wide", "college", "all", ""):
-        dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-        dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
-        match = False
-        if dept_code and (dept_code in ta or dept_code in sd):
-            match = True
-        if dept_name and (dept_name in ta or dept_name in sd):
-            match = True
-        if not match:
+    if event.registration_start_datetime:
+        reg_start = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+        if now < reg_start:
+            formatted_date = reg_start.strftime("%d %b %Y, %I:%M %p")
             raise HTTPException(
-                status_code=403,
-                detail="This event is not open to your department",
+                status_code=400,
+                detail=f"Registration opens on {formatted_date}",
             )
 
-    # Create registration (DB UNIQUE constraint handles duplicates)
+    if event.registration_deadline:
+        reg_deadline = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
+        if now > reg_deadline:
+            raise HTTPException(status_code=400, detail="Registration deadline has passed")
+
+    # Audience check — check college-wide, school/department, and departments_involved
+    if not is_student_eligible_for_event(current_user, event):
+        raise HTTPException(
+            status_code=403,
+            detail="This event is not open to your department",
+        )
+
+    # Check for existing registration record (handles re-registration after unregistering)
+    existing_result = await db.execute(
+        select(EventRegistration).where(
+            EventRegistration.event_id == event_id,
+            EventRegistration.student_id == current_user.id,
+        )
+    )
+    existing_reg = existing_result.scalar_one_or_none()
+
+    if existing_reg:
+        if existing_reg.status == "registered":
+            raise HTTPException(status_code=409, detail="You are already registered for this event")
+        else:
+            existing_reg.status = "registered"
+            existing_reg.registered_at = now
+            await db.commit()
+            return {"message": "Successfully registered for the event", "event_id": event_id}
+
+    # Create new registration if none existed
     registration = EventRegistration(
         event_id=event_id,
         student_id=current_user.id,

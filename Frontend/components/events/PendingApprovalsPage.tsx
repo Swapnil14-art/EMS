@@ -33,7 +33,7 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
             <h1 className="page-title">Pending Approvals</h1>
             <p className="page-subtitle">Events awaiting your decision</p>
           </div>
-          <span className="badge bg-red-100 text-[var(--text-danger)] text-sm px-3 py-1">{events?.length} pending</span>
+          <span className="badge bg-[var(--status-danger-bg)] text-[var(--text-danger)] text-sm px-3 py-1">{events?.length} pending</span>
         </div>
       )}
 
@@ -50,7 +50,7 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
       ) : events?.length === 0 ? (
         <div className="card">
           <EmptyState
-            icon={<CheckCircle2 className="w-16 h-16 text-emerald-300" />}
+            icon={<CheckCircle2 className="w-16 h-16 text-[var(--status-success-text)]" />}
             title="All clear!"
             subtitle="No events are waiting for your approval right now."
           />
@@ -65,7 +65,7 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
                     <EventTypeBadge type={event.event_type} />
                     <StatusBadge status={event.status} />
                     {event.is_collaborative && (
-                      <span className="badge bg-indigo-100 text-indigo-700">Collaborative</span>
+                      <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>
                     )}
                   </div>
                   <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-1 truncate">
@@ -83,7 +83,7 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
                     )}
                   </div>
                   {event.is_sponsored && (
-                    <p className="text-xs text-amber-600 font-medium mt-2">💰 Sponsored event</p>
+                    <p className="text-xs text-[var(--status-warning-text)] font-medium mt-2">💰 Sponsored event</p>
                   )}
                 </div>
 

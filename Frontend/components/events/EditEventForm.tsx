@@ -9,11 +9,10 @@ import {
   Package, FileText, ChevronRight, ChevronLeft, Save, AlertTriangle, ArrowLeft, Plus, Trash2
 } from 'lucide-react';
 import { Button, Input, Select, Textarea, Toggle, Alert, Combobox } from '@/components/ui';
-import { eventService, venueService } from '@/lib/services';
+import { eventService, venueService, departmentService } from '@/lib/services';
 import type { Event } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import { TermsModal } from '@/components/shared/TermsModal';
-import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import toast from 'react-hot-toast';
 
 /** Convert a datetime-local input value (local time, no TZ) to a UTC ISO string for the API */
@@ -38,6 +37,8 @@ const schema = z.object({
   objectives: z.array(z.string()).optional(),
   start_datetime: z.string().min(1, 'Start date/time required'),
   end_datetime: z.string().min(1, 'End date/time required'),
+  registration_start_datetime: z.string().optional(),
+  registration_deadline: z.string().optional(),
   venue_id: z.string().optional(),
   venue_custom: z.string().optional(),
   venue_type: z.string().optional(),
@@ -78,6 +79,13 @@ const schema = z.object({
     const end = new Date(data.end_datetime);
     if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End date & time must be after start date & time', path: ['end_datetime'] });
+    }
+  }
+  if (data.registration_start_datetime && data.registration_deadline) {
+    const regStart = new Date(data.registration_start_datetime);
+    const regEnd = new Date(data.registration_deadline);
+    if (!isNaN(regStart.getTime()) && !isNaN(regEnd.getTime()) && regEnd < regStart) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Student registration end date & time cannot be earlier than start date & time', path: ['registration_deadline'] });
     }
   }
   if (data.it_laptop && (!data.it_laptop_details || data.it_laptop_details.trim() === '')) {
@@ -154,7 +162,7 @@ function SectionProgress({ current, total }: { current: number; total: number })
   return (
     <div className="flex items-center gap-1 mb-8">
       {Array.from({ length: total }, (_, i) => (
-        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-muted'}`} />
+        <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-[var(--surface-subtle)]'}`} />
       ))}
     </div>
   );
@@ -169,12 +177,14 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [bufferedData, setBufferedData] = useState<FormData | null>(null);
   const [venues, setVenues] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [existingPoster, setExistingPoster] = useState<string | null>(null);
   const posterRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     venueService.list().then(res => setVenues(res.data)).catch(() => {});
+    if (departmentService) departmentService.list().then(res => setDepartments(res as any[])).catch(() => {});
   }, []);
 
   const { register, control, handleSubmit, watch, trigger, reset, setValue, formState: { errors } } = useForm<FormData>({
@@ -203,6 +213,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
           is_sponsored: !!ev.is_sponsored,
           start_datetime: formatDateTimeForInput(ev.start_datetime),
           end_datetime: formatDateTimeForInput(ev.end_datetime),
+          registration_start_datetime: formatDateTimeForInput(ev.registration_start_datetime),
+          registration_deadline: formatDateTimeForInput(ev.registration_deadline),
           venue_id: ev.venue_id ? ev.venue_id.toString() : '',
           venue_custom: ev.venue_custom || '',
           venue_type: ev.venue_type || '',
@@ -254,7 +266,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'school_department', 'event_incharge_name', 'event_incharge_contact', 'departments_involved', 'objectives'],
-    2: ['start_datetime', 'end_datetime'],
+    2: ['start_datetime', 'end_datetime', 'registration_start_datetime', 'registration_deadline'],
     3: [], 4: [], 5: [], 6: [], 7: [],
   };
 
@@ -285,6 +297,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
+        registration_start_datetime: bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
+        registration_deadline: bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
         event_type: bufferedData.event_type,
         venue_custom: bufferedData.venue_type === 'Other' ? bufferedData.venue_custom : null,
         venue_id: bufferedData.venue_type !== 'Other' ? bufferedData.venue_id : null,
@@ -326,8 +340,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
         </div>
       </div>
 
-      <Alert type="warning" className="border-orange-200 bg-orange-50 text-orange-800">
-        <AlertTriangle className="w-5 h-5 text-orange-500 mr-2 inline-block" />
+      <Alert type="warning" className="border-[var(--status-warning-text)] bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">
+        <AlertTriangle className="w-5 h-5 text-[var(--status-warning-text)] mr-2 inline-block" />
         <strong>Warning:</strong> Modifying details of this event will trigger the approval chain from the start.
       </Alert>
 
@@ -362,26 +376,49 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
             
             <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
               <p className="text-sm font-semibold text-[var(--text-primary)]">Departments Involved <span className="text-[var(--text-danger)]">*</span></p>
-              <Controller name="departments_involved" control={control} render={({ field }) => (
-                <div className="flex flex-wrap gap-2">
-                  {DEPARTMENTS_INVOLVED_OPTIONS.map(d => {
-                    const selected = field.value?.includes(d.value);
-                    return (
-                      <button
-                        key={d.value} type="button"
-                        onClick={() => {
-                          const curr = field.value || [];
-                          if (selected) field.onChange(curr.filter((n: string) => n !== d.value));
-                          else field.onChange([...curr, d.value]);
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-gray-100'} border`}
-                      >
-                        <SchoolDisplay value={d.value} />
-                      </button>
-                    );
-                  })}
-                </div>
-              )} />
+              <Controller name="departments_involved" control={control} render={({ field }) => {
+                const currentValues = field.value || [];
+                const isCollegeWideSelected = currentValues.some(v => String(v).toUpperCase() === 'COLLEGE WIDE' || String(v).toUpperCase() === 'COLLEGE_WIDE');
+                const deptOptions = [
+                  ...departments.map((d: any) => ({ value: d.name, label: d.name })),
+                  { value: 'COLLEGE WIDE', label: 'COLLEGE WIDE' }
+                ];
+                const visibleOptions = isCollegeWideSelected
+                  ? deptOptions.filter(d => d.value === 'COLLEGE WIDE')
+                  : deptOptions;
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      {visibleOptions.map(d => {
+                        const selected = currentValues.includes(d.value);
+                        return (
+                          <button
+                            key={d.value} type="button"
+                            onClick={() => {
+                              if (d.value === 'COLLEGE WIDE') {
+                                if (selected) field.onChange([]);
+                                else field.onChange(['COLLEGE WIDE']);
+                              } else {
+                                let next = currentValues.filter((v: string) => String(v).toUpperCase() !== 'COLLEGE WIDE' && String(v).toUpperCase() !== 'COLLEGE_WIDE');
+                                if (selected) next = next.filter((v: string) => v !== d.value);
+                                else next = [...next, d.value];
+                                field.onChange(next);
+                              }
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${selected ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border-[var(--status-success-text)]' : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--surface-subtle)]'} border`}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] mt-1.5">
+                      Approval chain is determined automatically based on the selected department(s). Selecting <strong>COLLEGE WIDE</strong> sends the event directly to the Director.
+                    </p>
+                  </div>
+                );
+              }} />
               {errors.departments_involved && <p className="text-xs text-[var(--text-danger)]">{errors.departments_involved.message}</p>}
             </div>
 
@@ -420,7 +457,7 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
                     />
                   </div>
                   {fields.length > 3 && (
-                    <button type="button" onClick={() => remove(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-red-50 hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
+                    <button type="button" onClick={() => remove(index)} className="p-2.5 text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] hover:text-[var(--text-danger)] rounded-xl transition-colors mt-0.5">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -445,6 +482,17 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
             <div className="grid grid-cols-2 gap-4">
               <Input label="Start Date & Time" type="datetime-local" error={errors.start_datetime?.message} {...register('start_datetime')} />
               <Input label="End Date & Time" type="datetime-local" error={errors.end_datetime?.message} {...register('end_datetime')} />
+            </div>
+
+            <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule</h3>
+                <p className="text-xs text-[var(--text-muted)]">Updating registration dates for approved events takes effect immediately without re-triggering approval workflow.</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} />
+                <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} />
+              </div>
             </div>
           </div>
         )}
@@ -586,13 +634,13 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
                 {existingPoster ? 'Replace Event Poster' : 'Upload Event Poster'}
               </Button>
               {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] mt-2 font-semibold">New poster: {posterFile.name}</span>}
-              {!posterFile && existingPoster && <span className="text-xs text-emerald-600 mt-2 font-semibold">✓ Existing poster on file</span>}
+              {!posterFile && existingPoster && <span className="text-xs text-[var(--status-success-text)] mt-2 font-semibold">✓ Existing poster on file</span>}
               {!posterFile && !existingPoster && <p className="text-xs text-[var(--text-muted)] mt-2 font-semibold">No poster uploaded — default will be used if none is uploaded</p>}
             </div>
             <Input label="Estimated Budget (₹)" type="number" placeholder="e.g. 25000" {...register('budget')} />
             <Textarea label="Additional Comments" placeholder="Any other notes for the approvers…" {...register('comments')} rows={4} />
 
-            <div className="p-4 bg-red-50 rounded-2xl">
+            <div className="p-4 bg-[var(--status-danger-bg)] rounded-2xl">
               <p className="text-sm font-semibold text-[var(--text-danger)] mb-2">Final Review</p>
               <p className="text-xs text-[var(--text-danger)]">
                 Clicking "Save Changes" will submit this updated event to the approval queue.

@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Building2, Trash2 } from 'lucide-react';
 import { departmentService } from '@/lib/services';
 import { Button, Input, Modal, EmptyState, Pagination } from '@/components/ui';
-import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import type { Department } from '@/types';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -89,17 +88,16 @@ export default function AdminDepartmentsPage() {
           <div className="col-span-full"><EmptyState icon={<Building2 />} title="No schools found" action={<Button onClick={() => setCreateOpen(true)}>Create First School</Button>} /></div>
         ) : filtered?.map(dept => (
           <div key={dept.id} className="card-hover p-5 relative">
-            <button onClick={() => handleDelete(dept.id)} className="absolute top-4 right-4 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-red-50 rounded-lg transition-colors">
+            <button onClick={() => handleDelete(dept.id)} className="absolute top-4 right-4 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors">
               <Trash2 className="w-4 h-4" />
             </button>
             <div className="flex items-start justify-between mb-3">
-              <div className="w-10 h-10 bg-indigo-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-                <Building2 className="w-5 h-5 text-indigo-600" />
+              <div className="w-10 h-10 bg-[var(--status-info-bg)] rounded-2xl flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-5 h-5 text-[var(--status-info-text)]" />
               </div>
             </div>
-            <h3 className="font-display font-bold text-[var(--text-primary)] mb-1">
-              <SchoolDisplay value={dept.code} />
-            </h3>
+            <h3 className="font-display font-bold text-[var(--text-primary)] mb-1">{dept.name}</h3>
+            <p className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--brand-soft)] px-2 py-0.5 font-mono text-sm font-semibold tracking-wide text-[var(--brand-primary)]">{dept.code}</p>
           </div>
         ))}
       </div>

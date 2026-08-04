@@ -10,7 +10,7 @@ import type {
   EventApproval, EventDocument, EventLink, EventRegistration,
   EmailNotification, CoordinatorDashboardStats, AdminDashboardStats,
   LoginFormData, ChangePasswordFormData, CompleteProfileFormData,
-  EventReport,
+  EventReport, EventRndReport,
 } from '@/types';
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -263,6 +263,7 @@ export const eventService = {
     from_date?: string;
     to_date?: string;
     search?: string;
+    is_rnd?: boolean;
     my_events?: boolean;
     manage_only?: boolean;
     page?: number;
@@ -270,7 +271,7 @@ export const eventService = {
   }) => {
     const res = await api.get('/events/', { params });
     const data = res.data;
-    let dataArray = [];
+    let dataArray: Event[] = [];
     if (data?.data && Array.isArray(data.data)) {
       dataArray = data.data.map(mapEventFromApi);
     } else if (Array.isArray(data)) {
@@ -694,6 +695,76 @@ export const reportService = {
   },
 };
 
+// ─── RnD Reports ──────────────────────────────────────────────────────────────
+// API mapped from /rnd-reports endpoints
+
+export const rndReportService = {
+  // POST /rnd-reports/{event_id}/submit — submit structured RnD report (JSON)
+  submitReport: async (eventId: number, payload: object) => {
+    const res = await api.post(`/rnd-reports/${eventId}/submit`, payload);
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-flier — upload event flier (1 compulsory)
+  uploadFlier: async (eventId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post(`/rnd-reports/${eventId}/upload-flier`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-photos — upload event photos
+  uploadPhotos: async (eventId: number, files: File[]) => {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    const res = await api.post(`/rnd-reports/${eventId}/upload-photos`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-attendance — upload attendance sheet
+  uploadAttendance: async (eventId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post(`/rnd-reports/${eventId}/upload-attendance`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  // GET /rnd-reports/{event_id}/generate — download generated .docx RnD report
+  generate: async (eventId: number) => {
+    const res = await api.get(`/rnd-reports/${eventId}/generate`, {
+      responseType: 'blob',
+    });
+    return res.data;
+  },
+
+  // GET /rnd-reports/{event_id} — get RnD report metadata
+  get: async (eventId: number) => {
+    const res = await api.get(`/rnd-reports/${eventId}`);
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-doc — upload pre-made RnD report
+  uploadDoc: async (eventId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post(`/rnd-reports/${eventId}/upload-doc`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  submit: async (eventId: number, data: EventRndReport) => {
+    const res = await api.post(`/rnd-reports/${eventId}/submit`, data);
+    return res.data;
+  },
+};
+
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 // API mapped from /dashboard endpoints
 
@@ -744,3 +815,29 @@ export const healthService = {
     return res.data;
   },
 };
+
+// ─── Permission Management (Additional Role) ──────────────────────────────────
+
+export const permissionService = {
+  getCatalog: async (): Promise<{ catalog: Record<string, string> }> => {
+    const res = await api.get('/permissions/catalog');
+    return res.data;
+  },
+  listUsers: async () => {
+    const res = await api.get('/permissions/users');
+    return res.data;
+  },
+  setPermissions: async (userId: number, permissions: string[]) => {
+    const res = await api.put(`/permissions/${userId}`, { permissions });
+    return res.data;
+  },
+  grantPermissions: async (userId: number, permissions: string[]) => {
+    const res = await api.post(`/permissions/${userId}/grant`, { permissions });
+    return res.data;
+  },
+  revokePermissions: async (userId: number, permissions: string[]) => {
+    const res = await api.delete(`/permissions/${userId}/revoke`, { data: { permissions } });
+    return res.data;
+  },
+};
+

@@ -4,8 +4,6 @@ import { Plus, Search, Users, Edit2, BookOpen, Trash2 } from 'lucide-react';
 import { clubService, departmentService, userService } from '@/lib/services';
 import { Button, Input, Select, Modal, EmptyState, Pagination } from '@/components/ui';
 import type { Club, User } from '@/types';
-import { getSchoolInfo } from '@/lib/utils';
-import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -13,11 +11,25 @@ import { zodResolver } from '@hookform/resolvers/zod';
 
 const schema = z.object({
   name: z.string().min(2, 'Club name required'),
-  department_id: z.coerce.number().min(1, 'School required'),
+  level: z.enum(['department', 'college_wide']).default('department'),
+  department_id: z.coerce.number().optional().nullable().transform(v => (!v || v === 0) ? null : v),
   description: z.string().optional(),
   coordinator_ids: z.array(z.number()).default([]),
+}).refine(data => {
+  if (data.level === 'department') {
+    return !!data.department_id && data.department_id > 0;
+  }
+  return true;
+}, {
+  message: 'School required for Department Level clubs',
+  path: ['department_id'],
 });
 type FormData = z.infer<typeof schema>;
+
+const levelOptions = [
+  { value: 'department', label: 'Department / School Level (Coordinator → Dean → Director)' },
+  { value: 'college_wide', label: 'College-Wide (Coordinator → Director)' },
+];
 
 export default function AdminClubsPage() {
   const [clubs, setClubs] = useState<Club[]>([]);
@@ -34,9 +46,10 @@ export default function AdminClubsPage() {
 
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { coordinator_ids: [] }
+    defaultValues: { level: 'department', coordinator_ids: [] }
   });
 
+  const watchedLevel = watch('level');
   const watchedDept = watch('department_id');
   const selectedCoordinatorIds = watch('coordinator_ids') || [];
 
@@ -53,10 +66,7 @@ export default function AdminClubsPage() {
     fetchClubs();
     departmentService.list().then(depts => {
       const arr = Array.isArray(depts) ? depts : [];
-      setDeptOptions(arr.map((d: any) => {
-        const info = getSchoolInfo(d.code);
-        return { value: String(d.id), label: info ? info.abbreviation : `${d.name} (${d.code})` };
-      }));
+      setDeptOptions(arr.map((d: any) => ({ value: String(d.id), label: `${d.name} (${d.code})` })));
     }).catch(() => {});
     
     userService.list({ role: 'club_coordinator', size: 500 }).then(res => {
@@ -64,10 +74,14 @@ export default function AdminClubsPage() {
     }).catch(() => {});
   }, [page]);
 
-  const availableCoordinators = allCoordinators.filter(u => 
-    (!watchedDept || u.department_id === Number(watchedDept)) && 
-    (!u.club_id || u.club_id === editingClub?.id)
-  );
+  const availableCoordinators = allCoordinators.filter(u => {
+    const isFreeOrMine = !u.club_id || u.club_id === editingClub?.id;
+    if (!isFreeOrMine) return false;
+    if (watchedLevel === 'college_wide') {
+      return true; // Show all unassigned coordinators across the institution
+    }
+    return watchedDept && u.department_id === Number(watchedDept);
+  });
 
   const handleCreateOrUpdate = async (data: FormData) => {
     setSubmitting(true);
@@ -81,7 +95,7 @@ export default function AdminClubsPage() {
       }
       setCreateOpen(false);
       setEditingClub(null);
-      reset({ name: '', department_id: undefined, description: '', coordinator_ids: [] });
+      reset({ name: '', department_id: undefined, description: '', level: 'department', coordinator_ids: [] });
       fetchClubs();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed');
@@ -107,6 +121,7 @@ export default function AdminClubsPage() {
       name: club.name,
       department_id: club.department_id,
       description: club.description || '',
+      level: club.level || 'department',
       coordinator_ids: club.coordinators?.map(c => c.id) || []
     });
     setCreateOpen(true);
@@ -120,7 +135,7 @@ export default function AdminClubsPage() {
         <div><h1 className="page-title">Club Management</h1><p className="page-subtitle">{total} clubs across all schools</p></div>
         <Button icon={<Plus className="w-4 h-4" />} onClick={() => {
           setEditingClub(null);
-          reset({ name: '', department_id: undefined, description: '', coordinator_ids: [] });
+          reset({ name: '', department_id: undefined, description: '', level: 'department', coordinator_ids: [] });
           setCreateOpen(true);
         }}>Create Club</Button>
       </div>
@@ -138,10 +153,10 @@ export default function AdminClubsPage() {
         ) : filtered?.map(club => (
           <div key={club.id} className="card-hover p-5 relative">
             <div className="absolute top-4 right-4 flex gap-1">
-              <button onClick={() => handleEdit(club)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+              <button onClick={() => handleEdit(club)} className="p-2 text-[var(--text-muted)] hover:text-[var(--status-info-text)] hover:bg-[var(--status-info-bg)] rounded-lg transition-colors" title="Edit">
                 <Edit2 className="w-4 h-4" />
               </button>
-              <button onClick={() => setDeleteClub(club)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+              <button onClick={() => setDeleteClub(club)} className="p-2 text-[var(--text-muted)] hover:text-[var(--status-danger-text)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors" title="Delete">
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -149,19 +164,24 @@ export default function AdminClubsPage() {
               <div className="w-10 h-10 bg-[var(--card-bg)] rounded-2xl flex items-center justify-center flex-shrink-0">
                 <BookOpen className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
-              <span className={`badge ${club.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
-                {club.is_active ? 'Active' : 'Inactive'}
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`badge ${club.level === 'college_wide' ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
+                  {club.level === 'college_wide' ? 'College-Wide' : 'Department'}
+                </span>
+                <span className={`badge ${club.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
+                  {club.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
             </div>
             <h3 className="font-display font-bold text-[var(--text-primary)] mb-1 pr-16">{club.name}</h3>
-            <div className="text-xs text-[var(--text-muted)] mb-2"><SchoolDisplay value={club.department?.name || 'Unknown school'} /></div>
+            <p className="text-xs text-[var(--text-muted)] mb-2">{club.level === 'college_wide' ? 'College-Wide' : (club.department?.name || 'Unknown school')}</p>
             
             {club.coordinators && club.coordinators.length > 0 ? (
               <div className="text-xs text-[var(--text-secondary)] mt-2">
                 <div className="flex items-center gap-1 font-semibold mb-1"><Users className="w-3 h-3" /> Coordinators:</div>
                 <div className="flex flex-wrap gap-1">
                   {club.coordinators.map(c => (
-                    <span key={c.id} className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-100">{c.name || c.email}</span>
+                    <span key={c.id} className="bg-[var(--status-info-bg)] text-[var(--status-info-text)] px-2 py-0.5 rounded-md border border-[var(--status-info-text)]">{c.name || c.email}</span>
                   ))}
                 </div>
               </div>
@@ -184,23 +204,29 @@ export default function AdminClubsPage() {
         </>}>
         <div className="space-y-4">
           <Input label="Club Name" placeholder="e.g. Robotics Club" error={errors.name?.message} {...register('name')} />
-          <Select label="School" options={deptOptions} placeholder="Select school" error={errors.department_id?.message} {...register('department_id')} />
+          <Select label="Club Level" options={levelOptions} error={errors.level?.message} {...register('level')} />
+
+          {watchedLevel !== 'college_wide' && (
+            <Select label="School" options={deptOptions} placeholder="Select school" error={errors.department_id?.message} {...register('department_id')} />
+          )}
           
           <div className="space-y-1.5">
             <label className="label">Assign Coordinators</label>
-            {!watchedDept ? (
-               <div className="text-sm text-slate-500 italic p-3 bg-slate-50 rounded-lg border border-slate-200">First select a school/department...</div>
+            {watchedLevel === 'department' && !watchedDept ? (
+               <div className="text-sm text-[var(--text-secondary)] italic p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border-subtle)]">First select a school/department...</div>
             ) : availableCoordinators.length === 0 ? (
-               <div className="text-sm text-slate-500 italic p-3 bg-slate-50 rounded-lg border border-slate-200">No free coordinators found in this school.</div>
+               <div className="text-sm text-[var(--text-secondary)] italic p-3 bg-[var(--surface-subtle)] rounded-lg border border-[var(--border-subtle)]">
+                 {watchedLevel === 'college_wide' ? 'No unassigned club coordinators found in the college.' : 'No free coordinators found in this school.'}
+               </div>
             ) : (
-              <div className="max-h-[160px] overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1">
+              <div className="max-h-[160px] overflow-y-auto border border-[var(--border-subtle)] rounded-xl p-2 space-y-1">
                 {availableCoordinators.map(user => {
                   const isChecked = selectedCoordinatorIds.includes(user.id);
                   return (
-                    <label key={user.id} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-blue-50 border-blue-100' : 'hover:bg-slate-50 border-transparent'} border`}>
+                    <label key={user.id} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isChecked ? 'bg-[var(--status-info-bg)] border-[var(--status-info-text)]' : 'hover:bg-[var(--surface-subtle)] border-transparent'} border`}>
                       <input 
                         type="checkbox" 
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                        className="w-4 h-4 rounded text-[var(--status-info-text)] focus:ring-[var(--status-info-text)]"
                         checked={isChecked}
                         onChange={(e) => {
                           if (e.target.checked) {
@@ -211,8 +237,8 @@ export default function AdminClubsPage() {
                         }}
                       />
                       <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-slate-800">{user.name || user.email}</span>
-                        {user.name && <span className="text-xs text-slate-500 ml-2 block sm:inline">({user.email})</span>}
+                        <span className="text-sm font-semibold text-[var(--text-primary)]">{user.name || user.email}</span>
+                        {user.name && <span className="text-xs text-[var(--text-secondary)] ml-2 block sm:inline">({user.email})</span>}
                       </div>
                     </label>
                   );
@@ -235,7 +261,7 @@ export default function AdminClubsPage() {
           <p className="text-sm text-[var(--text-secondary)]">
             Are you sure you want to permanently delete <strong>{deleteClub?.name}</strong>?
           </p>
-          <p className="text-sm font-semibold text-red-600">
+          <p className="text-sm font-semibold text-[var(--status-danger-text)]">
             Note: Clubs with existing events cannot be deleted directly.
           </p>
         </div>

@@ -45,19 +45,7 @@ async def list_users(
     if course and course.lower() != "all":
         query = query.where(User.course == course)
         
-    count_query = select(func.count(User.id))
-    if role:
-        count_query = count_query.where(User.role == role)
-    if status:
-        count_query = count_query.where(User.status == status)
-    if department_id:
-        count_query = count_query.where(User.department_id == department_id)
-    if year and year.lower() != "all":
-        count_query = count_query.where(User.year_of_study == year)
-    if branch and branch.lower() != "all":
-        count_query = count_query.where(User.branch == branch)
-    if course and course.lower() != "all":
-        count_query = count_query.where(User.course == course)
+    count_query = select(func.count()).select_from(query.subquery())
     
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0

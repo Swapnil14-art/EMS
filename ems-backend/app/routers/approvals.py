@@ -206,12 +206,17 @@ async def all_approval_history(
 @router.get("/{event_id}/history", response_model=List[ApprovalOut])
 async def approval_history(
     event_id: int,
-    current_user: User = Depends(require_roles(
-        "super_admin", "director", "associate_dean", "club_coordinator"
-    )),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the full approval chain history for an event."""
+    if current_user.role not in {"super_admin", "director", "associate_dean", "club_coordinator"}:
+        if current_user.role == "additional":
+            from app.utils.additional_perms import has_perm
+            if not has_perm(current_user, "view_event_status"):
+                raise HTTPException(status_code=403, detail="Missing permission: view_event_status")
+        else:
+            raise HTTPException(status_code=403, detail="Not authorized to view approval history")
     result = await db.execute(
         select(EventApproval)
         .where(EventApproval.event_id == event_id)

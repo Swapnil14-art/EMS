@@ -108,9 +108,9 @@ export default function RegisterPage() {
                 <p className="text-[var(--text-secondary)] mt-1">User registration is currently unavailable</p>
               </div>
 
-              <div className="bg-orange-50 border border-orange-200 text-orange-800 p-6 rounded-2xl">
-                <ShieldOff className="w-10 h-10 mb-4 text-orange-500" />
-                <h3 className="font-bold text-lg mb-2 text-orange-700">Registration Closed</h3>
+              <div className="bg-[var(--status-warning-bg)] border border-[var(--status-warning-text)] text-[var(--status-warning-text)] p-6 rounded-2xl">
+                <ShieldOff className="w-10 h-10 mb-4 text-[var(--status-warning-text)]" />
+                <h3 className="font-bold text-lg mb-2 text-[var(--status-warning-text)]">Registration Closed</h3>
                 <p className="text-sm font-medium">
                   User registration is currently disabled by administrator. Please contact the Super Admin if you need an account.
                 </p>
@@ -136,8 +136,8 @@ export default function RegisterPage() {
               {success ? (
                 <div className="space-y-6 animate-slide-up">
                   <div className="bg-[rgb(var(--alert-success-bg)/0.1)] border border-[rgb(var(--alert-success-border)/0.2)] text-[var(--alert-success-text)] p-6 rounded-2xl">
-                    <CheckCircle2 className="w-10 h-10 mb-4 text-green-500" />
-                    <h3 className="font-bold text-lg mb-2 text-green-700">Check your inbox</h3>
+                    <CheckCircle2 className="w-10 h-10 mb-4 text-[var(--status-success-text)]" />
+                    <h3 className="font-bold text-lg mb-2 text-[var(--status-success-text)]">Check your inbox</h3>
                     <p className="text-sm font-medium">A temporary password has been sent to your email. Please use it to log in, after which you will be prompted to create your own secure password.</p>
                   </div>
                   <Link href="/login">

@@ -15,10 +15,10 @@ export function RoleBadge({ role, className }: { role: UserRole; className?: str
 }
 export function EventTypeBadge({ type, className }: { type: string; className?: string }) {
   const colors: Record<string,string> = {
-    technical:'bg-[rgb(var(--btn-primary-bg)/0.1)] text-[rgb(var(--color-primary))]', cultural:'bg-[rgb(var(--color-secondary)/0.1)] text-[var(--text-secondary)]',
-    sports:'bg-green-100 text-green-700', seminar:'bg-amber-100 text-amber-700',
-    workshop:'bg-orange-100 text-orange-700', hackathon:'bg-indigo-100 text-indigo-700',
-    awareness:'bg-teal-100 text-teal-700', other:'bg-muted text-slate-700',
+    technical:'bg-[var(--status-info-bg)] text-[var(--status-info-text)]', cultural:'bg-[var(--surface-subtle)] text-[var(--text-secondary)]',
+    sports:'bg-[var(--status-success-bg)] text-[var(--status-success-text)]', seminar:'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]',
+    workshop:'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]', hackathon:'bg-[var(--status-info-bg)] text-[var(--status-info-text)]',
+    awareness:'bg-[var(--status-info-bg)] text-[var(--status-info-text)]', other:'bg-[var(--surface-subtle)] text-[var(--text-secondary)]',
   };
   const labels: Record<string,string> = {
     technical:'Technical', cultural:'Cultural', sports:'Sports', seminar:'Seminar',

@@ -13,18 +13,39 @@ from app.models.event_report import EventReport
 from app.schemas.report import ReportSubmit, ReportOut
 from app.services.storage_service import save_file
 from app.config import settings
+from app.utils.additional_perms import has_perm
 
 router = APIRouter()
+
+REPORT_WRITE_ROLES = {"club_coordinator"}
+REPORT_READ_ROLES  = {"club_coordinator", "super_admin", "associate_dean", "director"}
+
+
+def _check_report_write(user: User):
+    if user.role in REPORT_WRITE_ROLES:
+        return
+    if user.role == "additional" and has_perm(user, "submit_reports"):
+        return
+    raise HTTPException(status_code=403, detail="Missing permission: submit_reports")
+
+
+def _check_report_read(user: User):
+    if user.role in REPORT_READ_ROLES:
+        return
+    if user.role == "additional" and has_perm(user, "view_reports"):
+        return
+    raise HTTPException(status_code=403, detail="Missing permission: view_reports")
 
 
 @router.post("/{event_id}/submit", response_model=ReportOut, status_code=201)
 async def submit_report(
     event_id: int,
     body: ReportSubmit,
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Submit a post-event report. Transitions event: completed → archived."""
+    _check_report_write(current_user)
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -57,7 +78,6 @@ async def submit_report(
     if existing_report and existing_report.event_summary:
         raise HTTPException(status_code=409, detail="Report already submitted for this event")
 
-    # Build field dict from body
     fields = dict(
         submitted_by=current_user.id,
         event_summary=body.event_summary,
@@ -107,10 +127,11 @@ async def submit_report(
 async def upload_report_photos(
     event_id: int,
     files: list[UploadFile] = File(...),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload event photos for the post-event report (4–8 required)."""
+    _check_report_write(current_user)
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -127,10 +148,11 @@ async def upload_report_photos(
 async def upload_flier(
     event_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload the event flier (1 compulsory)."""
+    _check_report_write(current_user)
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -160,10 +182,11 @@ async def upload_flier(
 async def upload_attendance(
     event_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload the attendance sheet for an event."""
+    _check_report_write(current_user)
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -192,12 +215,11 @@ async def upload_attendance(
 @router.get("/{event_id}/generate")
 async def download_report(
     event_id: int,
-    current_user: User = Depends(require_roles(
-        "club_coordinator", "super_admin", "associate_dean", "director"
-    )),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Download the generated .docx report."""
+    _check_report_read(current_user)
     result = await db.execute(select(EventReport).where(EventReport.event_id == event_id))
     report = result.scalar_one_or_none()
     if not report:
@@ -230,11 +252,10 @@ async def download_report(
 @router.get("/{event_id}", response_model=ReportOut)
 async def get_report(
     event_id: int,
-    current_user: User = Depends(require_roles(
-        "club_coordinator", "super_admin", "associate_dean", "director"
-    )),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _check_report_read(current_user)
     result = await db.execute(select(EventReport).where(EventReport.event_id == event_id))
     report = result.scalar_one_or_none()
     if not report:
@@ -246,10 +267,11 @@ async def get_report(
 async def upload_premade_report(
     event_id: int,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Alternative: upload a pre-made .docx report directly."""
+    _check_report_write(current_user)
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")

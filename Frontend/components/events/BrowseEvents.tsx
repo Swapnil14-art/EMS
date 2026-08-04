@@ -1,96 +1,62 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
-import { eventService } from '@/lib/services';
+import { useEffect, useState } from 'react';
+import { Search, FlaskConical } from 'lucide-react';
 import { EventCard, EventCardSkeleton } from '@/components/events/EventCard';
 import { Input, Tabs, Pagination, EmptyState } from '@/components/ui';
-import type { Event } from '@/types';
-import { getEventTimeStatus } from '@/lib/utils';
+import { useDebouncedValue, useEventList, useEventStatusCounts } from '@/lib/event-queries';
 
 const STATUS_TABS = [
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'ongoing', label: 'Ongoing' },
   { value: 'past', label: 'Past' },
 ];
+const PAGE_SIZE = 12;
 
-interface BrowseEventsProps {
-  hideHeader?: boolean;
-  title?: string;
-  subtitle?: string;
-}
+interface BrowseEventsProps { hideHeader?: boolean; title?: string; subtitle?: string; }
 
-export function BrowseEvents({ hideHeader, title = "Browse Events", subtitle = "Discover what's happening on campus" }: BrowseEventsProps) {
-  const [allEvents, setAllEvents] = useState<Event[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [total, setTotal] = useState(0);
+export function BrowseEvents({ hideHeader, title = 'Browse Events', subtitle = "Discover what's happening on campus" }: BrowseEventsProps) {
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('upcoming');
   const [search, setSearch] = useState('');
-  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
+  const [isRndOnly, setIsRndOnly] = useState(false);
+  const debouncedSearch = useDebouncedValue(search);
+  const { data, isLoading } = useEventList({ status: tab, search: debouncedSearch || undefined, is_rnd: isRndOnly ? true : undefined, page, size: PAGE_SIZE });
+  const counts = useEventStatusCounts(debouncedSearch);
 
-  const fetchAndCategorize = () => {
-    setLoading(true);
-    // Fetch all public events matching search text
-    eventService.list({ status: 'approved,ongoing,completed,archived', search: search || undefined, size: 2000 })
-      .then(r => {
-        const data = r.data || [];
-        setAllEvents(data);
-      })
-      .catch(() => setAllEvents([]))
-      .finally(() => setLoading(false));
-  };
+  useEffect(() => setPage(1), [tab, debouncedSearch, isRndOnly]);
+  const tabsWithCounts = STATUS_TABS.map(item => ({ ...item, label: `${item.label} (${counts[item.value as keyof typeof counts]})` }));
 
-  useEffect(() => {
-    fetchAndCategorize();
-  }, [search]);
+  const emptySubtitle = debouncedSearch
+    ? "No eligible events match your search query. Try a different keyword!"
+    : tab === 'upcoming'
+    ? "No eligible upcoming events scheduled right now for your department or college-wide."
+    : tab === 'ongoing'
+    ? "No eligible events are currently ongoing."
+    : "No past eligible events found.";
 
-  useEffect(() => {
-    // Local filtering when `tab`, `page`, or `allEvents` changes
-    const filtered = allEvents.filter(e => getEventTimeStatus(e.start_datetime, e.end_datetime) === tab);
-    
-    // Update counts
-    const newCounts = { upcoming: 0, ongoing: 0, past: 0 };
-    allEvents.forEach(e => {
-      const s = getEventTimeStatus(e.start_datetime, e.end_datetime);
-      if (s in newCounts) newCounts[s as keyof typeof newCounts]++;
-    });
-    setTabCounts(newCounts);
-
-    // Local pagination
-    setTotal(filtered.length);
-    const startIdx = (page - 1) * 12;
-    setEvents(filtered.slice(startIdx, startIdx + 12));
-  }, [allEvents, tab, page]);
-
-  const tabsWithCounts = STATUS_TABS.map(t => ({
-    value: t.value,
-    label: `${t.label} (${tabCounts[t.value] ?? '...'})`
-  }));
-
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {!hideHeader && (
-        <div>
-          <h1 className="page-title">{title}</h1>
-          <p className="page-subtitle">{subtitle}</p>
-        </div>
-      )}
-
-      <div className="card p-4 flex flex-wrap gap-3 items-center">
-        <Input placeholder="Search events…" leftIcon={<Search className="w-4 h-4" />}
-          value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-        <Tabs tabs={tabsWithCounts} active={tab} onChange={t => { setTab(t); setPage(1); }} />
+  return <div className="space-y-6 animate-fade-in">
+    {!hideHeader && <div><h1 className="page-title">{title}</h1><p className="page-subtitle">{subtitle}</p></div>}
+    <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3 flex-1">
+        <Input placeholder="Search events…" leftIcon={<Search className="w-4 h-4" />} value={search} onChange={event => setSearch(event.target.value)} className="max-w-xs" />
+        <Tabs tabs={tabsWithCounts} active={tab} onChange={setTab} />
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 min-h-[200px]">
-        {loading
-          ? Array.from({ length: 8 }).map((_, i) => <EventCardSkeleton key={i} />)
-          : events?.length === 0
-            ? <div className="col-span-full"><EmptyState icon="📭" title="No events found" subtitle="Try a different filter or check back later" /></div>
-            : events?.map(e => <EventCard key={e.id} event={e} />)}
-      </div>
-      <Pagination page={page} total={total} perPage={12} onChange={setPage} />
+      <button
+        type="button"
+        onClick={() => setIsRndOnly(!isRndOnly)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+          isRndOnly
+            ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+            : 'bg-[var(--card-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-purple-400'
+        }`}
+      >
+        <FlaskConical className="w-3.5 h-3.5" />
+        <span>R&D Events Only</span>
+      </button>
     </div>
-  );
+    <div className="grid min-h-[200px] grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {isLoading ? Array.from({ length: 8 }).map((_, index) => <EventCardSkeleton key={index} />) : data?.data.length ? data.data.map(event => <EventCard key={event.id} event={event} />) : <div className="col-span-full"><EmptyState icon="📭" title="No events found" subtitle={emptySubtitle} /></div>}
+    </div>
+    <Pagination page={page} total={data?.total ?? 0} perPage={PAGE_SIZE} onChange={setPage} />
+  </div>;
 }

@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +10,10 @@ import { useAuthStore } from '@/store/authStore';
 import { Button, Input, Alert } from '@/components/ui';
 import { ROLE_DASHBOARD } from '@/lib/utils';
 import { extractApiError } from '@/lib/transformers';
+import { authService, systemService } from '@/lib/services';
+import { setAccessToken, setRefreshToken } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { BrandMark } from '@/components/layout/BrandMark';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -32,24 +34,20 @@ export default function LoginPage() {
 
   // Check if user signup is disabled via public config (no auth needed)
   useEffect(() => {
-    import('@/lib/services').then(({ systemService }) => {
-      systemService.getPublicConfig().then(config => {
-        if (config?.disable_role_signup) {
-          setRegistrationDisabled(true);
-        }
-      }).catch(() => {});
-    });
+    systemService.getPublicConfig().then(config => {
+      if (config?.disable_role_signup) {
+        setRegistrationDisabled(true);
+      }
+    }).catch(() => {});
   }, []);
 
   // API mapped from POST /auth/login
   const onSubmit = async (data: FormData) => {
     setApiError('');
     try {
-      const { authService } = await import('@/lib/services');
       const loginRes = await authService.login(data);
 
       // Store tokens immediately so /auth/me call is authenticated
-      const { setAccessToken, setRefreshToken } = await import('@/lib/api');
       setAccessToken(loginRes.accessToken);
       setRefreshToken(loginRes.refreshToken);
 
@@ -84,12 +82,10 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 blue-section relative overflow-hidden flex-col items-center justify-center p-12">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-48 h-48 bg-yellow-300 rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-20 w-48 h-48 bg-[var(--status-warning-bg)] rounded-full blur-3xl" />
         </div>
         <div className="relative z-10 text-center">
-          <div className="w-20 h-20 bg-white backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/20 p-2">
-            <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={80} height={80} className="w-full h-full object-contain" priority />
-          </div>
+          <div className="mx-auto mb-6 w-fit rounded-3xl bg-white/15 p-3 backdrop-blur-sm"><BrandMark compact link={false} /></div>
           <h1 className="font-display font-bold text-[var(--btn-primary-text)] text-4xl mb-3">EMS</h1>
           <p className="text-[rgb(var(--color-primary))]/20 text-lg mb-2">Event Management System</p>
           <p className="text-[rgb(var(--color-primary))]/20 text-sm">SVKM's NMIMS MPTP, Shirpur</p>
@@ -109,12 +105,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-6 bg-[var(--card-bg)] overflow-y-auto">
         <div className="w-full max-w-md py-8">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 relative flex items-center justify-center">
-              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={40} height={40} className="w-full h-full object-contain" priority />
-            </div>
-            <div><p className="font-display font-bold text-[var(--text-primary)]">EMS</p><p className="text-xs text-[var(--text-muted)]">NMIMS Shirpur</p></div>
-          </div>
+          <div className="lg:hidden mb-8"><BrandMark link={false} /></div>
 
           <div className="mb-6">
             <h2 className="font-display font-bold text-[var(--text-primary)] text-3xl">Welcome back</h2>
@@ -146,7 +137,7 @@ export default function LoginPage() {
                 leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.password?.message}
                 rightElement={
-                  <button type="button" onClick={() => setShowPass(!showPass)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
+                  <button type="button" onClick={() => setShowPass(!showPass)} aria-label={showPass ? 'Hide password' : 'Show password'} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 }

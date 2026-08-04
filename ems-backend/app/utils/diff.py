@@ -38,6 +38,9 @@ def take_event_snapshot(event) -> dict:
         "target_audience": event.target_audience,
         "start_datetime": event.start_datetime.isoformat() if event.start_datetime else None,
         "end_datetime": event.end_datetime.isoformat() if event.end_datetime else None,
+        "registration_start_datetime": (
+            event.registration_start_datetime.isoformat() if event.registration_start_datetime else None
+        ),
         "registration_deadline": (
             event.registration_deadline.isoformat() if event.registration_deadline else None
         ),

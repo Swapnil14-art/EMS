@@ -47,7 +47,7 @@ export default function VenuesPage() {
               <div className="w-10 h-10 bg-[var(--card-bg)] rounded-2xl flex items-center justify-center flex-shrink-0">
                 <MapPin className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
-              <span className={`badge ${venue.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+              <span className={`badge ${venue.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                 {venue.is_active ? 'Available' : 'Inactive'}
               </span>
             </div>

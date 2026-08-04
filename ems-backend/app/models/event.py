@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, String, TIMESTAMP, ForeignKey, Boolean,
-    Text, Numeric,
+    Text, Numeric, Date,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -30,6 +30,7 @@ class Event(Base):
     # Section B — Dates/Times
     start_datetime = Column(TIMESTAMP(timezone=True), nullable=False)
     end_datetime = Column(TIMESTAMP(timezone=True), nullable=False)
+    registration_start_datetime = Column(TIMESTAMP(timezone=True), nullable=True)
     registration_deadline = Column(TIMESTAMP(timezone=True), nullable=True)
 
     # Section C — Venue
@@ -79,8 +80,15 @@ class Event(Base):
     comments = Column(Text, nullable=True)
     participant_doc_path = Column(Text, nullable=True)
 
+    # Section R&D — R&D Event Classification
+    is_rnd_event = Column(Boolean, nullable=False, default=False)
+    rnd_activity_theme = Column(String(255), nullable=True)
+    rnd_prescribed_activity = Column(String(255), nullable=True)
+    rnd_semester_quarter = Column(String(100), nullable=True)
+    rnd_tentative_date = Column(Date, nullable=True)
+
     # Tracking
-    status = Column(String(60), nullable=False, default="draft")
+    status = Column(String(60), nullable=False, default="draft", index=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     responsible_coordinator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     current_approval_step = Column(Integer, nullable=False, default=1)
@@ -108,6 +116,7 @@ class Event(Base):
     coordinators = relationship("EventCoordinator", back_populates="event", cascade="all, delete-orphan")
     edit_history = relationship("EventEditHistory", back_populates="event", cascade="all, delete-orphan")
     report = relationship("EventReport", back_populates="event", uselist=False, cascade="all, delete-orphan")
+    rnd_report = relationship("EventRndReport", back_populates="event", uselist=False, cascade="all, delete-orphan")
 
 class EventVenue(Base):
     __tablename__ = "event_venues"

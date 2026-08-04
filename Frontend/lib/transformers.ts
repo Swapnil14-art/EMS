@@ -29,6 +29,7 @@ export function mapUserFromApi(apiUser: any): User {
     phone_number: apiUser.phone_number,
     is_club_coordinator_requested: apiUser.is_club_coordinator_requested,
     club_name: apiUser.club_name,
+    extra_permissions: apiUser.extra_permissions || [],
     // Derived convenience fields
     is_active: (apiUser.status || 'active') === 'active',
     force_password_change: apiUser.is_first_login ?? apiUser.force_password_change ?? false,
@@ -106,9 +107,11 @@ export function mapEventToApi(formData: any): any {
     delete payload.venue_id;
   }
 
-  // Ensure budget is a number
-  if (payload.budget === undefined || payload.budget === null || payload.budget === '') {
-    payload.budget = 0;
+  // Ensure budget is a number if provided
+  if ('budget' in payload) {
+    if (payload.budget === undefined || payload.budget === null || payload.budget === '') {
+      payload.budget = 0;
+    }
   }
 
   // Clean up frontend-only fields that the backend schema does not accept

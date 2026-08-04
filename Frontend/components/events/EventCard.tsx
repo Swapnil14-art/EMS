@@ -9,16 +9,16 @@ import type { Event } from '@/types';
 interface EventCardProps {
   event: Event;
   variant?: 'default' | 'compact' | 'horizontal';
-  showStatus?: boolean;
+  showStatus?: boolean; 
 }
 
 const GRADIENT_FALLBACKS = [
-  'from-blue-400 to-blue-700',
-  'from-indigo-400 to-indigo-700',
-  'from-sky-400 to-sky-700',
-  'from-violet-400 to-violet-700',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
   'from-cyan-400 to-cyan-600',
-  'from-blue-500 to-indigo-700',
+  'from-[var(--status-info-text)] to-[var(--status-info-text)]',
 ];
 
 function fallbackGradient(id: number) {
@@ -34,7 +34,7 @@ export function EventCard({ event, showStatus = true }: EventCardProps) {
   return (
     <Link href={`/events/${event.id}`} className="block group event-card card-hover overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
       {/* Image area */}
-      <div className="event-img-wrap relative h-48 bg-gradient-to-br overflow-hidden">
+      <div className="event-img-wrap relative h-40 overflow-hidden bg-gradient-to-br sm:h-48">
         {event.poster_url ? (
           <img src={event.poster_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
         ) : (
@@ -43,9 +43,14 @@ export function EventCard({ event, showStatus = true }: EventCardProps) {
           </div>
         )}
         {/* Status overlay */}
-        <div className="absolute top-3 left-3 flex gap-2">
+        <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
+          {event.is_rnd_event && (
+            <span className="flex items-center gap-1 px-2.5 py-1 bg-purple-600 text-white rounded-full text-xs font-bold shadow">
+              R&D
+            </span>
+          )}
           {isOngoing && (
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--status-success-bg)] text-[var(--btn-primary-text)] rounded-full text-xs font-bold shadow">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               LIVE
             </span>

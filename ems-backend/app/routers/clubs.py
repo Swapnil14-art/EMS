@@ -58,6 +58,7 @@ async def create_club(
         description=body.description,
         department_id=body.department_id,
         coordinator_id=coord_id,
+        level=body.level or "department",
     )
     db.add(club)
     await db.flush()

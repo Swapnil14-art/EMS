@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
+import { AlertCircle, CalendarDays, Filter } from 'lucide-react';
 import { eventService, clubService, departmentService } from '@/lib/services';
-import { useAuthStore } from '@/store/authStore';
 import type { Club, Department } from '@/types';
 import { getSchoolInfo } from '@/lib/utils';
 
@@ -13,13 +13,29 @@ interface EventCalendarProps {
   isPublic?: boolean;
 }
 
+type CalendarEvent = {
+  id: string;
+  title?: string;
+  start?: string;
+  color?: string;
+  status?: string;
+  [key: string]: unknown;
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  approved: '#16a34a', upcoming: '#16a34a', ongoing: '#2563eb', completed: '#64748b',
+  past: '#64748b', draft: '#64748b', pending_associate_dean: '#d97706',
+  pending_coordinator_parallel: '#d97706', pending_director: '#d97706',
+  suggested_changes: '#9333ea', rejected: '#dc2626', cancelled: '#dc2626',
+};
+
 export default function EventCalendar({ isPublic = false }: EventCalendarProps) {
   const router = useRouter();
-  const { user } = useAuthStore();
   const calendarRef = useRef<FullCalendar>(null);
   
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Filters
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -64,16 +80,23 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
         if (selectedDept !== 'all') params.department = selectedDept;
         if (selectedClub !== 'all') params.club_id = selectedClub;
         
-        if (selectedStatus !== 'all') {
-          params.status = selectedStatus;
-        } else if (isPublic) {
-          params.status = 'approved';
-        }
+        if (selectedStatus !== 'all') params.status = selectedStatus;
 
         const data = await eventService.getCalendar(params);
-        setEvents(data || []);
+        const calendarEvents = Array.isArray(data) ? data : (data?.data || []);
+        setEvents(calendarEvents
+          .filter((event: CalendarEvent) => event?.id != null && event?.start)
+          .map((event: CalendarEvent) => ({
+            ...event,
+            id: String(event.id),
+            title: event.title?.trim() || 'Untitled event',
+            color: event.color || STATUS_COLORS[event.status || ''] || '#2563eb',
+          })));
+        setError(null);
       } catch (err) {
         console.error('Failed to fetch calendar events', err);
+        setEvents([]);
+        setError('The event schedule could not be loaded. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -90,14 +113,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
   };
 
   const handleEventClick = (info: any) => {
-    if (isPublic) {
-      router.push(`/events`);
-    } else {
-      router.push(`/events/${info.event.id}`);
-    }
+    router.push(`/events/${info.event.id}`);
   };
 
-  const getDisplayStatusText = (status: string) => {
+  const getDisplayStatusText = (status = 'scheduled') => {
     switch (status) {
       case 'upcoming': return 'Upcoming';
       case 'ongoing': return 'Ongoing';
@@ -119,17 +138,18 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
         <div>
           <h2 className="text-xl font-display font-bold text-[var(--text-primary)]">Event Calendar</h2>
           <p className="text-sm text-[var(--text-muted)] mt-1">
-            {isPublic ? 'Public view of campus events' : 'View and manage event schedules across campus'}
+            All campus events, across every school, department, and club.
           </p>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto bg-[var(--card-bg)] p-2 rounded-xl border border-[var(--card-border)]">
-          <span className="text-sm font-semibold text-[var(--text-secondary)] pl-2">Filter:</span>
+          <span className="text-sm font-semibold text-[var(--text-secondary)] pl-2 flex items-center gap-1.5"><Filter className="w-3.5 h-3.5" /> Filter</span>
           
           <select
             className="input-field py-1.5 px-3 min-w-[140px] text-sm"
             value={selectedDept}
             onChange={(e) => setSelectedDept(e.target.value)}
+            aria-label="Filter events by school or department"
           >
             <option value="all">🏢 All Schools</option>
             {departments.map(d => {
@@ -142,6 +162,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             className="input-field py-1.5 px-3 min-w-[140px] text-sm"
             value={selectedClub}
             onChange={(e) => setSelectedClub(e.target.value)}
+            aria-label="Filter events by club"
           >
             <option value="all">👥 All Clubs</option>
             {clubs.map(c => <option key={c.id} value={c.id.toString()}>{c.name}</option>)}
@@ -152,6 +173,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               className="input-field py-1.5 px-3 min-w-[140px] text-sm"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
+              aria-label="Filter events by status"
             >
               <option value="all">⚡ All Statuses</option>
               <option value="approved">✅ Approved</option>
@@ -163,31 +185,32 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
       </div>
 
       {/* Calendar Area */}
-      <div className="calendar-container overflow-hidden rounded-xl border border-[var(--card-border)] bg-white relative">
+      <div className="calendar-container overflow-hidden rounded-xl border border-[var(--card-border)] bg-[var(--surface-bg)] relative">
         <style dangerouslySetInnerHTML={{__html: `
           .fc {
-            --fc-border-color: #e2e8f0;
-            --fc-button-bg-color: #ffffff;
-            --fc-button-border-color: #cbd5e1;
-            --fc-button-text-color: #334155;
-            --fc-button-hover-bg-color: #f1f5f9;
-            --fc-button-hover-border-color: #cbd5e1;
-            --fc-button-active-bg-color: #e2e8f0;
-            --fc-button-active-border-color: #cbd5e1;
+            --fc-border-color: var(--border-subtle);
+            --fc-button-bg-color: var(--surface-bg);
+            --fc-button-border-color: var(--border-strong);
+            --fc-button-text-color: var(--text-secondary);
+            --fc-button-hover-bg-color: var(--surface-subtle);
+            --fc-button-hover-border-color: var(--border-strong);
+            --fc-button-active-bg-color: var(--brand-soft);
+            --fc-button-active-border-color: var(--brand-primary);
             --fc-event-border-color: transparent;
-            --fc-today-bg-color: #eff6ff; 
+            --fc-today-bg-color: var(--brand-soft); 
             font-family: inherit;
           }
           .fc-header-toolbar {
             padding: 1rem 1.25rem !important;
             margin-bottom: 0 !important;
-            border-bottom: 1px solid #e2e8f0;
-            background: #f8fafc;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--surface-subtle);
           }
           @media (max-width: 640px) {
             .fc-header-toolbar {
               flex-direction: column;
               gap: 0.5rem;
+              padding: 0.75rem !important;
             }
             .fc-toolbar-chunk {
               display: flex;
@@ -196,17 +219,22 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               flex-wrap: wrap;
               gap: 0.5rem;
             }
+            .fc-toolbar-title { font-size: 1rem !important; }
+            .fc-button-primary { padding: 0.3rem 0.55rem !important; font-size: 0.75rem !important; }
+            .fc-col-header-cell-cushion { padding: 0.5rem 0.2rem !important; font-size: 0.7rem; }
+            .fc-daygrid-day-number { padding: 0.35rem !important; font-size: 0.75rem; }
+            .fc-event { margin: 1px 2px !important; padding: 2px 3px; }
           }
           .fc-toolbar-title { 
             font-size: 1.125rem !important; 
             font-weight: 700 !important; 
-            color: #1e293b; 
+            color: var(--text-primary); 
           }
           .fc-button-primary { 
             border-radius: 0.5rem !important; 
             font-weight: 600 !important; 
             font-size: 0.8125rem !important; 
-            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); 
+            box-shadow: var(--shadow-card); 
             text-transform: capitalize;
             padding: 0.375rem 0.75rem !important;
           }
@@ -214,7 +242,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             padding: 0.75rem 0.5rem !important; 
             font-weight: 600; 
             font-size: 0.875rem;
-            color: #475569; 
+            color: var(--text-secondary); 
             text-transform: uppercase;
             letter-spacing: 0.025em;
           }
@@ -222,30 +250,32 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             padding: 0.5rem !important; 
             font-weight: 600; 
             font-size: 0.875rem;
-            color: #334155; 
+            color: var(--text-secondary); 
           }
           .fc-day-other .fc-daygrid-day-number {
-             color: #94a3b8;
+             color: var(--text-muted);
              font-weight: 500;
           }
           .fc-event { 
-            border-radius: 6px; 
-            padding: 2px 4px; 
+            border-radius: 8px;
+            padding: 3px 6px;
             margin: 1px 4px !important;
             cursor: pointer; 
             transition: all 0.2s ease; 
-            box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            box-shadow: var(--shadow-card);
             border: none !important;
           }
           .fc-event:hover { 
             transform: translateY(-1px); 
             filter: brightness(1.05); 
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            box-shadow: var(--shadow-card-md);
             z-index: 10;
           }
           .fc-daygrid-event-dot { display: none; }
           .fc-event-time { font-weight: 700 !important; margin-right: 4px; }
           .fc-event-title { font-weight: 600 !important; }
+          .fc-popover { border-radius: 0.875rem; overflow: hidden; box-shadow: var(--shadow-card-md); }
+          .fc-more-link { color: var(--brand-primary); font-weight: 700; padding: 0.25rem; }
           
           /* Tooltip styling */
           .event-content-wrapper {
@@ -278,6 +308,12 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             </div>
           </div>
         )}
+
+        {!loading && error && (
+          <div className="absolute inset-x-4 top-4 z-10 flex items-center gap-3 rounded-xl border border-[var(--status-danger-border)] bg-[var(--status-danger-bg)] p-3 text-sm text-[var(--text-danger)]">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" /> {error}
+          </div>
+        )}
         
         <FullCalendar
           ref={calendarRef}
@@ -303,8 +339,8 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           }}
           displayEventTime={true}
           eventContent={(eventInfo) => {
-             const dept = eventInfo.event.extendedProps.department;
-             const venue = eventInfo.event.extendedProps.venue;
+             const dept = eventInfo.event.extendedProps.department || 'Campus event';
+             const venue = eventInfo.event.extendedProps.venue || 'Venue TBA';
              return (
              <div className="event-content-wrapper" title={`${eventInfo.event.title}\nVenue: ${venue}\nDept: ${dept || 'N/A'}`}>
                <div className="flex items-center gap-1 event-title text-[10px] sm:text-xs">
@@ -322,12 +358,20 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
         />
       </div>
 
+      {!loading && !error && events.length === 0 && (
+        <div className="mt-4 rounded-xl border border-dashed border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-5 text-center">
+          <CalendarDays className="w-6 h-6 mx-auto mb-2 text-[var(--text-muted)]" />
+          <p className="text-sm font-semibold text-[var(--text-secondary)]">No events in this date range</p>
+          <p className="text-xs text-[var(--text-muted)] mt-1">Try another month or clear a filter to see the full campus schedule.</p>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 px-2">
          <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider hidden sm:block">Legend</span>
-         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Upcoming / Approved</span></div>
+         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[var(--status-success-bg)] shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Upcoming / Approved</span></div>
          <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[var(--btn-primary-bg)] shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Ongoing</span></div>
-         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-gray-500 shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Completed / Past</span></div>
+         <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-[var(--surface-subtle)] shadow-sm" /> <span className="text-xs font-medium text-[var(--text-secondary)]">Completed / Past</span></div>
       </div>
     </div>
   );

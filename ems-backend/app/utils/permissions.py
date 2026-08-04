@@ -49,7 +49,12 @@ from typing import Optional
 def can_view_internal_docs(user: Optional[User]) -> bool:
     if not user:
         return False
-    return user.role in ["super_admin", "director", "associate_dean", "club_coordinator"]
+    if user.role in ["super_admin", "director", "associate_dean", "club_coordinator"]:
+        return True
+    if user.role == "additional":
+        from app.utils.additional_perms import has_perm
+        return has_perm(user, "view_documents")
+    return False
 
 
 

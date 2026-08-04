@@ -5,7 +5,8 @@ export type UserRole =
   | 'director'
   | 'associate_dean'
   | 'club_coordinator'
-  | 'student';
+  | 'student'
+  | 'additional';
 
 export type YearOfStudy = 'Y1' | 'Y2' | 'Y3' | 'Y4' | 'Alumni';
 
@@ -38,6 +39,8 @@ export interface User {
   is_active: boolean;               // derived from status === 'active'
   force_password_change: boolean;   // derived from is_first_login or login response
   profile_completed?: boolean;      // derived from login response require_profile_completion
+  // Dynamic permissions for 'additional' role users
+  extra_permissions?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -68,6 +71,7 @@ export interface Club {
   coordinator_id?: number | null;  // legacy
   coordinator?: User;
   coordinators?: { id: number; name: string; email: string }[];
+  level?: 'department' | 'college_wide';
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -201,6 +205,7 @@ export interface Event {
   // Frontend convenience (composed from event_date + start/end_time)
   start_datetime: string;
   end_datetime: string;
+  registration_start_datetime?: string;
   registration_deadline?: string;
 
   venue_id?: number;
@@ -257,6 +262,14 @@ export interface Event {
   attendance_doc_url?: string;
   report_path?: string;
   report_url?: string;
+  rnd_report?: EventRndReport;
+
+  // R&D classification
+  is_rnd_event?: boolean;
+  rnd_activity_theme?: string;
+  rnd_prescribed_activity?: string;
+  rnd_semester_quarter?: string;
+  rnd_tentative_date?: string;
 
   status: EventStatus;
   created_by: number;
@@ -372,6 +385,20 @@ export interface EventReport {
   is_submitted: boolean;
 }
 
+export interface EventRndReport {
+  event_id: number;
+  event_summary: string;
+  actual_budget: number;
+  participant_count: number;
+  outcomes: string;
+  issues: string;
+  feedback: string;
+  attendance_doc_path?: string;
+  flier_path?: string;
+  generated_report_path?: string;
+  is_submitted: boolean;
+}
+
 // ─── Notification ─────────────────────────────────────────────────────────────
 
 export interface EmailNotification {
@@ -383,3 +410,4 @@ export interface EmailNotification {
   status: 'sent' | 'failed';
   error_msg?: string;
 }
+

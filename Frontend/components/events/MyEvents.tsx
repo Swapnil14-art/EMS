@@ -29,9 +29,10 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
   const [cancelEvent, setCancelEvent] = useState<Event | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
-  const [deadlineEvent, setDeadlineEvent] = useState<Event | null>(null);
-  const [deadline, setDeadline] = useState('');
-  const [savingDeadline, setSavingDeadline] = useState(false);
+  const [regWindowEvent, setRegWindowEvent] = useState<Event | null>(null);
+  const [regStart, setRegStart] = useState('');
+  const [regEnd, setRegEnd] = useState('');
+  const [savingRegWindow, setSavingRegWindow] = useState(false);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   
   // Submission Terms State
@@ -56,9 +57,12 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
     setLoading(true);
     try {
       const res = await eventService.list({ status: tab || undefined, search: search || undefined, page, size: 20, my_events: true });
-      const events = Array.isArray(res) ? res : (res?.data || []);
-      setEvents(events);
-      setTotal(res?.total || events.length || 0);
+      const eventsList = Array.isArray(res) ? res : (res?.data || []);
+      const totalCount = res?.total || eventsList.length || 0;
+      setEvents(eventsList);
+      setTotal(totalCount);
+      // Synchronize active tab count without extra API calls
+      setTabCounts(prev => ({ ...prev, [tab]: totalCount }));
     } catch { setEvents([]); } finally { setLoading(false); }
   };
 
@@ -129,19 +133,28 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
     finally { setCancelling(false); }
   };
 
-  const handleUpdateDeadline = async () => {
-    if (!deadlineEvent) return;
-    if (!deadline) { toast.error('Please select a date and time'); return; }
-    if (!window.confirm("WARNING: Changing the deadline will reset the event's approval status. Are you sure?")) return;
-    setSavingDeadline(true);
+  const handleUpdateRegistrationWindow = async () => {
+    if (!regWindowEvent) return;
+    if (regStart && regEnd && new Date(regEnd) < new Date(regStart)) {
+      toast.error('Registration end time cannot be earlier than start time');
+      return;
+    }
+    setSavingRegWindow(true);
     try {
-      await eventService.update(deadlineEvent.id, { registration_deadline: new Date(deadline).toISOString() });
-      toast.success('Deadline updated (Event submitted for approval)');
-      setDeadlineEvent(null);
+      const payload: Record<string, any> = {};
+      if (regStart) payload.registration_start_datetime = new Date(regStart).toISOString();
+      if (regEnd) payload.registration_deadline = new Date(regEnd).toISOString();
+
+      await eventService.update(regWindowEvent.id, payload);
+      toast.success('Registration window updated successfully');
+      setRegWindowEvent(null);
       fetchEvents();
       fetchCounts();
-    } catch (err: any) { toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Failed'); }
-    finally { setSavingDeadline(false); }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Failed to update registration window');
+    } finally {
+      setSavingRegWindow(false);
+    }
   };
 
   const tabsWithCounts = STATUS_TABS.map(t => ({
@@ -174,7 +187,7 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap gap-2 mb-1">
                 <EventTypeBadge type={ev.event_type} /><StatusBadge status={ev.status} />
-                {ev.is_collaborative && <span className="badge bg-indigo-100 text-indigo-700">Collaborative</span>}
+                {ev.is_collaborative && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>}
               </div>
               <h3 className="font-display font-bold text-[var(--text-primary)] truncate">{ev.title}</h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">{formatDate(ev.start_datetime)} · {ev.venue?.name || ev.venue_custom || 'Venue TBD'}</p>
@@ -195,16 +208,22 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
               {['approved','ongoing','pending_director'].includes(ev.status) && (
                 <>
                   <Button variant="secondary" size="sm" onClick={() => { 
-                    setDeadlineEvent(ev); 
+                    setRegWindowEvent(ev); 
+                    if (ev.registration_start_datetime) {
+                      const d = new Date(ev.registration_start_datetime);
+                      const tzOffset = d.getTimezoneOffset() * 60000;
+                      setRegStart(new Date(d.getTime() - tzOffset).toISOString().slice(0, 16));
+                    } else {
+                      setRegStart('');
+                    }
                     if (ev.registration_deadline) {
                       const d = new Date(ev.registration_deadline);
                       const tzOffset = d.getTimezoneOffset() * 60000;
-                      const localIsoTime = (new Date(d.getTime() - tzOffset)).toISOString().slice(0, 16);
-                      setDeadline(localIsoTime);
+                      setRegEnd(new Date(d.getTime() - tzOffset).toISOString().slice(0, 16));
                     } else {
-                      setDeadline('');
+                      setRegEnd('');
                     }
-                  }}>Edit Deadline</Button>
+                  }}>Edit Registration Window</Button>
                   <Button variant="danger" size="sm" onClick={() => { setCancelEvent(ev); setCancelReason(''); }}>Cancel</Button>
                 </>
               )}
@@ -222,8 +241,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
           <Button variant="danger" loading={cancelling} onClick={handleCancel}>Confirm Cancellation</Button>
         </>}>
         <div className="space-y-4">
-          <div className="p-4 bg-red-50 rounded-xl">
-            <p className="font-semibold text-red-800">{cancelEvent?.title}</p>
+          <div className="p-4 bg-[var(--status-danger-bg)] rounded-xl">
+            <p className="font-semibold text-[var(--status-danger-text)]">{cancelEvent?.title}</p>
             <p className="text-xs text-[var(--text-danger)] mt-0.5">All registered students will be notified via email.</p>
           </div>
           <Textarea label="Cancellation Reason (required)" placeholder="Explain why this event is being cancelled…"
@@ -238,20 +257,20 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
         loading={submitting}
       />
 
-      <Modal open={!!deadlineEvent} onClose={() => { setDeadlineEvent(null); }}
-        title="Edit Registration Deadline"
+      <Modal open={!!regWindowEvent} onClose={() => { setRegWindowEvent(null); }}
+        title="Edit Registration Window"
         footer={<>
-          <Button variant="secondary" onClick={() => setDeadlineEvent(null)}>Back</Button>
-          <Button loading={savingDeadline} onClick={handleUpdateDeadline}>Save Deadline</Button>
+          <Button variant="secondary" onClick={() => setRegWindowEvent(null)}>Back</Button>
+          <Button loading={savingRegWindow} onClick={handleUpdateRegistrationWindow}>Save Schedule</Button>
         </>}>
         <div className="space-y-4">
-          <div className="p-4 bg-orange-50 rounded-xl border border-orange-200">
-            <p className="text-xs text-orange-800">
-              <strong>Warning:</strong> Changing the deadline will trigger the approval chain again from the start.
-            </p>
-          </div>
-          <Input type="datetime-local" label="Registration Deadline" 
-            value={deadline} onChange={e => setDeadline(e.target.value)} />
+          <p className="text-xs text-[var(--text-muted)]">
+            Configure the student registration start and end date & time. Updating the registration schedule will be saved directly and will not reset approval status.
+          </p>
+          <Input type="datetime-local" label="Student Registration Start Date & Time" 
+            value={regStart} onChange={e => setRegStart(e.target.value)} />
+          <Input type="datetime-local" label="Student Registration End Date & Time" 
+            value={regEnd} onChange={e => setRegEnd(e.target.value)} />
         </div>
       </Modal>
 

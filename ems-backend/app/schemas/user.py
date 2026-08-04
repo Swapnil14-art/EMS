@@ -40,6 +40,7 @@ class UserOut(UserBase):
 
     department: Optional[SimpleDepartment] = None
     club: Optional[SimpleClub] = None
+    extra_permissions: Optional[list[str]] = []
 
     class Config:
         from_attributes = True

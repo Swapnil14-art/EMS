@@ -1,3 +1,4 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -39,10 +40,23 @@ class Settings(BaseSettings):
     STORAGE_ROOT: str = "storage"
     FRONTEND_URL: str = "http://localhost:3000"
     COLLEGE_NAME: str = "SVKM's NMIMS, Shirpur Campus"
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 30
 
     @property
     def allowed_domain_list(self) -> List[str]:
         return [d.strip() for d in self.ALLOWED_DOMAINS.split(",")]
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self):
+        if self.APP_ENV.lower() == "production":
+            unsafe_values = {"changeme", "changeme-jwt-secret-min-32-chars!!", "changeme-refresh-secret-min-32-chars!"}
+            if self.APP_SECRET_KEY in unsafe_values or self.JWT_SECRET in unsafe_values or self.JWT_REFRESH_SECRET in unsafe_values:
+                raise ValueError("Production requires unique APP_SECRET_KEY, JWT_SECRET, and JWT_REFRESH_SECRET values")
+            if not self.FRONTEND_URL.startswith("https://"):
+                raise ValueError("Production FRONTEND_URL must use HTTPS")
+        return self
 
     class Config:
         env_file = ".env"
