@@ -9,7 +9,7 @@ import type { Event } from '@/types';
 interface EventCardProps {
   event: Event;
   variant?: 'default' | 'compact' | 'horizontal';
-  showStatus?: boolean;
+  showStatus?: boolean; 
 }
 
 const GRADIENT_FALLBACKS = [
