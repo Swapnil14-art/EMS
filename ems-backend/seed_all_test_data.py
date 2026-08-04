@@ -261,7 +261,7 @@ def seed():
             (club_agri_innov, coord_agri),
             (club_pharma, coord_pharma),
         ]:
-            club_rec = db.query(Club).get(club_obj.id)
+            club_rec = db.get(Club, club_obj.id)
             if club_rec and club_rec.coordinator_id != coord_obj.id:
                 club_rec.coordinator_id = coord_obj.id
                 print(f"  ✓ {club_rec.name} → {coord_obj.name}")
