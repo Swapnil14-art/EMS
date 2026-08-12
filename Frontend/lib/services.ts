@@ -264,6 +264,7 @@ export const eventService = {
     to_date?: string;
     search?: string;
     is_rnd?: boolean;
+    document_type?: 'DOCUMENT' | 'ATTENDANCE' | 'REPORT';
     my_events?: boolean;
     manage_only?: boolean;
     page?: number;

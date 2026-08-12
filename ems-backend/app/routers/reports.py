@@ -50,10 +50,10 @@ async def submit_report(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    if event.status != "completed":
+    if event.status not in ("completed", "archived"):
         raise HTTPException(
             status_code=400,
-            detail=f"Report can only be submitted for completed events (current: {event.status})",
+            detail=f"Report can only be submitted for completed or archived events (current: {event.status})",
         )
 
     # Check photos exist (at least 1)
@@ -276,10 +276,10 @@ async def upload_premade_report(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    if event.status != "completed":
+    if event.status not in ("completed", "archived"):
         raise HTTPException(
             status_code=400,
-            detail="Event must be in 'completed' status to upload a report",
+            detail="Event must be in 'completed' or 'archived' status to upload a report",
         )
 
     path = await save_file(file, event_id, "report", file_type="document")

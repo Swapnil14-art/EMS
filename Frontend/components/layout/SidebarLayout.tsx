@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard, Users, BookOpen, Calendar, MapPin, Mail, Settings,
-  Bell, BarChart3, Shield, LogOut, KeyRound, GraduationCap, Building2, SlidersHorizontal, Home, Menu,
+  BarChart3, LogOut, KeyRound, GraduationCap, Building2, SlidersHorizontal, Home, Menu,
   FileText, FlaskConical, ShieldCheck, X
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
@@ -17,7 +17,6 @@ import { AppFooter } from './AppFooter';
 
 type NavItem = { label: string; href: string; icon: React.ReactNode; badge?: number };
 
-// API mapped from user roles — navigation items per role
 const NAV_MAP: Record<string, NavItem[]> = {
   super_admin: [
     { label: 'Dashboard', href: '/admin', icon: <LayoutDashboard className="w-4.5 h-4.5" /> },
@@ -64,13 +63,11 @@ const NAV_MAP: Record<string, NavItem[]> = {
     { label: 'Dashboard', href: '/student', icon: <LayoutDashboard className="w-4.5 h-4.5" /> },
     { label: 'Event Calendar', href: '/calendar', icon: <Calendar className="w-4.5 h-4.5" /> },
     { label: 'My Registrations', href: '/student/registrations', icon: <GraduationCap className="w-4.5 h-4.5" /> },
-    { label: 'Venues', href: '/student/venues', icon: <MapPin className="w-4.5 h-4.5" /> },
   ],
 };
 
 const DASHBOARD_ROOTS = ['/admin', '/student', '/club_coordinator', '/director', '/associate_dean', '/additional'];
 
-// Build dynamic nav for 'additional' role based on their permissions
 function buildAdditionalNav(perms: string[]): NavItem[] {
   const items: NavItem[] = [
     { label: 'Dashboard', href: '/additional', icon: <LayoutDashboard className="w-4.5 h-4.5" /> },
@@ -100,12 +97,10 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!user) { router.replace('/login'); }
     else if (user.force_password_change) { router.replace('/change-password'); }
@@ -129,14 +124,17 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   };
 
   const NavLink = ({ item }: { item: NavItem }) => {
-    // Dashboard roots should only be active on their exact landing route.
-    // Other navigation entries remain active for their nested detail pages.
-    const isDashboardRoot = DASHBOARD_ROOTS.includes(item.href);
-    const isActive = item.href === '/'
-      ? pathname === '/'
-      : isDashboardRoot
-        ? pathname === item.href
-        : pathname === item.href || pathname.startsWith(`${item.href}/`);
+    // Find the single best (longest) matching nav item for the current pathname
+    const bestMatchingHref = navItems
+      .map(n => n.href)
+      .filter(h => {
+        if (h === '/') return pathname === '/';
+        if (DASHBOARD_ROOTS.includes(h)) return pathname === h;
+        return pathname === h || pathname.startsWith(`${h}/`);
+      })
+      .sort((a, b) => b.length - a.length)[0];
+
+    const isActive = item.href === bestMatchingHref;
     return (
       <Link href={item.href}
         title={sidebarCollapsed ? item.label : undefined}
@@ -150,7 +148,11 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
     );
   };
 
-  const SidebarContent = () => <nav className={cn('min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-3', sidebarCollapsed && 'lg:px-2')} aria-label="Main navigation">{navItems.map(item => <NavLink key={item.href} item={item} />)}</nav>;
+  const SidebarContent = () => (
+    <nav className={cn('min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-3', sidebarCollapsed && 'lg:px-2')} aria-label="Main navigation">
+      {navItems.map(item => <NavLink key={item.href} item={item} />)}
+    </nav>
+  );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--page-bg)]">
@@ -178,50 +180,50 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
       </header>
 
       <div className="relative flex min-h-0 flex-1">
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-[rgb(var(--neutral-900)/0.35)] backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+        {/* Mobile overlay */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 bg-[rgb(var(--neutral-900)/0.35)] backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
 
-      {/* Sidebar */}
-      <aside className={cn(
-        'flex h-full flex-shrink-0 flex-col border-r border-[var(--card-border)] bg-[var(--surface-bg)]',
-        'fixed lg:relative z-50 lg:z-auto top-0 left-0 bottom-0',
-        'w-72 transition-[transform,width] duration-300 ease-in-out lg:w-60',
-        !mobileOpen && '-translate-x-full lg:translate-x-0',
-        sidebarCollapsed && 'lg:w-[4.75rem]'
-      )}>
-        <div className={cn('border-b border-[var(--card-border)] px-4 py-3', sidebarCollapsed && 'lg:px-3')}>
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              aria-label="Toggle navigation menu"
-              aria-pressed={sidebarCollapsed}
-              title="Menu"
-              className={cn('hidden select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-primary)] lg:flex', sidebarCollapsed && 'lg:px-2')}
-            >
-              <span className="relative h-4 w-4" aria-hidden="true">
-                <span className={cn('absolute left-0 top-1 block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'top-[7px] rotate-45')} />
-                <span className={cn('absolute left-0 top-[7px] block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'scale-x-0 opacity-0')} />
-                <span className={cn('absolute left-0 top-3 block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'top-[7px] -rotate-45')} />
-              </span>
-              <span className={cn(sidebarCollapsed && 'lg:sr-only')}>Menu</span>
-            </button>
-            <button onClick={() => setMobileOpen(false)} aria-label="Close navigation" className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] lg:hidden">
-              <X className="h-5 w-5" />
-            </button>
+        {/* Sidebar */}
+        <aside className={cn(
+          'flex h-full flex-shrink-0 flex-col border-r border-[var(--card-border)] bg-[var(--surface-bg)]',
+          'fixed lg:relative z-50 lg:z-auto top-0 left-0 bottom-0',
+          'w-72 transition-[transform,width] duration-300 ease-in-out lg:w-60',
+          !mobileOpen && '-translate-x-full lg:translate-x-0',
+          sidebarCollapsed && 'lg:w-[4.75rem]'
+        )}>
+          <div className={cn('border-b border-[var(--card-border)] px-4 py-3', sidebarCollapsed && 'lg:px-3')}>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                aria-label="Toggle navigation menu"
+                aria-pressed={sidebarCollapsed}
+                title="Menu"
+                className={cn('hidden select-none items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[var(--brand-primary)] lg:flex', sidebarCollapsed && 'lg:px-2')}
+              >
+                <span className="relative h-4 w-4" aria-hidden="true">
+                  <span className={cn('absolute left-0 top-1 block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'top-[7px] rotate-45')} />
+                  <span className={cn('absolute left-0 top-[7px] block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'scale-x-0 opacity-0')} />
+                  <span className={cn('absolute left-0 top-3 block h-0.5 w-4 rounded-full bg-current transition-all duration-300 ease-in-out', sidebarCollapsed && 'top-[7px] -rotate-45')} />
+                </span>
+                <span className={cn(sidebarCollapsed && 'lg:sr-only')}>Menu</span>
+              </button>
+              <button onClick={() => setMobileOpen(false)} aria-label="Close navigation" className="rounded-lg p-2 text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] lg:hidden">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
-        </div>
-        <SidebarContent />
-      </aside>
+          <SidebarContent />
+        </aside>
 
-      {/* Main content */}
-      <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="p-4 lg:p-6">{children}</div>
-      </main>
+        {/* Main content */}
+        <main className="min-w-0 flex-1 overflow-y-auto">
+          <div className="p-4 lg:p-6">{children}</div>
+        </main>
       </div>
       <AppFooter compact />
     </div>

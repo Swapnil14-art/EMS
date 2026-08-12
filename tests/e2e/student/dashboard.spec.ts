@@ -65,9 +65,8 @@ test.describe('Student — Registrations', () => {
 test.describe('Student — Venues', () => {
   test.use({ storageState: STUDENT_STATE });
 
-  test('should load venue calendar', async ({ page }) => {
-    await navigateTo(page, '/student/venues');
-    await waitForPageLoad(page);
-    await assertPageLoaded(page);
+  test('should not load venue calendar', async ({ page }) => {
+    const response = await page.goto('/student/venues');
+    expect(response?.status()).toBe(404);
   });
 });

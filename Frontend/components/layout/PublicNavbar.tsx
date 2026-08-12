@@ -49,7 +49,6 @@ const ROLE_MENU_ITEMS: Record<string, { label: string; href: string; icon: React
     { label: 'Dashboard', href: '/student', icon: <LayoutDashboard className="w-4 h-4" /> },
     { label: 'Browse Events', href: '/student/events', icon: <Calendar className="w-4 h-4" /> },
     { label: 'My Registrations', href: '/student/registrations', icon: <BookOpen className="w-4 h-4" /> },
-    { label: 'Venues', href: '/student/venues', icon: <MapPin className="w-4 h-4" /> },
   ],
 };
 

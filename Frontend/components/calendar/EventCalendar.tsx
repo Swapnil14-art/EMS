@@ -8,6 +8,7 @@ import { AlertCircle, CalendarDays, Filter } from 'lucide-react';
 import { eventService, clubService, departmentService } from '@/lib/services';
 import type { Club, Department } from '@/types';
 import { getSchoolInfo } from '@/lib/utils';
+import { useAuthStore } from '@/store/authStore';
 
 interface EventCalendarProps {
   isPublic?: boolean;
@@ -31,7 +32,9 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function EventCalendar({ isPublic = false }: EventCalendarProps) {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const calendarRef = useRef<FullCalendar>(null);
+  const isRestrictedCalendar = user?.role === 'student' || (isPublic && !user);
   
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +106,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
     };
 
     fetchCalendarEvents();
-  }, [dateRange, selectedDept, selectedClub, selectedStatus, isPublic]);
+  }, [dateRange, selectedDept, selectedClub, selectedStatus, isPublic, user?.role]);
 
   const handleDatesSet = (dateInfo: any) => {
     setDateRange({
@@ -168,7 +171,18 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             {clubs.map(c => <option key={c.id} value={c.id.toString()}>{c.name}</option>)}
           </select>
 
-          {!isPublic && (
+          {isRestrictedCalendar ? (
+            <select
+              className="input-field py-1.5 px-3 min-w-[140px] text-sm"
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              aria-label="Filter events by status"
+            >
+              <option value="all">All Upcoming & Ongoing</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="ongoing">Ongoing</option>
+            </select>
+          ) : (
             <select
               className="input-field py-1.5 px-3 min-w-[140px] text-sm"
               value={selectedStatus}

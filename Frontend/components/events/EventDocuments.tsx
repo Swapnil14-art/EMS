@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Plus, Trash2, FileText, Link as LinkIcon, Upload, ExternalLink, Download, CheckCircle2, ArrowLeft, Search } from 'lucide-react';
+import { Plus, Trash2, FileText, Link as LinkIcon, Upload, Download, CheckCircle2, ArrowLeft, Search } from 'lucide-react';
 import { eventService, resourceService, reportService, rndReportService } from '@/lib/services';
-import { Button, Input, Select, Modal, Alert, EmptyState } from '@/components/ui';
+import { Button, Input, Select, Modal, EmptyState } from '@/components/ui';
 import { useAuthStore } from '@/store/authStore';
 import type { EventDocument, EventLink, Event } from '@/types';
 import toast from 'react-hot-toast';
@@ -30,8 +30,16 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [docTypeFilter, setDocTypeFilter] = useState('ALL'); // ALL, REPORT, DOCUMENT, ATTENDANCE
   const [selectedEventId, setSelectedEventId] = useState<number | null>(urlEventId);
   const selectedEvent = myEvents.find(e => e.id === selectedEventId);
+
+  const DOC_TYPE_OPTIONS = [
+    { value: 'ALL', label: 'All Document Types' },
+    { value: 'REPORT', label: 'Report' },
+    { value: 'DOCUMENT', label: 'Document' },
+    { value: 'ATTENDANCE', label: 'Attendance' },
+  ];
 
   const [docs, setDocs] = useState<EventDocument[]>([]);
   const [links, setLinks] = useState<EventLink[]>([]);
@@ -55,14 +63,25 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
   const reportInputRef = useRef<HTMLInputElement>(null);
   const rndReportInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchEvents = () => {
+  const fetchEvents = (documentType = docTypeFilter) => {
     const listParams = isCoordinator ? { size: 50, manage_only: true } : { size: 50 };
-    eventService.list(listParams).then(r => setMyEvents(r.data || [])).catch(() => { });
+    eventService.list({
+      ...listParams,
+      document_type: documentType === 'ALL' ? undefined : documentType as 'DOCUMENT' | 'ATTENDANCE' | 'REPORT',
+    }).then(r => setMyEvents(r.data || [])).catch(() => { });
   };
 
   useEffect(() => {
-    fetchEvents();
-  }, []);
+    if (!selectedEventId) fetchEvents();
+  }, [docTypeFilter, selectedEventId, isCoordinator]);
+
+  useEffect(() => {
+    if (selectedEventId && !myEvents.some(e => e.id === selectedEventId)) {
+      eventService.get(selectedEventId).then(ev => {
+        if (ev) setMyEvents(prev => [...prev, ev]);
+      }).catch(() => {});
+    }
+  }, [selectedEventId, myEvents]);
 
   const fetchDocsAndLinks = () => {
     if (!selectedEventId) return;
@@ -84,7 +103,6 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
   useEffect(() => {
     setUploadedAttendancePath(null);
     fetchDocsAndLinks();
-    // Scroll to report section if triggered from MyEvents
     if (initialTab === 'report') {
       setTimeout(() => document.getElementById('report-section')?.scrollIntoView({ behavior: 'smooth' }), 500);
     }
@@ -112,23 +130,6 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
     } catch { toast.error('Failed to remove link'); }
   };
 
-  const handleUploadInternal = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedEventId) return;
-    setUploadingInternal(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      await resourceService.addDoc(selectedEventId, formData);
-      toast.success('Internal document uploaded');
-      fetchDocsAndLinks();
-    } catch (err: any) { toast.error(err?.response?.data?.message || 'Failed to upload'); }
-    finally {
-      setUploadingInternal(false);
-      if (internalInputRef.current) internalInputRef.current.value = '';
-    }
-  };
-
   const handleUploadParticipant = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedEventId) return;
@@ -144,26 +145,6 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
     }
   };
 
-  const handleGenerateReport = async () => {
-    if (!selectedEventId) return;
-    setUploadingReport(true);
-    try {
-      const blob = await eventService.generateReport(selectedEventId);
-      const url = window.URL.createObjectURL(new Blob([blob]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Event_Report_${selectedEventId}.txt`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      toast.success('Automated report generated and downloaded!');
-    } catch (err: any) {
-      toast.error('Failed to generate report');
-    } finally {
-      setUploadingReport(false);
-    }
-  };
-
   const handleUploadAttendance = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedEventId) return;
@@ -175,7 +156,6 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
       const newPath = response?.attendance_doc_path ?? response?.path ?? response?.generated_report_path ?? 'temp';
       if (newPath !== 'temp') setUploadedAttendancePath(newPath);
 
-      // ── FIX: refresh both so the Download Current button and checkmark appear immediately
       await fetchDocsAndLinks();
       fetchEvents();
     } catch (err: any) {
@@ -187,7 +167,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
   };
 
   const filteredEvents = myEvents?.filter(e => {
-    const isDocEligible = ['approved', 'ongoing', 'completed'].includes(e.status);
+    const isDocEligible = ['approved', 'ongoing', 'completed', 'archived'].includes(e.status);
     if (!isDocEligible) return false;
 
     let matchesStatus = false;
@@ -203,56 +183,95 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
     } else if (statusFilter === 'ONGOING') {
       matchesStatus = e.status === 'ongoing';
     } else if (statusFilter === 'COMPLETED') {
-      matchesStatus = e.status === 'completed';
+      matchesStatus = ['completed', 'archived'].includes(e.status);
+    } else if (statusFilter === 'ARCHIVED') {
+      matchesStatus = e.status === 'archived';
     }
 
-    const matchesSearch = searchTerm ? e.title.toLowerCase().includes(searchTerm.toLowerCase()) : true;
+    const matchesSearch = searchTerm ? (
+      e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (e.event_type && e.event_type.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (e.target_audience && e.target_audience.toLowerCase().includes(searchTerm.toLowerCase()))
+    ) : true;
+
     return matchesStatus && matchesSearch;
   });
 
-  const eventOptions = filteredEvents?.map(e => ({ value: String(e.id), label: e.title }));
   const isCompleted = selectedEvent ? new Date(selectedEvent.end_datetime).getTime() < Date.now() || ['completed', 'archived'].includes(selectedEvent.status) : false;
-
-  // Derived: attendance path can live in either reportData or selectedEvent
   const attendanceDocPath = uploadedAttendancePath || reportData?.attendance_doc_path || selectedEvent?.attendance_doc_path;
+
+  const handleBackToMainDocuments = () => {
+    setSelectedEventId(null);
+    router.push(`${basePath}/documents`);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-start gap-3">
-        <button onClick={() => router.back()} className="mt-1 btn-ghost p-1.5 -ml-2 text-[var(--text-muted)] hover:text-[rgb(var(--color-primary))]"><ArrowLeft className="w-5 h-5" /></button>
-        <div>
-          <h1 className="page-title">Event Documents & Links</h1>
-          <p className="page-subtitle">Manage documents, reports, and tracking links for your events</p>
-        </div>
+      <div>
+        <h1 className="page-title">Event Documents & Links</h1>
+        <p className="page-subtitle">Manage documents, reports, and tracking links for your events</p>
       </div>
 
-      {/* Event selector */}
+      {/* Event selector & Filter Bar (shown when browsing events list) */}
       {!selectedEventId && (
         <div className="card w-full p-4 space-y-4">
-          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              options={[
-                { value: 'ALL', label: 'All Statuses' },
-                { value: 'APPROVED', label: 'Approved' },
-                { value: 'UPCOMING', label: 'Upcoming' },
-                { value: 'ONGOING', label: 'Ongoing' },
-                { value: 'COMPLETED', label: 'Completed' }
-              ]}
-              className="w-full sm:w-48 sm:flex-shrink-0"
-            />
-            <div className="flex-1 w-full">
+          <div className="flex w-full flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                options={[
+                  { value: 'ALL', label: 'All Statuses' },
+                  { value: 'APPROVED', label: 'Approved' },
+                  { value: 'UPCOMING', label: 'Upcoming' },
+                  { value: 'ONGOING', label: 'Ongoing' },
+                  { value: 'COMPLETED', label: 'Completed' },
+                  { value: 'ARCHIVED', label: 'Archived' }
+                ]}
+                className="w-full sm:w-44 flex-shrink-0"
+              />
+              <Select
+                value={docTypeFilter}
+                onChange={(e) => setDocTypeFilter(e.target.value)}
+                options={DOC_TYPE_OPTIONS}
+                className="w-full sm:w-48 flex-shrink-0"
+              />
+            </div>
+            {/* Extended full-width search input */}
+            <div className="flex-1 w-full min-w-[280px]">
               <Input
-                className="w-full"
-                placeholder="Search events by name..."
+                className="w-full h-11"
+                placeholder="Search events by name, type, or audience..."
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
                   setSearchTerm(e.target.value);
                 }}
-                leftIcon={<Search className="w-4 h-4" />}
+                leftIcon={<Search className="w-4 h-4 text-[var(--text-muted)]" />}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header when a specific event is selected */}
+      {selectedEventId && selectedEvent && (
+        <div className="card p-4 flex items-center justify-between gap-4 bg-surface/50 border-[var(--border-subtle)]">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBackToMainDocuments}
+              className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 font-medium hover:bg-[var(--surface-subtle)] transition-colors"
+              aria-label="Back to main documents page"
+              title="Back to all events"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to All Events</span>
+            </button>
+            <div className="border-l border-[var(--border-subtle)] pl-3">
+              <h2 className="font-bold text-base text-[var(--text-primary)]">{selectedEvent.title}</h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                Status: <span className="font-semibold uppercase">{selectedEvent.status}</span> • {new Date(selectedEvent.start_datetime).toLocaleDateString()}
+              </p>
             </div>
           </div>
         </div>
@@ -282,8 +301,8 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
       ) : (
         <div className="space-y-8">
 
+          {/* External Links */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Links */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="section-title">External Links</h2>
@@ -317,7 +336,7 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            {/* Participation Document — unchanged */}
+            {/* Participation Document */}
             <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30">
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -350,20 +369,18 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
               ) : null}
             </div>
 
-            {/* ── Attendance Document ───────────────────────────────── */}
+            {/* Attendance Document */}
             <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
               <div className="flex items-start justify-between mb-4 pr-8">
                 <div>
                   <h3 className="section-title">Attendance Document</h3>
                   <p className="text-xs text-[var(--text-muted)] mt-1">Upload the finalized attendance sheet before report submission (optional).</p>
                 </div>
-                {/* checkmark driven by unified attendanceDocPath */}
                 {attendanceDocPath && (
                   <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
                 )}
               </div>
 
-              {/* Download button — appears as soon as attendanceDocPath is truthy */}
               {attendanceDocPath && (
                 <div className="mb-4">
                   <a

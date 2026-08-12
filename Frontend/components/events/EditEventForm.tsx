@@ -160,7 +160,7 @@ const formatDateTimeForInput = (isoString?: string) => {
 
 function SectionProgress({ current, total }: { current: number; total: number }) {
   return (
-    <div className="flex items-center gap-1 mb-8">
+    <div className="flex items-center gap-1 mt-4 mb-2">
       {Array.from({ length: total }, (_, i) => (
         <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${i < current ? 'bg-[var(--btn-primary-bg)]' : i === current - 1 ? 'bg-[var(--btn-primary-bg)]' : 'bg-[var(--surface-subtle)]'}`} />
       ))}
@@ -347,12 +347,12 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
 
       {/* Step nav */}
       <div className="card p-4">
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap mb-2">
           {SECTIONS.map(s => (
             <button key={s.id} type="button" onClick={() => setStep(s.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                s.id === step ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)]' :
-                'bg-[var(--card-bg)] text-[rgb(var(--color-primary))] cursor-pointer hover:bg-[var(--btn-primary-bg)]'
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                s.id === step ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] font-bold shadow-sm' :
+                'bg-[var(--surface-subtle)] text-[var(--text-primary)] border border-[var(--border-subtle)] hover:bg-[var(--btn-primary-bg)] hover:text-[var(--btn-primary-text)] cursor-pointer'
               }`}>
               {s.icon} <span className="hidden sm:inline">{s.label}</span>
               <span className="sm:hidden">{s.id}</span>

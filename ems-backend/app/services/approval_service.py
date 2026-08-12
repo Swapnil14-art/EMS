@@ -390,6 +390,15 @@ async def set_non_collab_pending_status(db: AsyncSession, event: Event):
                 )
             )
             deans = dean_result.scalars().all()
-            from app.services.email_service import notify_event_submitted
-            for dean in deans:
-                notify_event_submitted(event, dean)
+        else:
+            dean_result = await db.execute(
+                select(User).where(
+                    User.role == "associate_dean",
+                    User.status == "active",
+                )
+            )
+            deans = dean_result.scalars().all()
+
+        from app.services.email_service import notify_event_submitted
+        for dean in deans:
+            notify_event_submitted(event, dean)

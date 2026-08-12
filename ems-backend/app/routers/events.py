@@ -23,6 +23,8 @@ from app.models.event import (
     EventLink, EventDocument, EventOtherDoc,
     EventCoordinator, EventEditHistory, EventVenue,
 )
+from app.models.event_report import EventReport
+from app.models.event_rnd_report import EventRndReport
 from app.schemas.event import (
     EventCreate, EventUpdate, EventOut,
     EventLinkCreate, EventLinkUpdate, EventLinkOut,
@@ -170,6 +172,7 @@ async def list_events(
     to_date: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
     is_rnd: Optional[bool] = Query(None),
+    document_type: Optional[str] = Query(None),
     my_events: bool = Query(False),
     manage_only: bool = Query(False),
     page: int = Query(1, ge=1),
@@ -187,6 +190,7 @@ async def list_events(
     if hasattr(my_events, "default"): my_events = False
     if hasattr(manage_only, "default"): manage_only = False
     if hasattr(is_rnd, "default"): is_rnd = None
+    if hasattr(document_type, "default"): document_type = None
 
     query = select(Event)
 
@@ -303,6 +307,18 @@ async def list_events(
         query = query.where(Event.title.ilike(f"%{search}%"))
     if is_rnd is not None:
         query = query.where(Event.is_rnd_event == is_rnd)
+    if document_type == "DOCUMENT":
+        query = query.where(Event.participant_doc_path.isnot(None))
+    elif document_type == "ATTENDANCE":
+        query = query.where(or_(
+            Event.id.in_(select(EventReport.event_id).where(EventReport.attendance_doc_path.isnot(None))),
+            Event.id.in_(select(EventRndReport.event_id).where(EventRndReport.attendance_doc_path.isnot(None))),
+        ))
+    elif document_type == "REPORT":
+        query = query.where(or_(
+            Event.id.in_(select(EventReport.event_id).where(EventReport.generated_report_path.isnot(None))),
+            Event.id.in_(select(EventRndReport.event_id).where(EventRndReport.generated_report_path.isnot(None))),
+        ))
     if my_events and current_user:
         if current_user.role == "club_coordinator" and current_user.club_id:
             coord_events = select(EventCoordinator.event_id).where(
@@ -354,10 +370,31 @@ async def get_calendar_events(
         )
     )
 
-    # The campus calendar is intentionally shared: every visitor and every role
-    # sees the same schedule, across all departments and clubs.  A status filter
-    # is opt-in so the default view cannot silently hide events.
-    if status:
+    # Public visitors and students may only see approved events that have not
+    # finished. Other roles retain the full shared-calendar visibility.
+    restricted_calendar = current_user is None or current_user.role == "student"
+    now = datetime.now(timezone.utc)
+    if restricted_calendar:
+        query = query.where(
+            Event.status.in_(["approved", "ongoing"]),
+            Event.end_datetime >= now,
+        )
+        if status == "upcoming":
+            query = query.where(
+                Event.status == "approved",
+                Event.start_datetime > now,
+            )
+        elif status == "ongoing":
+            query = query.where(
+                or_(
+                    Event.status == "ongoing",
+                    and_(
+                        Event.status == "approved",
+                        Event.start_datetime <= now,
+                    ),
+                ),
+            )
+    elif status:
         query = query.where(Event.status == status)
 
     if club_id:
@@ -376,7 +413,6 @@ async def get_calendar_events(
         return '#3b82f6'
 
     calendar_data = []
-    now = datetime.now(timezone.utc)
     for e in events:
         evt_status = e.status
         if evt_status == 'approved':
@@ -395,7 +431,7 @@ async def get_calendar_events(
             "start": e.start_datetime.isoformat() if e.start_datetime else None,
             "end": e.end_datetime.isoformat() if e.end_datetime else None,
             "allDay": False,
-            "status": e.status,
+            "status": evt_status,
             "department": e.school_department,
             "color": get_event_color(evt_status),
             "venue": venue_name
@@ -903,7 +939,8 @@ async def update_event(
                     editor_name = current_user.name or current_user.email
                     notify_collab_chain_restarted(event, all_coords, editor_name)
             else:
-                from app.services.approval_service import set_non_collab_pending_status
+                from app.services.approval_service import clear_approval_records, set_non_collab_pending_status
+                await clear_approval_records(db, event.id)
                 await set_non_collab_pending_status(db, event)
         elif post_director and not after_start:
             # Save snapshot for diff
@@ -929,7 +966,8 @@ async def update_event(
                     editor_name = current_user.name or current_user.email
                     notify_collab_chain_restarted(event, all_coords, editor_name)
             else:
-                from app.services.approval_service import set_non_collab_pending_status
+                from app.services.approval_service import clear_approval_records, set_non_collab_pending_status
+                await clear_approval_records(db, event.id)
                 await set_non_collab_pending_status(db, event)
 
             # Notify registered students
@@ -1037,6 +1075,10 @@ async def submit_event(
                 status_code=409,
                 detail=f"Venue clash detected! The venue is already booked for: {detail_str}. An approver must override to proceed."
             )
+
+        # Clear any prior approval records on fresh submit (e.g. from suggested_changes)
+        from app.services.approval_service import clear_approval_records
+        await clear_approval_records(db, event.id)
 
         # Determine target status
         if event.is_collaborative and event.collaborating_clubs:

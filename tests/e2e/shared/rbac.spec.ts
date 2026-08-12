@@ -17,7 +17,7 @@ const ACCESS_MATRIX = [
   {
     role: 'Student',
     storageState: STUDENT_STATE,
-    allowed: ['/student', '/student/events', '/student/registrations', '/student/venues', '/calendar'],
+    allowed: ['/student', '/student/events', '/student/registrations', '/calendar'],
     blocked: ['/admin', '/admin/users', '/director', '/club_coordinator', '/associate_dean'],
   },
   {
