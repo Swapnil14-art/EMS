@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime, date, time
 from decimal import Decimal
@@ -64,6 +64,9 @@ class EventCreate(BaseModel):
     rnd_prescribed_activity: Optional[str] = None
     rnd_semester_quarter: Optional[str] = None
     rnd_tentative_date: Optional[date] = None
+    # Outside campus registration
+    outside_campus_registration: bool = False
+    registration_accepted: bool = False
 
 
 class EventUpdate(BaseModel):
@@ -123,6 +126,9 @@ class EventUpdate(BaseModel):
     rnd_prescribed_activity: Optional[str] = None
     rnd_semester_quarter: Optional[str] = None
     rnd_tentative_date: Optional[date] = None
+    # Outside campus registration
+    outside_campus_registration: Optional[bool] = None
+    registration_accepted: Optional[bool] = None
     # Post-start editable fields only
     registration_link: Optional[str] = None
     payment_link: Optional[str] = None
@@ -226,6 +232,9 @@ class EventOut(BaseModel):
     rnd_prescribed_activity: Optional[str] = None
     rnd_semester_quarter: Optional[str] = None
     rnd_tentative_date: Optional[date] = None
+    # Outside campus registration
+    outside_campus_registration: bool = False
+    registration_accepted: bool = False
 
     class Config:
         from_attributes = True
@@ -237,6 +246,14 @@ class CancelEventRequest(BaseModel):
 
 class AddCoordinatorRequest(BaseModel):
     user_id: int
+
+
+class VisitorRegistrationCreate(BaseModel):
+    full_name: str
+    email: EmailStr
+    phone: str
+    qualification: str
+    school_college: str
 
 
 class EventDocumentCreate(BaseModel):

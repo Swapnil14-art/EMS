@@ -2,43 +2,82 @@
 import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { EventCard, EventCardSkeleton } from '@/components/events/EventCard';
-import { Input, Tabs, Pagination, EmptyState } from '@/components/ui';
+import { Input, Tabs, Pagination, EmptyState, Select } from '@/components/ui';
 import { useDebouncedValue, useEventList, useEventStatusCounts } from '@/lib/event-queries';
+import { useAuthStore } from '@/store/authStore';
 
-const STATUS_TABS = [
+const DEFAULT_STATUS_TABS = [
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'ongoing', label: 'Ongoing' },
   { value: 'past', label: 'Past' },
 ];
+
+const COORDINATOR_STATUS_TABS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'ongoing', label: 'Ongoing' },
+  { value: 'past', label: 'Past' },
+  { value: 'pending_associate_dean,pending_director,pending_coordinator_parallel', label: 'Pending' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'archived', label: 'Archived' },
+];
+
+const RND_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Event Types' },
+  { value: 'normal', label: 'Normal Events' },
+  { value: 'rnd', label: 'R&D Events' },
+];
+
 const PAGE_SIZE = 12;
 
 interface BrowseEventsProps { hideHeader?: boolean; title?: string; subtitle?: string; }
 
 export function BrowseEvents({ hideHeader, title = 'Browse Events', subtitle = "Discover what's happening on campus" }: BrowseEventsProps) {
-  const [page, setPage] = useState(1);
-  const [tab, setTab] = useState('upcoming');
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search);
-  const { data, isLoading } = useEventList({ status: tab, search: debouncedSearch || undefined, page, size: PAGE_SIZE });
-  const counts = useEventStatusCounts(debouncedSearch);
+  const { user } = useAuthStore();
+  const isCoordinator = user?.role === 'club_coordinator';
+  const statusTabs = isCoordinator ? COORDINATOR_STATUS_TABS : DEFAULT_STATUS_TABS;
 
-  useEffect(() => setPage(1), [tab, debouncedSearch]);
-  const tabsWithCounts = STATUS_TABS.map(item => ({ ...item, label: `${item.label} (${counts[item.value as keyof typeof counts]})` }));
+  const [page, setPage] = useState(1);
+  const [tab, setTab] = useState(isCoordinator ? '' : 'upcoming');
+  const [search, setSearch] = useState('');
+  const [rndFilter, setRndFilter] = useState('all');
+
+  const debouncedSearch = useDebouncedValue(search);
+
+  const isRndParam = rndFilter === 'rnd' ? true : rndFilter === 'normal' ? false : undefined;
+
+  const { data, isLoading } = useEventList({
+    status: tab || undefined,
+    search: debouncedSearch || undefined,
+    is_rnd: isRndParam,
+    page,
+    size: PAGE_SIZE
+  });
+
+  const defaultCounts = useEventStatusCounts(debouncedSearch);
+
+  useEffect(() => setPage(1), [tab, debouncedSearch, rndFilter]);
+
+  const tabsToRender = isCoordinator
+    ? statusTabs
+    : statusTabs.map(item => ({ ...item, label: `${item.label} (${defaultCounts[item.value as keyof typeof defaultCounts] ?? 0})` }));
 
   const emptySubtitle = debouncedSearch
-    ? "No eligible events match your search query. Try a different keyword!"
+    ? "No events match your search query. Try a different keyword!"
     : tab === 'upcoming'
-    ? "No eligible upcoming events scheduled right now for your department or college-wide."
+    ? "No upcoming events scheduled right now."
     : tab === 'ongoing'
-    ? "No eligible events are currently ongoing."
-    : "No past eligible events found.";
+    ? "No events are currently ongoing."
+    : "No events found.";
 
   return <div className="space-y-6 animate-fade-in">
     {!hideHeader && <div><h1 className="page-title">{title}</h1><p className="page-subtitle">{subtitle}</p></div>}
     <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-3 flex-1">
         <Input placeholder="Search events…" leftIcon={<Search className="w-4 h-4" />} value={search} onChange={event => setSearch(event.target.value)} className="max-w-xs" />
-        <Tabs tabs={tabsWithCounts} active={tab} onChange={setTab} />
+        <Select value={rndFilter} onChange={e => setRndFilter(e.target.value)} options={RND_FILTER_OPTIONS} className="w-44 flex-shrink-0" />
+        <Tabs tabs={tabsToRender} active={tab} onChange={setTab} />
       </div>
     </div>
     <div className="grid min-h-[200px] grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

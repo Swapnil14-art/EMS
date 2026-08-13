@@ -98,7 +98,10 @@ export default function PublicEventDetailPage() {
   const isBeforeRegStart = regStart ? now < regStart : false;
   const isAfterRegEnd = regEnd ? now > regEnd : false;
 
-  const canRegister = ['approved', 'ongoing'].includes(event.status) &&
+  const isRegistrationAccepted = !!event.registration_accepted;
+
+  const canRegister = isRegistrationAccepted &&
+                      ['approved', 'ongoing'].includes(event.status) &&
                       user?.role === 'student' &&
                       !registrationDisabled &&
                       !isBeforeRegStart &&
@@ -112,6 +115,13 @@ export default function PublicEventDetailPage() {
   if (isInternalUser) {
     return <FullEventDetailsView event={event} />;
   }
+
+  const canRegisterVisitor = isRegistrationAccepted &&
+                            !!event.outside_campus_registration &&
+                            ['approved', 'ongoing'].includes(event.status) &&
+                            !registrationDisabled &&
+                            !isBeforeRegStart &&
+                            !isAfterRegEnd;
 
   return (
     <div className="min-h-screen bg-[var(--card-bg)]">
@@ -154,6 +164,7 @@ export default function PublicEventDetailPage() {
                   <EventTypeBadge type={event.event_type} />
                   {event.is_collaborative && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>}
                   {event.is_sponsored && <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">Sponsored</span>}
+                  {event.outside_campus_registration && <span className="badge bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">Outside Campus Accepted</span>}
                 </div>
               </div>
 
@@ -169,7 +180,7 @@ export default function PublicEventDetailPage() {
                     { label: 'Event Incharge', value: event.event_incharge_name, icon: <User className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     { label: 'Contact', value: event.event_incharge_contact, icon: <Phone className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     ...(event.club?.name ? [{ label: 'Club', value: event.club.name, icon: <Building className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
-                    ...(event.registration_count !== undefined ? [{ label: 'Registered', value: `${event.registration_count} students`, icon: <Users className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
+                    ...(event.registration_count !== undefined ? [{ label: 'Registered', value: `${event.registration_count} participants`, icon: <Users className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
                   ].map(row => (
                     <div key={row.label} className="flex gap-3">
                       <div className="flex-shrink-0 mt-0.5">{row.icon}</div>
@@ -303,6 +314,16 @@ export default function PublicEventDetailPage() {
                     <div className="space-y-2">
                       <Link href="/login" className="btn-primary w-full justify-center block text-center">Log In</Link>
                       <Link href="/signup" className="btn-secondary w-full justify-center block text-center">Create Account</Link>
+                      {canRegisterVisitor && (
+                        <div className="pt-3 border-t border-[var(--border-subtle)] mt-3">
+                          <Link
+                            href={`/events/${id}/register-visitor`}
+                            className="w-full justify-center block text-center text-sm font-semibold py-2.5 px-4 rounded-xl border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white transition-all shadow-sm"
+                          >
+                            Register as Non-Campus Participant
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (

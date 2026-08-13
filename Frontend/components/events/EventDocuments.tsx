@@ -417,119 +417,122 @@ export function EventDocuments({ basePath, viewOnly = false }: { basePath: strin
               ) : null}
             </div>
 
-            {/* Final Event Report */}
-            <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
-              <div className="flex items-start justify-between mb-4 pr-8">
-                <div>
-                  <h3 className="section-title">Final Event Report</h3>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Final report submitted/generated for this event.</p>
+            {/* Final Event Report (Normal events only) */}
+            {!selectedEvent?.is_rnd_event && (
+              <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
+                <div className="flex items-start justify-between mb-4 pr-8">
+                  <div>
+                    <h3 className="section-title">Final Event Report</h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">Final report submitted/generated for this event.</p>
+                  </div>
+                  {reportData?.generated_report_path && (
+                    <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
+                  )}
                 </div>
+
                 {reportData?.generated_report_path && (
-                  <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
+                  <div className="mb-4">
+                    <a
+                      href={`/api/admin/files/${reportData.generated_report_path.replace(/^\/+/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-secondary gap-2 w-full justify-center h-11"
+                    >
+                      <Download className="w-4 h-4" /> Download Current Report
+                    </a>
+                  </div>
                 )}
+
+                {!effectiveViewOnly && !reportData?.generated_report_path ? (
+                  <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
+                    No report submitted yet. Go to <button onClick={() => router.push(`${basePath}/report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">Report Tab</button> to submit.
+                  </div>
+                ) : !effectiveViewOnly ? (
+                  <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
+                    <input type="file" ref={reportInputRef} className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !selectedEventId) return;
+                      setUploadingReport(true);
+                      try {
+                        await reportService.uploadDoc(selectedEventId, file);
+                        toast.success('Report updated successfully');
+                        fetchDocsAndLinks();
+                      } catch (err: any) { toast.error('Failed to upload'); }
+                      finally { setUploadingReport(false); if (reportInputRef.current) reportInputRef.current.value = ''; }
+                    }} accept=".pdf,.doc,.docx" />
+                    <Button
+                      variant="secondary"
+                      loading={uploadingReport}
+                      icon={<Upload className="w-4 h-4" />}
+                      onClick={() => reportInputRef.current?.click()}
+                      className="w-full justify-center h-11"
+                    >
+                      Upload New Document
+                    </Button>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-2">Replaces existing report.</p>
+                  </div>
+                ) : null}
               </div>
+            )}
 
-              {reportData?.generated_report_path && (
-                <div className="mb-4">
-                  <a
-                    href={`/api/admin/files/${reportData.generated_report_path.replace(/^\/+/, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-secondary gap-2 w-full justify-center h-11"
-                  >
-                    <Download className="w-4 h-4" /> Download Current Report
-                  </a>
+            {/* Final RnD Report (R&D events only) */}
+            {selectedEvent?.is_rnd_event && (
+              <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
+                <div className="flex items-start justify-between mb-4 pr-8">
+                  <div>
+                    <h3 className="section-title">Final RnD Report</h3>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">Final RnD report submitted/generated for this event.</p>
+                  </div>
+                  {rndReportData?.generated_report_path && (
+                    <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
+                  )}
                 </div>
-              )}
 
-              {!effectiveViewOnly && !reportData?.generated_report_path ? (
-                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
-                  No report submitted yet. Go to <button onClick={() => router.push(`${basePath}/report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">Report Tab</button> to submit.
-                </div>
-              ) : !effectiveViewOnly ? (
-                <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
-                  <input type="file" ref={reportInputRef} className="hidden" onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file || !selectedEventId) return;
-                    setUploadingReport(true);
-                    try {
-                      await reportService.uploadDoc(selectedEventId, file);
-                      toast.success('Report updated successfully');
-                      fetchDocsAndLinks();
-                    } catch (err: any) { toast.error('Failed to upload'); }
-                    finally { setUploadingReport(false); if (reportInputRef.current) reportInputRef.current.value = ''; }
-                  }} accept=".pdf,.doc,.docx" />
-                  <Button
-                    variant="secondary"
-                    loading={uploadingReport}
-                    icon={<Upload className="w-4 h-4" />}
-                    onClick={() => reportInputRef.current?.click()}
-                    className="w-full justify-center h-11"
-                  >
-                    Upload New Document
-                  </Button>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-2">Replaces existing report.</p>
-                </div>
-              ) : null}
-            </div>
-
-            {/* Final RnD Report */}
-            <div className="card p-6 border-[var(--input-focus-ring)] bg-surface/30 relative">
-              <div className="flex items-start justify-between mb-4 pr-8">
-                <div>
-                  <h3 className="section-title">Final RnD Report</h3>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">Final RnD report submitted/generated for this event.</p>
-                </div>
                 {rndReportData?.generated_report_path && (
-                  <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)] absolute top-6 right-6" />
+                  <div className="mb-4">
+                    <a
+                      href={`/api/admin/files/${rndReportData.generated_report_path.replace(/^\/+/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-secondary gap-2 w-full justify-center h-11"
+                    >
+                      <Download className="w-4 h-4" /> Download Current RnD Report
+                    </a>
+                  </div>
                 )}
+
+                {!effectiveViewOnly && !rndReportData?.generated_report_path ? (
+                  <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
+                    No RnD report submitted yet. Go to <button onClick={() => router.push(`${basePath}/rnd-report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">RnD Report Tab</button> to submit.
+                  </div>
+                ) : !effectiveViewOnly ? (
+                  <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
+                    <input type="file" ref={rndReportInputRef} className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || !selectedEventId) return;
+                      setUploadingRndReport(true);
+                      try {
+                        await rndReportService.uploadDoc(selectedEventId, file);
+                        toast.success('RnD Report updated successfully');
+                        fetchDocsAndLinks();
+                      } catch (err: any) { toast.error('Failed to upload'); }
+                      finally { setUploadingRndReport(false); if (rndReportInputRef.current) rndReportInputRef.current.value = ''; }
+                    }} accept=".pdf,.doc,.docx" />
+                    <Button
+                      variant="secondary"
+                      loading={uploadingRndReport}
+                      icon={<Upload className="w-4 h-4" />}
+                      onClick={() => rndReportInputRef.current?.click()}
+                      className="w-full justify-center h-11"
+                    >
+                      Upload New Document
+                    </Button>
+                    <p className="text-[10px] text-[var(--text-muted)] mt-2">Replaces existing RnD report.</p>
+                  </div>
+                ) : null}
               </div>
-
-              {rndReportData?.generated_report_path && (
-                <div className="mb-4">
-                  <a
-                    href={`/api/admin/files/${rndReportData.generated_report_path.replace(/^\/+/, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-secondary gap-2 w-full justify-center h-11"
-                  >
-                    <Download className="w-4 h-4" /> Download Current RnD Report
-                  </a>
-                </div>
-              )}
-
-              {!effectiveViewOnly && !rndReportData?.generated_report_path ? (
-                <div className="p-4 text-center text-xs text-[var(--text-muted)] bg-white rounded-xl border border-[var(--border-subtle)]">
-                  No RnD report submitted yet. Go to <button onClick={() => router.push(`${basePath}/rnd-report?event=${selectedEventId}`)} className="text-[rgb(var(--color-primary))] font-semibold hover:underline">RnD Report Tab</button> to submit.
-                </div>
-              ) : !effectiveViewOnly ? (
-                <div className="border border-dashed border-[var(--input-focus-ring)] bg-white rounded-xl p-4 text-center">
-                  <input type="file" ref={rndReportInputRef} className="hidden" onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file || !selectedEventId) return;
-                    setUploadingRndReport(true);
-                    try {
-                      await rndReportService.uploadDoc(selectedEventId, file);
-                      toast.success('RnD Report updated successfully');
-                      fetchDocsAndLinks();
-                    } catch (err: any) { toast.error('Failed to upload'); }
-                    finally { setUploadingRndReport(false); if (rndReportInputRef.current) rndReportInputRef.current.value = ''; }
-                  }} accept=".pdf,.doc,.docx" />
-                  <Button
-                    variant="secondary"
-                    loading={uploadingRndReport}
-                    icon={<Upload className="w-4 h-4" />}
-                    onClick={() => rndReportInputRef.current?.click()}
-                    className="w-full justify-center h-11"
-                  >
-                    Upload New Document
-                  </Button>
-                  <p className="text-[10px] text-[var(--text-muted)] mt-2">Replaces existing RnD report.</p>
-                </div>
-              ) : null}
-            </div>
+            )}
           </div>
-
         </div>
       )}
 

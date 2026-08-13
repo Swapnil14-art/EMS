@@ -623,6 +623,18 @@ export const registrationService = {
     });
     return res.data;
   },
+
+  // POST /registrations/{event_id}/register-visitor — register visitor (non-campus)
+  registerVisitor: async (eventId: number, data: {
+    full_name: string;
+    email: string;
+    phone: string;
+    qualification: string;
+    school_college: string;
+  }) => {
+    const res = await api.post(`/registrations/${eventId}/register-visitor`, data);
+    return res.data;
+  },
 };
 
 // ─── Reports ──────────────────────────────────────────────────────────────────

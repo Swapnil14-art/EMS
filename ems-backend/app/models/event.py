@@ -87,6 +87,10 @@ class Event(Base):
     rnd_semester_quarter = Column(String(100), nullable=True)
     rnd_tentative_date = Column(Date, nullable=True)
 
+    # Outside Campus Registration
+    outside_campus_registration = Column(Boolean, nullable=False, default=False)
+    registration_accepted = Column(Boolean, nullable=False, default=False)
+
     # Tracking
     status = Column(String(60), nullable=False, default="draft", index=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)

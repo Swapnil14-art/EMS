@@ -92,12 +92,22 @@ const schema = z.object({
   rnd_prescribed_activity: z.string().optional(),
   rnd_semester_quarter: z.string().optional(),
   rnd_tentative_date: z.string().optional(),
+  outside_campus_registration: z.boolean().default(false),
+  registration_accepted: z.boolean().default(false),
 }).superRefine((data, ctx) => {
   if (data.start_datetime && data.end_datetime) {
     const start = new Date(data.start_datetime);
     const end = new Date(data.end_datetime);
     if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End date & time must be after start date & time', path: ['end_datetime'] });
+    }
+  }
+  if (data.registration_accepted) {
+    if (!data.registration_start_datetime || data.registration_start_datetime.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Registration Start Date & Time is required when Registration Accepted is ON', path: ['registration_start_datetime'] });
+    }
+    if (!data.registration_deadline || data.registration_deadline.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Registration End Date & Time is required when Registration Accepted is ON', path: ['registration_deadline'] });
     }
   }
   if (data.registration_start_datetime && data.registration_deadline) {
@@ -302,11 +312,14 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       rnd_prescribed_activity: '',
       rnd_semester_quarter: '',
       rnd_tentative_date: '',
+      outside_campus_registration: false,
+      registration_accepted: false,
     },
   });
 
   const watchIsRnd = watch('is_rnd_event');
   const watchRndTheme = watch('rnd_activity_theme');
+  const watchRegistrationAccepted = watch('registration_accepted');
 
   const SECTIONS = [
     ...BASE_SECTIONS,
@@ -339,7 +352,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
-    2: ['start_datetime', 'end_datetime', 'registration_start_datetime', 'registration_deadline'],
+    2: ['start_datetime', 'end_datetime', ...(watchRegistrationAccepted ? ['registration_start_datetime', 'registration_deadline'] as (keyof FormData)[] : [])],
     3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [],
     7: watchIsRnd ? ['rnd_activity_theme', 'rnd_prescribed_activity'] : [],
     8: [],
@@ -367,8 +380,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
-        registration_start_datetime: data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
-        registration_deadline: data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
+        registration_start_datetime: data.registration_accepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: data.registration_accepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -391,6 +404,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
         rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
         rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
+        outside_campus_registration: data.outside_campus_registration,
+        registration_accepted: data.registration_accepted,
       };
       let id = createdId;
       if (!id) {
@@ -425,8 +440,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
-        registration_start_datetime: data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
-        registration_deadline: data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
+        registration_start_datetime: data.registration_accepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: data.registration_accepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -449,6 +464,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
         rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
         rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
+        outside_campus_registration: data.outside_campus_registration,
+        registration_accepted: data.registration_accepted,
       };
         let id = createdId;
         if (!id) {
@@ -491,8 +508,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
-        registration_start_datetime: bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
-        registration_deadline: bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
+        registration_start_datetime: bufferedData.registration_accepted && bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
+        registration_deadline: bufferedData.registration_accepted && bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: bufferedData.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -515,8 +532,10 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_prescribed_activity: bufferedData.is_rnd_event ? bufferedData.rnd_prescribed_activity : null,
         rnd_semester_quarter: bufferedData.is_rnd_event ? bufferedData.rnd_semester_quarter : null,
         rnd_tentative_date: bufferedData.is_rnd_event ? bufferedData.rnd_tentative_date : null,
+        outside_campus_registration: bufferedData.outside_campus_registration,
+        registration_accepted: bufferedData.registration_accepted,
       };
-      
+
       let id = createdId;
       if (!id) {
         const res = await eventService.create(payloadData as any);
@@ -581,6 +600,14 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
                 <Toggle checked={field.value} onChange={(val) => { field.onChange(val); if (!val) { setValue('rnd_activity_theme', ''); setValue('rnd_prescribed_activity', ''); setValue('rnd_semester_quarter', ''); setValue('rnd_tentative_date', ''); } }} label="R&D Event" />
               )} />
               <p className="text-xs text-[var(--text-muted)] mt-1 ml-1">Enable this to classify the event under the R&D framework. An additional mandatory R&D tab will appear.</p>
+            </div>
+
+            {/* Outside Campus Registration Toggle */}
+            <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl border border-emerald-200 dark:border-emerald-800 mb-2">
+              <Controller name="outside_campus_registration" control={control} render={({ field }) => (
+                <Toggle checked={field.value} onChange={(val) => field.onChange(val)} label="Outside Campus Registration Accepted" />
+              )} />
+              <p className="text-xs text-[var(--text-muted)] mt-1 ml-1">Allow non-campus visitors and external participants to register for this event once approved.</p>
             </div>
 
             <Input label="Event Title" placeholder="e.g. TechFest 2025 — Day 1" error={errors.title?.message} {...register('title')} />
@@ -739,14 +766,32 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             </div>
 
             <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule</h3>
-                <p className="text-xs text-[var(--text-muted)]">Specify when student registration opens and closes for this event.</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} />
-                <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} />
-              </div>
+              <Controller name="registration_accepted" control={control} render={({ field }) => (
+                <Toggle
+                  checked={field.value}
+                  onChange={(val) => {
+                    field.onChange(val);
+                    if (!val) {
+                      setValue('registration_start_datetime', '');
+                      setValue('registration_deadline', '');
+                    }
+                  }}
+                  label="Registration Accepted"
+                />
+              )} />
+              
+              {watch('registration_accepted') && (
+                <div className="space-y-4 pt-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule <span className="text-[var(--text-danger)]">*</span></h3>
+                    <p className="text-xs text-[var(--text-muted)]">Specify when student registration opens and closes for this event.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} required />
+                    <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} required />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

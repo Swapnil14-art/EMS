@@ -6,6 +6,7 @@ import { Select, Button, Alert } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
 import type { Event } from '@/types';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 // Lazy load the report generator to keep page.tsx bundle lean
@@ -18,8 +19,11 @@ const ReportGenerator = dynamic(() => import('@/components/events/ReportGenerato
 });
 
 export default function ClubCoordinatorReportPage() {
+  const searchParams = useSearchParams();
+  const eventParam = searchParams.get('event');
+
   const [events, setEvents] = useState<Event[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(eventParam ? Number(eventParam) : null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -30,6 +34,12 @@ export default function ClubCoordinatorReportPage() {
   const [showGenerator, setShowGenerator] = useState(false);
   const [loadingReport, setLoadingReport] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (eventParam) {
+      setSelectedId(Number(eventParam));
+    }
+  }, [eventParam]);
 
   const fetchEvents = () => {
     eventService.list({ status: 'completed,archived', size: 50, manage_only: true, is_rnd: false })

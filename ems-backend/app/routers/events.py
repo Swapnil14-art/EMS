@@ -100,6 +100,81 @@ def is_student_eligible_for_event(user: User, event: Event) -> bool:
             for name in dept_names:
                 if matches(name, item_str):
                     return True
+from app.schemas.event import (
+    EventCreate, EventUpdate, EventOut,
+    EventLinkCreate, EventLinkUpdate, EventLinkOut,
+    EventDocumentOut, EventOtherDocOut,
+    EventCoordinatorOut, CancelEventRequest,
+    AddCoordinatorRequest, EventDocumentCreate,
+)
+from app.services.storage_service import save_file, delete_file
+from app.services.venue_clash_service import check_venue_clash
+from app.services.email_service import notify_event_cancelled, notify_event_details_updated
+from app.utils.permissions import can_edit_event, can_cancel_event, can_view_internal_docs
+from app.utils.diff import take_event_snapshot, compute_diff
+
+router = APIRouter()
+
+
+# ─── Helpers ────────────────────────────────────────────────────────────────
+
+def is_student_eligible_for_event(user: User, event: Event) -> bool:
+    """
+    Check if a student user is eligible to view/register for an event.
+    """
+    ta = (event.target_audience or "").strip().lower()
+    sd = (event.school_department or "").strip().lower()
+
+    # 1. College-wide / All / Empty target audience or school_department
+    if ta in ("college_wide", "college", "all", "") or "college" in ta or "all" in ta:
+        return True
+    if "college" in sd or "all" in sd:
+        return True
+
+    # 2. Extract user department code and name safely without triggering async lazy-loading
+    dept_codes = []
+    dept_names = []
+    try:
+        from sqlalchemy import inspect
+        insp = inspect(user)
+        if insp and "department" not in insp.unloaded and getattr(user, "department", None):
+            if getattr(user.department, "code", None):
+                dept_codes.append(user.department.code.strip().lower())
+            if getattr(user.department, "name", None):
+                dept_names.append(user.department.name.strip().lower())
+    except Exception:
+        pass
+
+    # If user has no department assigned, allow visibility for general public/college-wide events
+    if not dept_codes and not dept_names:
+        return True
+
+    def matches(str1: str, str2: str) -> bool:
+        if not str1 or not str2:
+            return False
+        return str1 in str2 or str2 in str1
+
+    # Check target_audience & school_department
+    for code in dept_codes:
+        if matches(code, ta) or matches(code, sd):
+            return True
+    for name in dept_names:
+        if matches(name, ta) or matches(name, sd):
+            return True
+
+    # Check departments_involved (list of strings or JSON or string)
+    depts_inv = event.departments_involved or []
+    if isinstance(depts_inv, list):
+        for item in depts_inv:
+            item_str = str(item).strip().lower()
+            if item_str in ("college_wide", "college", "all") or "college" in item_str or "all" in item_str:
+                return True
+            for code in dept_codes:
+                if matches(code, item_str):
+                    return True
+            for name in dept_names:
+                if matches(name, item_str):
+                    return True
     elif isinstance(depts_inv, str):
         item_str = depts_inv.strip().lower()
         if item_str in ("college_wide", "college", "all") or "college" in item_str or "all" in item_str:
@@ -117,25 +192,32 @@ def is_student_eligible_for_event(user: User, event: Event) -> bool:
 def _apply_student_filter(query, user: User):
     """
     Filter for student role:
-    1. Only approved or ongoing events where registration is currently open.
+    1. Visible statuses (approved, ongoing, completed, archived).
     2. Eligible based on event's department/school eligibility or College-Wide.
     """
     visible_statuses = ["approved", "ongoing", "completed", "archived"]
     query = query.where(Event.status.in_(visible_statuses))
     
-    dept_code = ""
-    dept_name = ""
+    tokens = set()
     try:
         from sqlalchemy import inspect
         insp = inspect(user)
         if insp and "department" not in insp.unloaded and getattr(user, "department", None):
             dept_code = user.department.code.strip().lower() if user.department.code else ""
             dept_name = user.department.name.strip().lower() if user.department.name else ""
-    except Exception:
-        pass
+            if dept_code:
+                tokens.add(dept_code)
+            if dept_name:
+                tokens.add(dept_name)
+                for word in dept_name.split():
+                    w = word.strip().lower()
+                    if len(w) > 3 and w not in ("school", "department", "studies", "sciences", "technology"):
+                        tokens.add(w)
+    except Exception as e:
+        logger.warning(f"Error inspecting student department: {e}")
 
     dept_inv_str = cast(Event.departments_involved, String)
-    logger.info(f"Student event filter — dept_code='{dept_code}', dept_name='{dept_name}' (User ID: {user.id})")
+    logger.info(f"Student event filter — tokens={tokens} (User ID: {user.id})")
     
     conditions = [
         Event.target_audience.ilike("%college%"),
@@ -148,14 +230,10 @@ def _apply_student_filter(query, user: User):
         dept_inv_str.ilike("%all%"),
     ]
     
-    if dept_code:
-        conditions.append(Event.target_audience.ilike(f"%{dept_code}%"))
-        conditions.append(Event.school_department.ilike(f"%{dept_code}%"))
-        conditions.append(dept_inv_str.ilike(f"%{dept_code}%"))
-    if dept_name:
-        conditions.append(Event.target_audience.ilike(f"%{dept_name}%"))
-        conditions.append(Event.school_department.ilike(f"%{dept_name}%"))
-        conditions.append(dept_inv_str.ilike(f"%{dept_name}%"))
+    for t in tokens:
+        conditions.append(Event.target_audience.ilike(f"%{t}%"))
+        conditions.append(Event.school_department.ilike(f"%{t}%"))
+        conditions.append(dept_inv_str.ilike(f"%{t}%"))
         
     query = query.where(or_(*conditions))
     return query
@@ -195,35 +273,37 @@ async def list_events(
     query = select(Event)
 
     if not current_user:
-        # Public users can only see approved events
-        query = query.where(Event.status == "approved")
+        # Public unauthenticated users see all public events regardless of School/Department
+        query = query.where(Event.status.in_(["approved", "ongoing", "completed", "archived"]))
     elif current_user.role == "student":
         # Role-based base filter
         query = _apply_student_filter(query, current_user)
     elif current_user.role == "club_coordinator":
-        # Base: events they created, coordinate, or their club is involved in (any status)
-        coord_events = select(EventCoordinator.event_id).where(
-            EventCoordinator.user_id == current_user.id
-        ).scalar_subquery()
-        
-        # Include events where their club is the primary club or a collaborator
-        collab_events = select(EventCollaboratingClub.event_id).where(
-            EventCollaboratingClub.club_id == current_user.club_id
-        ).scalar_subquery() if current_user.club_id else select(EventCollaboratingClub.event_id).where(False).scalar_subquery()
-        
-        conditions = [
-            Event.created_by == current_user.id,
-            Event.id.in_(coord_events)
-        ]
-        
-        if current_user.club_id:
-            conditions.append(Event.club_id == current_user.club_id)
-            conditions.append(Event.id.in_(collab_events))
+        if my_events or manage_only:
+            # My Events or report management: events they created, coordinate, or their club is involved in
+            coord_events = select(EventCoordinator.event_id).where(
+                EventCoordinator.user_id == current_user.id
+            ).scalar_subquery()
             
-        if not manage_only:
-            conditions.append(Event.status.in_(["approved", "ongoing", "completed", "archived"])) # Browse public
+            # Include events where their club is the primary club or a collaborator
+            collab_events = select(EventCollaboratingClub.event_id).where(
+                EventCollaboratingClub.club_id == current_user.club_id
+            ).scalar_subquery() if current_user.club_id else select(EventCollaboratingClub.event_id).where(False).scalar_subquery()
             
-        query = query.where(or_(*conditions))
+            conditions = [
+                Event.created_by == current_user.id,
+                Event.id.in_(coord_events)
+            ]
+            
+            if current_user.club_id:
+                conditions.append(Event.club_id == current_user.club_id)
+                conditions.append(Event.id.in_(collab_events))
+                
+            query = query.where(or_(*conditions))
+        else:
+            # Browse Events tab for Club Coordinator:
+            # Show ALL events from the entire database, regardless of status or club
+            pass
 
     elif current_user.role == "associate_dean":
         conditions = [
@@ -548,6 +628,7 @@ async def get_event(
         "rnd_prescribed_activity": event.rnd_prescribed_activity,
         "rnd_semester_quarter": event.rnd_semester_quarter,
         "rnd_tentative_date": event.rnd_tentative_date.isoformat() if event.rnd_tentative_date else None,
+        "outside_campus_registration": event.outside_campus_registration,
         "registration_count": registration_count,
         "is_registered": is_registered,
         "links": [{"id": l.id, "link_type": l.link_type, "url": l.url, "label": l.label}
@@ -734,6 +815,8 @@ async def create_event(
             rnd_prescribed_activity=body.rnd_prescribed_activity if body.is_rnd_event else None,
             rnd_semester_quarter=body.rnd_semester_quarter if body.is_rnd_event else None,
             rnd_tentative_date=body.rnd_tentative_date if body.is_rnd_event else None,
+            outside_campus_registration=body.outside_campus_registration,
+            registration_accepted=body.registration_accepted,
         )
         db.add(event)
         await db.flush()
@@ -1043,6 +1126,13 @@ async def submit_event(
 
         if not event.poster_path:
             raise HTTPException(status_code=400, detail="Poster upload is required before submission")
+
+        if event.registration_accepted:
+            if not event.registration_start_datetime or not event.registration_deadline:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Registration start date & time and end date & time are required when Registration Accepted is ON.",
+                )
 
         event_start = event.start_datetime
         if event_start.tzinfo is None:
@@ -1701,13 +1791,27 @@ async def get_event_registrations(
         .where(
             EventRegistration.event_id == event_id,
             EventRegistration.status == "registered",
+            EventRegistration.participation_type == "in_campus",
         )
         .order_by(User.name)
     )
     rows = result.all()
-    
-    return [
-        {
+
+    # Also fetch visitor registrations (no linked user)
+    visitor_result = await db.execute(
+        select(EventRegistration)
+        .where(
+            EventRegistration.event_id == event_id,
+            EventRegistration.status == "registered",
+            EventRegistration.participation_type == "visitor",
+        )
+        .order_by(EventRegistration.visitor_name)
+    )
+    visitor_rows = visitor_result.scalars().all()
+
+    registrations = []
+    for user, reg in rows:
+        registrations.append({
             "id": user.id,
             "name": user.name,
             "email": user.email,
@@ -1717,9 +1821,24 @@ async def get_event_registrations(
             "branch": user.branch or "N/A",
             "course": user.course or "N/A",
             "registered_at": reg.registered_at.isoformat() if reg.registered_at else None,
-        }
-        for user, reg in rows
-    ]
+            "participation_type": "In-Campus",
+        })
+
+    for reg in visitor_rows:
+        registrations.append({
+            "id": reg.id,
+            "name": reg.visitor_name or "N/A",
+            "email": reg.visitor_email or "N/A",
+            "department": reg.visitor_school_college or "N/A",
+            "phone_number": reg.visitor_phone or "N/A",
+            "year": "N/A",
+            "branch": reg.visitor_qualification or "N/A",
+            "course": "N/A",
+            "registered_at": reg.registered_at.isoformat() if reg.registered_at else None,
+            "participation_type": "Visitor",
+        })
+
+    return registrations
 
 
 @router.get("/{event_id}/registrations/export")
@@ -1737,7 +1856,7 @@ async def export_event_registrations(
     ws.title = "Registered Students"
     
     # Header
-    headers = ["Name", "Email", "Phone Number", "Department", "Year", "Branch", "Course", "Registration Time"]
+    headers = ["Name", "Email", "Phone Number", "Department", "Year", "Branch", "Course", "Registration Time", "Participation Type"]
     ws.append(headers)
     
     # Rows
@@ -1750,7 +1869,8 @@ async def export_event_registrations(
             r["year"],
             r["branch"],
             r["course"],
-            r["registered_at"]
+            r["registered_at"],
+            r.get("participation_type", "In-Campus"),
         ])
     
     # Auto-adjust column widths

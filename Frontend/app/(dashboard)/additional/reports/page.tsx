@@ -9,11 +9,16 @@ import { Button, Alert } from '@/components/ui';
 import type { Event } from '@/types';
 import toast from 'react-hot-toast';
 
+import { useSearchParams } from 'next/navigation';
+
 export default function AdditionalReportsPage() {
+  const searchParams = useSearchParams();
+  const eventParam = searchParams.get('event');
+
   const { user } = useAuthStore();
   const router = useRouter();
   const [events, setEvents] = useState<Event[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<number | null>(eventParam ? Number(eventParam) : null);
   const [search, setSearch] = useState('');
   const [reportData, setReportData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -27,12 +32,18 @@ export default function AdditionalReportsPage() {
   const canSubmit = perms.includes('submit_reports');
 
   useEffect(() => {
+    if (eventParam) {
+      setSelectedId(Number(eventParam));
+    }
+  }, [eventParam]);
+
+  useEffect(() => {
     if (!user) return;
     if (user.role !== 'additional' || (!canView && !canSubmit)) {
       router.replace('/additional'); return;
     }
     // Fetch completed events (for submit) or all public events (for view)
-    eventService.list({ status: 'completed,archived', size: 100 })
+    eventService.list({ status: 'completed,archived', size: 100, is_rnd: false })
       .then(r => setEvents(r.data || []))
       .catch(() => {})
       .finally(() => setLoading(false));

@@ -227,6 +227,13 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
                   <Button variant="danger" size="sm" onClick={() => { setCancelEvent(ev); setCancelReason(''); }}>Cancel</Button>
                 </>
               )}
+              {ev.status === 'completed' && (
+                <Link href={ev.is_rnd_event ? `${basePath}/rnd-report?event=${ev.id}` : `${basePath}/report?event=${ev.id}`}>
+                  <Button size="sm" icon={<FileText className="w-4 h-4" />}>
+                    {ev.is_rnd_event ? 'Submit R&D Report' : 'Submit Report'}
+                  </Button>
+                </Link>
+              )}
 
             </div>
           </div>

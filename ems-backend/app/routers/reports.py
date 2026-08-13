@@ -50,6 +50,12 @@ async def submit_report(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
+    if event.is_rnd_event:
+        raise HTTPException(
+            status_code=400,
+            detail="This is an R&D event. Please submit the report using the R&D Report section.",
+        )
+
     if event.status not in ("completed", "archived"):
         raise HTTPException(
             status_code=400,
@@ -275,6 +281,12 @@ async def upload_premade_report(
     event = await db.get(Event, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+
+    if event.is_rnd_event:
+        raise HTTPException(
+            status_code=400,
+            detail="This is an R&D event. Please submit the report using the R&D Report section.",
+        )
 
     if event.status not in ("completed", "archived"):
         raise HTTPException(

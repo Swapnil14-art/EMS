@@ -50,6 +50,12 @@ async def submit_rnd_report(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
+    if not event.is_rnd_event:
+        raise HTTPException(
+            status_code=400,
+            detail="This is a Normal event. Please submit the report using the Normal Report section.",
+        )
+
     # Allow submission for completed or archived events
     if event.status not in ("completed", "archived"):
         raise HTTPException(
@@ -115,7 +121,7 @@ async def submit_rnd_report(
 
     await db.flush()
 
-    # Do NOT change event.status — RnD report is independent
+    event.status = "archived"
     await db.commit()
     await db.refresh(report)
 
@@ -278,6 +284,12 @@ async def upload_premade_rnd_report(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
+    if not event.is_rnd_event:
+        raise HTTPException(
+            status_code=400,
+            detail="This is a Normal event. Please submit the report using the Normal Report section.",
+        )
+
     if event.status not in ("completed", "archived"):
         raise HTTPException(
             status_code=400,
@@ -302,6 +314,6 @@ async def upload_premade_rnd_report(
         )
         db.add(report)
 
-    # Do NOT change event.status — RnD report is independent
+    event.status = "archived"
     await db.commit()
     return {"message": "RnD Report document uploaded", "path": path}

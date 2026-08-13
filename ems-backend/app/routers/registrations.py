@@ -15,6 +15,7 @@ from app.models.event_registration import EventRegistration
 from app.models.system_config import SystemSettings
 from app.services.email_service import notify_registration_confirmation
 from app.routers.events import is_student_eligible_for_event
+from app.schemas.event import VisitorRegistrationCreate
 
 logger = logging.getLogger(__name__)
 
@@ -241,3 +242,105 @@ async def send_bulk_update(
     send_bulk_email.delay(emails, subject, body_html, event_id, "manual_update")
 
     return {"message": f"Update email queued for {len(emails)} students"}
+
+
+@router.post("/{event_id}/register-visitor")
+async def register_visitor(
+    event_id: int,
+    body: VisitorRegistrationCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Register a non-campus visitor for an event. No authentication required."""
+    # System control: block registration if disabled
+    config_result = await db.execute(select(SystemSettings).limit(1))
+    config = config_result.scalar_one_or_none()
+    if config and config.disable_student_registration:
+        raise HTTPException(
+            status_code=403,
+            detail="Event registration is currently disabled",
+        )
+
+    event = await db.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    # Must have outside campus registration enabled
+    if not event.outside_campus_registration:
+        raise HTTPException(
+            status_code=403,
+            detail="This event does not accept outside campus registrations",
+        )
+
+    # Must have reached Director-level approval (status approved or ongoing)
+    if event.status not in ["approved", "ongoing"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Registration is only open for approved or ongoing events",
+        )
+
+    # Registration start time & deadline checks
+    now = datetime.now(timezone.utc)
+    if event.registration_start_datetime:
+        reg_start = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+        if now < reg_start:
+            formatted_date = reg_start.strftime("%d %b %Y, %I:%M %p")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Registration opens on {formatted_date}",
+            )
+
+    if event.registration_deadline:
+        reg_deadline = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
+        if now > reg_deadline:
+            raise HTTPException(status_code=400, detail="Registration deadline has passed")
+
+    # Check for duplicate visitor email
+    existing_result = await db.execute(
+        select(EventRegistration).where(
+            EventRegistration.event_id == event_id,
+            EventRegistration.visitor_email == body.email,
+            EventRegistration.participation_type == "visitor",
+        )
+    )
+    existing_reg = existing_result.scalar_one_or_none()
+
+    if existing_reg:
+        if existing_reg.status == "registered":
+            raise HTTPException(
+                status_code=409,
+                detail="This email is already registered for this event",
+            )
+        else:
+            # Re-register a previously cancelled visitor
+            existing_reg.status = "registered"
+            existing_reg.registered_at = now
+            existing_reg.visitor_name = body.full_name
+            existing_reg.visitor_phone = body.phone
+            existing_reg.visitor_qualification = body.qualification
+            existing_reg.visitor_school_college = body.school_college
+            await db.commit()
+            return {"message": "Successfully registered for the event", "event_id": event_id}
+
+    registration = EventRegistration(
+        event_id=event_id,
+        student_id=None,
+        participation_type="visitor",
+        status="registered",
+        visitor_name=body.full_name,
+        visitor_email=body.email,
+        visitor_phone=body.phone,
+        visitor_qualification=body.qualification,
+        visitor_school_college=body.school_college,
+    )
+    db.add(registration)
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This email is already registered for this event",
+        )
+
+    return {"message": "Successfully registered for the event", "event_id": event_id}

@@ -271,6 +271,10 @@ export interface Event {
   rnd_semester_quarter?: string;
   rnd_tentative_date?: string;
 
+  // Outside campus registration
+  outside_campus_registration?: boolean;
+  registration_accepted?: boolean;
+
   status: EventStatus;
   created_by: number;
   creator?: User;

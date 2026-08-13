@@ -28,8 +28,8 @@ function fallbackGradient(id: number) {
 // Default card - for grids
 export function EventCard({ event, showStatus = true }: EventCardProps) {
   const timeStatus = getEventTimeStatus(event.start_datetime, event.end_datetime);
-  const isOngoing = timeStatus === 'ongoing';
-  const isUpcoming = timeStatus === 'upcoming';
+  const isOngoing = timeStatus === 'ongoing' && ['approved', 'ongoing'].includes(event.status);
+  const isUpcoming = timeStatus === 'upcoming' && event.status === 'approved';
 
   return (
     <Link href={`/events/${event.id}`} className="block group event-card card-hover overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">

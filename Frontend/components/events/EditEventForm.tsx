@@ -73,12 +73,22 @@ const schema = z.object({
   other_requirements: z.string().optional(),
   budget: z.coerce.number().optional(),
   comments: z.string().optional(),
+  outside_campus_registration: z.boolean().default(false),
+  registration_accepted: z.boolean().default(false),
 }).superRefine((data, ctx) => {
   if (data.start_datetime && data.end_datetime) {
     const start = new Date(data.start_datetime);
     const end = new Date(data.end_datetime);
     if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end <= start) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End date & time must be after start date & time', path: ['end_datetime'] });
+    }
+  }
+  if (data.registration_accepted) {
+    if (!data.registration_start_datetime || data.registration_start_datetime.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Registration Start Date & Time is required when Registration Accepted is ON', path: ['registration_start_datetime'] });
+    }
+    if (!data.registration_deadline || data.registration_deadline.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Registration End Date & Time is required when Registration Accepted is ON', path: ['registration_deadline'] });
     }
   }
   if (data.registration_start_datetime && data.registration_deadline) {
@@ -242,6 +252,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
           budget: ev.budget || undefined,
           comments: ev.comments || '',
           objectives: ev.objectives?.length ? ev.objectives : ['', '', ''],
+          outside_campus_registration: !!ev.outside_campus_registration,
+          registration_accepted: !!ev.registration_accepted,
         });
         setLoading(false);
       })
@@ -263,10 +275,11 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
   const watchSeating = watch('seating_arrangement');
   const watchPodium = watch('podium_setup');
   const watchDecoration = watch('decoration');
+  const watchRegistrationAccepted = watch('registration_accepted');
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'school_department', 'event_incharge_name', 'event_incharge_contact', 'departments_involved', 'objectives'],
-    2: ['start_datetime', 'end_datetime', 'registration_start_datetime', 'registration_deadline'],
+    2: ['start_datetime', 'end_datetime', ...(watchRegistrationAccepted ? ['registration_start_datetime', 'registration_deadline'] as (keyof FormData)[] : [])],
     3: [], 4: [], 5: [], 6: [], 7: [],
   };
 
@@ -297,8 +310,8 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
-        registration_start_datetime: bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
-        registration_deadline: bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
+        registration_start_datetime: bufferedData.registration_accepted && bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
+        registration_deadline: bufferedData.registration_accepted && bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
         event_type: bufferedData.event_type,
         venue_custom: bufferedData.venue_type === 'Other' ? bufferedData.venue_custom : null,
         venue_id: bufferedData.venue_type !== 'Other' ? bufferedData.venue_id : null,
@@ -313,7 +326,9 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
         transport_details: bufferedData.transport ? bufferedData.transport_details : null,
         security_details: bufferedData.security ? bufferedData.security_details : null,
         printing_details: bufferedData.printing ? bufferedData.printing_details : null,
-        volunteers_details: bufferedData.volunteers ? bufferedData.volunteers_details : null
+        volunteers_details: bufferedData.volunteers ? bufferedData.volunteers_details : null,
+        outside_campus_registration: bufferedData.outside_campus_registration,
+        registration_accepted: bufferedData.registration_accepted,
       };
       
       await eventService.update(eventId, payload as any);
@@ -367,7 +382,16 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
         {step === 1 && (
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><Info className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Basic Information</h2>
-            <Input label="Event Title" placeholder="e.g. TechFest 2025" error={errors.title?.message} {...register('title')} />
+            
+            {/* Outside Campus Registration Toggle */}
+            <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl border border-emerald-200 dark:border-emerald-800 mb-2">
+              <Controller name="outside_campus_registration" control={control} render={({ field }) => (
+                <Toggle checked={field.value} onChange={(val) => field.onChange(val)} label="Outside Campus Registration Accepted" />
+              )} />
+              <p className="text-xs text-[var(--text-muted)] mt-1 ml-1">Allow non-campus visitors and external participants to register for this event once approved.</p>
+            </div>
+
+            <Input label="Event Title" placeholder="e.g. TechFest 2025 — Day 1" error={errors.title?.message} {...register('title')} />
             <div className="grid grid-cols-2 gap-4">
               <Controller name="event_type" control={control} render={({ field }) => (
                 <Select label="Event Type" options={EVENT_TYPES} placeholder="Select type" error={errors.event_type?.message} {...field} />
@@ -485,14 +509,32 @@ export default function EditEventForm({ basePath, eventId }: { basePath: string,
             </div>
 
             <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule</h3>
-                <p className="text-xs text-[var(--text-muted)]">Updating registration dates for approved events takes effect immediately without re-triggering approval workflow.</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} />
-                <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} />
-              </div>
+              <Controller name="registration_accepted" control={control} render={({ field }) => (
+                <Toggle
+                  checked={field.value}
+                  onChange={(val) => {
+                    field.onChange(val);
+                    if (!val) {
+                      setValue('registration_start_datetime', '');
+                      setValue('registration_deadline', '');
+                    }
+                  }}
+                  label="Registration Accepted"
+                />
+              )} />
+
+              {watch('registration_accepted') && (
+                <div className="space-y-4 pt-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule <span className="text-[var(--text-danger)]">*</span></h3>
+                    <p className="text-xs text-[var(--text-muted)]">Updating registration dates for approved events takes effect immediately without re-triggering approval workflow.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} required />
+                    <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} required />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

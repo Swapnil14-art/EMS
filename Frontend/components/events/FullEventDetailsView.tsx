@@ -9,6 +9,7 @@ import type { Event } from '@/types';
 import { formatDateTime } from '@/lib/utils';
 import { StatusBadge, EventTypeBadge } from '@/components/shared/StatusBadge';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import { eventService, approvalService, reportService, rndReportService } from '@/lib/services';
 import { Button, Modal, Textarea, Alert } from '@/components/ui';
@@ -345,7 +346,30 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
               );
             })()}
 
-            {(() => {
+            {/* Report Banner for Completed Event */}
+            {event.status === 'completed' && (
+              <div className="p-5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-6 h-6 text-amber-600 shrink-0" />
+                  <div>
+                    <h3 className="font-bold text-amber-900 dark:text-amber-200 text-sm">
+                      {event.is_rnd_event ? 'R&D Report Required' : 'Post-Event Report Required'}
+                    </h3>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      This event is completed. Submit the {event.is_rnd_event ? 'R&D Report' : 'Post-Event Report'} to archive it.
+                    </p>
+                  </div>
+                </div>
+                <Link href={event.is_rnd_event ? `/club_coordinator/rnd-report?event=${event.id}` : `/club_coordinator/report?event=${event.id}`}>
+                  <Button className="bg-amber-600 text-white hover:bg-amber-700 border-0 shadow-sm shrink-0">
+                    {event.is_rnd_event ? 'Submit R&D Report' : 'Submit Report'}
+                  </Button>
+                </Link>
+              </div>
+            )}
+
+            {/* Normal Report Download (Normal events only) */}
+            {!event.is_rnd_event && (() => {
               const path = event.report_path || reportData?.generated_report_path;
               if (!path) return null;
               return (
@@ -366,7 +390,8 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
               );
             })()}
 
-            {(() => {
+            {/* R&D Report Download (R&D events only) */}
+            {event.is_rnd_event && (() => {
               const path = rndReportData?.generated_report_path;
               if (!path) return null;
               return (
@@ -443,28 +468,41 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
                     <thead className="bg-[var(--surface-subtle)] sticky top-0 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.05)] z-10 text-xs uppercase text-[var(--text-secondary)] font-semibold tracking-wider">
                       <tr>
                         <th className="px-6 py-4 border-b border-[var(--border-subtle)]">Name</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Type</th>
                         <th className="px-6 py-4 border-b border-[var(--border-subtle)]">Email</th>
                         <th className="px-6 py-4 border-b border-[var(--border-subtle)]">Phone Number</th>
-                        <th className="px-6 py-4 border-b border-[var(--border-subtle)]">School</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)]">School / Org</th>
                         <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Year</th>
-                        <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Branch</th>
+                        <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Branch / Qual</th>
                         <th className="px-6 py-4 border-b border-[var(--border-subtle)] text-center">Course</th>
                         <th className="px-6 py-4 border-b border-[var(--border-subtle)]">Registration Time</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {registrations.map((r, i) => (
-                        <tr key={r.id || i} className="hover:bg-[var(--surface-subtle)] transition-colors">
-                          <td className="px-6 py-4 text-sm font-medium text-[var(--text-primary)]">{r.name}</td>
-                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.email}</td>
-                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.phone_number || 'N/A'}</td>
-                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.department}</td>
-                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center"><span className="px-2.5 py-1 bg-[var(--surface-subtle)] text-[var(--text-primary)] rounded-md text-xs font-medium border border-[var(--border-subtle)]">{r.year}</span></td>
-                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center">{r.branch}</td>
-                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center">{r.course}</td>
-                          <td className="px-6 py-4 text-sm text-[var(--text-secondary)] whitespace-nowrap text-tabular-nums">{r.registered_at ? formatDateTime(r.registered_at.replace("T", " ").replace("Z", "")) : 'N/A'}</td>
-                        </tr>
-                      ))}
+                      {registrations.map((r, i) => {
+                        const isVisitor = r.participation_type === 'Visitor';
+                        return (
+                          <tr key={r.id || i} className="hover:bg-[var(--surface-subtle)] transition-colors">
+                            <td className="px-6 py-4 text-sm font-medium text-[var(--text-primary)]">{r.name}</td>
+                            <td className="px-6 py-4 text-sm text-center">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                                isVisitor
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                                  : 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+                              }`}>
+                                {isVisitor ? 'Visitor' : 'In-Campus'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.email}</td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.phone_number || 'N/A'}</td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">{r.department}</td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center"><span className="px-2.5 py-1 bg-[var(--surface-subtle)] text-[var(--text-primary)] rounded-md text-xs font-medium border border-[var(--border-subtle)]">{r.year}</span></td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center">{r.branch}</td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)] text-center">{r.course}</td>
+                            <td className="px-6 py-4 text-sm text-[var(--text-secondary)] whitespace-nowrap text-tabular-nums">{r.registered_at ? formatDateTime(r.registered_at.replace("T", " ").replace("Z", "")) : 'N/A'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
