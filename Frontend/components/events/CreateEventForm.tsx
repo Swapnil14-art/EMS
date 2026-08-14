@@ -613,14 +613,6 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
               <p className="text-xs text-[var(--text-muted)] mt-1 ml-1">Enable this to classify the event under the R&D framework. An additional mandatory R&D tab will appear.</p>
             </div>
 
-            {/* Outside Campus Registration Toggle */}
-            <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl border border-emerald-200 dark:border-emerald-800 mb-2">
-              <Controller name="outside_campus_registration" control={control} render={({ field }) => (
-                <Toggle checked={field.value} onChange={(val) => field.onChange(val)} label="Outside Campus Registration Accepted" />
-              )} />
-              <p className="text-xs text-[var(--text-muted)] mt-1 ml-1">Allow non-campus visitors and external participants to register for this event once approved.</p>
-            </div>
-
             <Input label="Event Title" placeholder="e.g. TechFest 2025 — Day 1" error={errors.title?.message} {...register('title')} />
             <div className="grid grid-cols-2 gap-4">
               <Controller name="event_type" control={control} render={({ field }) => (
