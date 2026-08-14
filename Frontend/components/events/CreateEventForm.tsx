@@ -102,7 +102,7 @@ const schema = z.object({
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'End date & time must be after start date & time', path: ['end_datetime'] });
     }
   }
-  if (data.registration_accepted) {
+  if (data.registration_accepted || data.outside_campus_registration) {
     if (!data.registration_start_datetime || data.registration_start_datetime.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Registration Start Date & Time is required when Registration Accepted is ON', path: ['registration_start_datetime'] });
     }
@@ -317,9 +317,11 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
     },
   });
 
+  const watchRegistrationAccepted = watch('registration_accepted');
+  const watchOutsideCampus = watch('outside_campus_registration');
+  const isRegRequired = watchRegistrationAccepted || watchOutsideCampus;
   const watchIsRnd = watch('is_rnd_event');
   const watchRndTheme = watch('rnd_activity_theme');
-  const watchRegistrationAccepted = watch('registration_accepted');
 
   const SECTIONS = [
     ...BASE_SECTIONS,
@@ -352,7 +354,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
     1: ['title', 'event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
-    2: ['start_datetime', 'end_datetime', ...(watchRegistrationAccepted ? ['registration_start_datetime', 'registration_deadline'] as (keyof FormData)[] : [])],
+    2: ['start_datetime', 'end_datetime', ...(isRegRequired ? ['registration_start_datetime', 'registration_deadline'] as (keyof FormData)[] : [])],
     3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [],
     7: watchIsRnd ? ['rnd_activity_theme', 'rnd_prescribed_activity'] : [],
     8: [],
@@ -375,13 +377,16 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       const venueTypes = data.venue_selections.map(s => s.venue_type).filter(Boolean);
       const allVenueIds = data.venue_selections.flatMap(s => s.venue_ids || []);
       
+      const regAccepted = data.registration_accepted || data.outside_campus_registration;
+      const outsideCampus = data.outside_campus_registration && regAccepted;
+
       const payloadData = { 
         ...data, 
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
-        registration_start_datetime: data.registration_accepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
-        registration_deadline: data.registration_accepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
+        registration_start_datetime: regAccepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: regAccepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -404,8 +409,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
         rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
         rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
-        outside_campus_registration: data.outside_campus_registration,
-        registration_accepted: data.registration_accepted,
+        outside_campus_registration: outsideCampus,
+        registration_accepted: regAccepted,
       };
       let id = createdId;
       if (!id) {
@@ -435,13 +440,16 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       const venueTypes = data.venue_selections.map(s => s.venue_type).filter(Boolean);
       const allVenueIds = data.venue_selections.flatMap(s => s.venue_ids || []);
 
+      const regAccepted = data.registration_accepted || data.outside_campus_registration;
+      const outsideCampus = data.outside_campus_registration && regAccepted;
+
       const payloadData = {
         ...data,
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
-        registration_start_datetime: data.registration_accepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
-        registration_deadline: data.registration_accepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
+        registration_start_datetime: regAccepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
+        registration_deadline: regAccepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: data.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -464,8 +472,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_prescribed_activity: data.is_rnd_event ? data.rnd_prescribed_activity : null,
         rnd_semester_quarter: data.is_rnd_event ? data.rnd_semester_quarter : null,
         rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
-        outside_campus_registration: data.outside_campus_registration,
-        registration_accepted: data.registration_accepted,
+        outside_campus_registration: outsideCampus,
+        registration_accepted: regAccepted,
       };
         let id = createdId;
         if (!id) {
@@ -503,13 +511,16 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       const venueTypes = bufferedData.venue_selections.map(s => s.venue_type).filter(Boolean);
       const allVenueIds = bufferedData.venue_selections.flatMap(s => s.venue_ids || []);
 
+      const regAccepted = bufferedData.registration_accepted || bufferedData.outside_campus_registration;
+      const outsideCampus = bufferedData.outside_campus_registration && regAccepted;
+
       const payloadData = {
         ...bufferedData,
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
-        registration_start_datetime: bufferedData.registration_accepted && bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
-        registration_deadline: bufferedData.registration_accepted && bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
+        registration_start_datetime: regAccepted && bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
+        registration_deadline: regAccepted && bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
         school_department: user?.department?.name || "Multiple",
         club_id: bufferedData.is_club_event ? user?.club_id : undefined,
         venue_type: venueTypes.join(', '),
@@ -532,8 +543,8 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_prescribed_activity: bufferedData.is_rnd_event ? bufferedData.rnd_prescribed_activity : null,
         rnd_semester_quarter: bufferedData.is_rnd_event ? bufferedData.rnd_semester_quarter : null,
         rnd_tentative_date: bufferedData.is_rnd_event ? bufferedData.rnd_tentative_date : null,
-        outside_campus_registration: bufferedData.outside_campus_registration,
-        registration_accepted: bufferedData.registration_accepted,
+        outside_campus_registration: outsideCampus,
+        registration_accepted: regAccepted,
       };
 
       let id = createdId;
@@ -766,29 +777,45 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
             </div>
 
             <div className="pt-4 border-t border-[var(--border-color)] space-y-4">
-              <Controller name="registration_accepted" control={control} render={({ field }) => (
-                <Toggle
-                  checked={field.value}
-                  onChange={(val) => {
-                    field.onChange(val);
-                    if (!val) {
-                      setValue('registration_start_datetime', '');
-                      setValue('registration_deadline', '');
-                    }
-                  }}
-                  label="Registration Accepted"
-                />
-              )} />
+              <div className="flex flex-col gap-4 p-4 bg-[var(--page-bg)] rounded-2xl border border-[var(--border-subtle)]">
+                <Controller name="registration_accepted" control={control} render={({ field }) => (
+                  <Toggle
+                    checked={field.value}
+                    onChange={(val) => {
+                      field.onChange(val);
+                      if (!val) {
+                        setValue('outside_campus_registration', false);
+                        setValue('registration_start_datetime', '');
+                        setValue('registration_deadline', '');
+                      }
+                    }}
+                    label="Registration Accepted"
+                  />
+                )} />
+
+                <Controller name="outside_campus_registration" control={control} render={({ field }) => (
+                  <Toggle
+                    checked={field.value}
+                    onChange={(val) => {
+                      field.onChange(val);
+                      if (val) {
+                        setValue('registration_accepted', true);
+                      }
+                    }}
+                    label="Outside Campus Registration Accepted"
+                  />
+                )} />
+              </div>
               
-              {watch('registration_accepted') && (
+              {(watch('registration_accepted') || watch('outside_campus_registration')) && (
                 <div className="space-y-4 pt-2">
                   <div>
-                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Student Registration Schedule <span className="text-[var(--text-danger)]">*</span></h3>
-                    <p className="text-xs text-[var(--text-muted)]">Specify when student registration opens and closes for this event.</p>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)]">Registration Schedule <span className="text-[var(--text-danger)]">*</span></h3>
+                    <p className="text-xs text-[var(--text-muted)]">Specify when registration opens and closes for this event.</p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Input label="Student Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} required />
-                    <Input label="Student Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} required />
+                    <Input label="Registration Start Date & Time" type="datetime-local" error={errors.registration_start_datetime?.message} {...register('registration_start_datetime')} required />
+                    <Input label="Registration End Date & Time" type="datetime-local" error={errors.registration_deadline?.message} {...register('registration_deadline')} required />
                   </div>
                 </div>
               )}

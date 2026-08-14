@@ -62,4 +62,6 @@ def take_event_snapshot(event) -> dict:
         "comments": event.comments,
         "is_sponsored": event.is_sponsored,
         "is_collaborative": event.is_collaborative,
+        "registration_accepted": event.registration_accepted,
+        "outside_campus_registration": event.outside_campus_registration,
     }

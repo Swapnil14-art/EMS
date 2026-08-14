@@ -248,65 +248,72 @@ export default function PublicEventDetailPage() {
             <div className="space-y-4">
               <div className="card p-6 sticky top-24">
                 {user?.role === 'student' && ['approved', 'ongoing'].includes(event.status) ? (
-                  <>
-                    <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">
-                      {registered ? 'You are registered!' : 'Register for this event'}
-                    </h3>
-                    <p className="text-sm text-[var(--text-muted)] mb-4">
-                      {registered
-                        ? 'You have successfully registered. Check your email for details.'
-                        : isBeforeRegStart
-                        ? `Registration opens on ${formatDateTime(event.registration_start_datetime!)}.`
-                        : isAfterRegEnd
-                        ? 'Registration deadline has passed.'
-                        : 'Join this event — it\'s free!'}
-                    </p>
-                    {registered && <CheckCircle2 className="w-10 h-10 text-[var(--status-success-text)] mb-4" />}
-                    {registered ? (
-                      <div className="space-y-2">
+                  !isRegistrationAccepted ? (
+                    <div className="text-center">
+                      <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">Registration Not Available</h3>
+                      <p className="text-sm text-[var(--text-muted)]">Registration is not accepted for this event.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">
+                        {registered ? 'You are registered!' : 'Register for this event'}
+                      </h3>
+                      <p className="text-sm text-[var(--text-muted)] mb-4">
+                        {registered
+                          ? 'You have successfully registered. Check your email for details.'
+                          : isBeforeRegStart
+                          ? `Registration opens on ${formatDateTime(event.registration_start_datetime!)}.`
+                          : isAfterRegEnd
+                          ? 'Registration deadline has passed.'
+                          : 'Join this event — it\'s free!'}
+                      </p>
+                      {registered && <CheckCircle2 className="w-10 h-10 text-[var(--status-success-text)] mb-4" />}
+                      {registered ? (
+                        <div className="space-y-2">
+                          <Button
+                            disabled
+                            variant="secondary"
+                            className="w-full justify-center opacity-80 cursor-not-allowed"
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-2 text-[var(--status-success-text)]" />
+                            Already Registered
+                          </Button>
+                          <Button
+                            variant="danger"
+                            loading={registering}
+                            onClick={handleRegister}
+                            className="w-full justify-center"
+                          >
+                            Unregister from Event
+                          </Button>
+                        </div>
+                      ) : isBeforeRegStart ? (
                         <Button
                           disabled
                           variant="secondary"
-                          className="w-full justify-center opacity-80 cursor-not-allowed"
+                          className="w-full justify-center opacity-70 cursor-not-allowed"
                         >
-                          <CheckCircle2 className="w-4 h-4 mr-2 text-[var(--status-success-text)]" />
-                          Already Registered
+                          Registration Not Open
                         </Button>
+                      ) : isAfterRegEnd ? (
                         <Button
-                          variant="danger"
-                          loading={registering}
-                          onClick={handleRegister}
+                          disabled
+                          variant="secondary"
+                          className="w-full justify-center opacity-70 cursor-not-allowed"
+                        >
+                          Registration Closed
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => router.push(`/student/events/${id}/register`)}
+                          variant="primary"
                           className="w-full justify-center"
                         >
-                          Unregister from Event
+                          Register Now
                         </Button>
-                      </div>
-                    ) : isBeforeRegStart ? (
-                      <Button
-                        disabled
-                        variant="secondary"
-                        className="w-full justify-center opacity-70 cursor-not-allowed"
-                      >
-                        Registration Not Open
-                      </Button>
-                    ) : isAfterRegEnd ? (
-                      <Button
-                        disabled
-                        variant="secondary"
-                        className="w-full justify-center opacity-70 cursor-not-allowed"
-                      >
-                        Registration Closed
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => router.push(`/student/events/${id}/register`)}
-                        variant="primary"
-                        className="w-full justify-center"
-                      >
-                        Register Now
-                      </Button>
-                    )}
-                  </>
+                      )}
+                    </>
+                  )
                 ) : !isAuthenticated ? (
                   <>
                     <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">Interested?</h3>

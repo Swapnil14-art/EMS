@@ -628,6 +628,7 @@ async def get_event(
         "rnd_prescribed_activity": event.rnd_prescribed_activity,
         "rnd_semester_quarter": event.rnd_semester_quarter,
         "rnd_tentative_date": event.rnd_tentative_date.isoformat() if event.rnd_tentative_date else None,
+        "registration_accepted": event.registration_accepted,
         "outside_campus_registration": event.outside_campus_registration,
         "registration_count": registration_count,
         "is_registered": is_registered,
@@ -675,6 +676,7 @@ async def get_event(
         for field in internal_fields:
             if hasattr(event, field):
                 data[field] = getattr(event, field)
+
 
     return data
 
@@ -730,20 +732,36 @@ async def create_event(
             err_msg = f"Venue clash detected! The venue is already booked for: {detail_str}. Please choose a different venue or time slot."
             raise HTTPException(status_code=409, detail=err_msg)
 
-        # Registration dates handling
-        reg_start = body.registration_start_datetime
-        if reg_start and reg_start.tzinfo is None:
-            reg_start = reg_start.replace(tzinfo=timezone.utc)
+        # Registration dates and toggle synchronization handling
+        outside_campus = body.outside_campus_registration
+        reg_accepted = body.registration_accepted
+        if outside_campus:
+            reg_accepted = True
+        if not reg_accepted:
+            outside_campus = False
 
-        reg_deadline = body.registration_deadline or (start_dt - timedelta(days=1))
-        if reg_deadline and reg_deadline.tzinfo is None:
-            reg_deadline = reg_deadline.replace(tzinfo=timezone.utc)
+        reg_start = None
+        reg_deadline = None
 
-        if reg_start and reg_deadline and reg_deadline < reg_start:
-            raise HTTPException(
-                status_code=400,
-                detail="Student registration end date & time cannot be earlier than start date & time"
-            )
+        if reg_accepted:
+            if not body.registration_start_datetime or not body.registration_deadline:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Registration Start Date & Time and End Date & Time are required when Registration Accepted is ON"
+                )
+            reg_start = body.registration_start_datetime
+            if reg_start.tzinfo is None:
+                reg_start = reg_start.replace(tzinfo=timezone.utc)
+
+            reg_deadline = body.registration_deadline
+            if reg_deadline.tzinfo is None:
+                reg_deadline = reg_deadline.replace(tzinfo=timezone.utc)
+
+            if reg_deadline < reg_start:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Student registration end date & time cannot be earlier than start date & time"
+                )
 
         import os
         import random
@@ -804,6 +822,8 @@ async def create_event(
             printing_details=body.printing_details,
             volunteers=body.volunteers,
             volunteers_details=body.volunteers_details,
+            outside_campus_registration=outside_campus,
+            registration_accepted=reg_accepted,
             other_requirements=body.other_requirements,
             budget=body.budget,
             comments=body.comments,
@@ -815,8 +835,6 @@ async def create_event(
             rnd_prescribed_activity=body.rnd_prescribed_activity if body.is_rnd_event else None,
             rnd_semester_quarter=body.rnd_semester_quarter if body.is_rnd_event else None,
             rnd_tentative_date=body.rnd_tentative_date if body.is_rnd_event else None,
-            outside_campus_registration=body.outside_campus_registration,
-            registration_accepted=body.registration_accepted,
         )
         db.add(event)
         await db.flush()
@@ -870,10 +888,24 @@ async def update_event(
 
         now = datetime.now(timezone.utc)
         update_data = body.model_dump(exclude_unset=True)
-        is_registration_dates_only = bool(update_data) and set(update_data.keys()).issubset({"registration_start_datetime", "registration_deadline"})
+
+        reg_config_keys = {"registration_start_datetime", "registration_deadline", "registration_accepted", "outside_campus_registration"}
+        is_registration_dates_only = bool(update_data) and set(update_data.keys()).issubset(reg_config_keys)
 
         # Special case: Editing registration schedule alone for any event (including approved/ongoing)
         if is_registration_dates_only:
+            if "outside_campus_registration" in update_data:
+                event.outside_campus_registration = body.outside_campus_registration
+                if body.outside_campus_registration:
+                    event.registration_accepted = True
+
+            if "registration_accepted" in update_data:
+                event.registration_accepted = body.registration_accepted
+                if not body.registration_accepted:
+                    event.outside_campus_registration = False
+                    event.registration_start_datetime = None
+                    event.registration_deadline = None
+
             if "registration_start_datetime" in update_data:
                 reg_s = body.registration_start_datetime
                 if reg_s and reg_s.tzinfo is None:
@@ -886,11 +918,22 @@ async def update_event(
                     reg_e = reg_e.replace(tzinfo=timezone.utc)
                 event.registration_deadline = reg_e
 
-            chk_s = event.registration_start_datetime
-            chk_e = event.registration_deadline
-            if chk_s and chk_e:
-                chk_s_utc = chk_s if chk_s.tzinfo else chk_s.replace(tzinfo=timezone.utc)
-                chk_e_utc = chk_e if chk_e.tzinfo else chk_e.replace(tzinfo=timezone.utc)
+            # Sync check
+            if event.outside_campus_registration:
+                event.registration_accepted = True
+            if not event.registration_accepted:
+                event.outside_campus_registration = False
+                event.registration_start_datetime = None
+                event.registration_deadline = None
+
+            if event.registration_accepted:
+                if not event.registration_start_datetime or not event.registration_deadline:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Registration Start Date & Time and End Date & Time are required when Registration Accepted is ON"
+                    )
+                chk_s_utc = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+                chk_e_utc = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
                 if chk_e_utc < chk_s_utc:
                     raise HTTPException(
                         status_code=400,
@@ -918,7 +961,7 @@ async def update_event(
                 status_code=400,
                 detail="After event start, only links can be edited via /links endpoints",
             )
-        
+
         # Defensive Boolean details handling inside dict
         if 'podium_setup' in update_data and not update_data['podium_setup']: update_data['podium_details'] = None
         if 'decoration' in update_data and not update_data['decoration']: update_data['decoration_details'] = None
@@ -930,41 +973,27 @@ async def update_event(
         if 'security' in update_data and not update_data['security']: update_data['security_details'] = None
         if 'printing' in update_data and not update_data['printing']: update_data['printing_details'] = None
         if 'volunteers' in update_data and not update_data['volunteers']: update_data['volunteers_details'] = None
-        
+
         for field, value in update_data.items():
             if hasattr(event, field):
                 setattr(event, field, value)
 
-        # Recompute datetimes if provided
-        if body.start_datetime:
-            start_dt = body.start_datetime
-            if start_dt.tzinfo is None:
-                start_dt = start_dt.replace(tzinfo=timezone.utc)
-            event.start_datetime = start_dt
-            
-        if body.end_datetime:
-            end_dt = body.end_datetime
-            if end_dt.tzinfo is None:
-                end_dt = end_dt.replace(tzinfo=timezone.utc)
-            event.end_datetime = end_dt
-            
-        if "registration_start_datetime" in update_data:
-            reg_s = body.registration_start_datetime
-            if reg_s and reg_s.tzinfo is None:
-                reg_s = reg_s.replace(tzinfo=timezone.utc)
-            event.registration_start_datetime = reg_s
+        # Toggle synchronization on general update
+        if event.outside_campus_registration:
+            event.registration_accepted = True
+        if not event.registration_accepted:
+            event.outside_campus_registration = False
+            event.registration_start_datetime = None
+            event.registration_deadline = None
 
-        if "registration_deadline" in update_data:
-            reg_dt = body.registration_deadline
-            if reg_dt and reg_dt.tzinfo is None:
-                reg_dt = reg_dt.replace(tzinfo=timezone.utc)
-            event.registration_deadline = reg_dt
-
-        chk_s = event.registration_start_datetime
-        chk_e = event.registration_deadline
-        if chk_s and chk_e:
-            chk_s_utc = chk_s if chk_s.tzinfo else chk_s.replace(tzinfo=timezone.utc)
-            chk_e_utc = chk_e if chk_e.tzinfo else chk_e.replace(tzinfo=timezone.utc)
+        if event.registration_accepted:
+            if not event.registration_start_datetime or not event.registration_deadline:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Registration Start Date & Time and End Date & Time are required when Registration Accepted is ON"
+                )
+            chk_s_utc = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+            chk_e_utc = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
             if chk_e_utc < chk_s_utc:
                 raise HTTPException(
                     status_code=400,

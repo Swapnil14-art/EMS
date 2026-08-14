@@ -50,6 +50,13 @@ async def register_for_event(
             detail="Registration is only open for approved or ongoing events",
         )
 
+    # Registration accepted check
+    if not event.registration_accepted:
+        raise HTTPException(
+            status_code=403,
+            detail="Registration is not accepted for this event",
+        )
+
     # Registration start time & deadline checks
     now = datetime.now(timezone.utc)
     if event.registration_start_datetime:
@@ -265,7 +272,7 @@ async def register_visitor(
         raise HTTPException(status_code=404, detail="Event not found")
 
     # Must have outside campus registration enabled
-    if not event.outside_campus_registration:
+    if not event.registration_accepted or not event.outside_campus_registration:
         raise HTTPException(
             status_code=403,
             detail="This event does not accept outside campus registrations",

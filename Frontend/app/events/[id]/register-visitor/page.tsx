@@ -120,7 +120,8 @@ export default function VisitorRegistrationPage() {
   const isBeforeRegStart = regStart ? now < regStart : false;
   const isAfterRegEnd = regEnd ? now > regEnd : false;
 
-  const isEligible = !!event.outside_campus_registration &&
+  const isEligible = !!event.registration_accepted &&
+                     !!event.outside_campus_registration &&
                      ['approved', 'ongoing'].includes(event.status) &&
                      !isBeforeRegStart &&
                      !isAfterRegEnd;
