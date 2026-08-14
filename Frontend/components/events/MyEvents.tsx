@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Eye, Trash2, Send, Edit, Upload, CheckCircle2, FileText } from 'lucide-react';
 import Link from 'next/link';
 import { eventService, reportService } from '@/lib/services';
-import { Button, Input, Tabs, Modal, Textarea, Pagination, EmptyState } from '@/components/ui';
+import { Button, Input, Tabs, Modal, Textarea, Pagination, EmptyState, Toggle } from '@/components/ui';
 import { StatusBadge, EventTypeBadge } from '@/components/shared/StatusBadge';
 import { formatDate } from '@/lib/utils';
 import type { Event } from '@/types';
@@ -32,6 +32,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
   const [regWindowEvent, setRegWindowEvent] = useState<Event | null>(null);
   const [regStart, setRegStart] = useState('');
   const [regEnd, setRegEnd] = useState('');
+  const [registrationAccepted, setRegistrationAccepted] = useState(false);
+  const [outsideCampusRegistration, setOutsideCampusRegistration] = useState(false);
   const [savingRegWindow, setSavingRegWindow] = useState(false);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   
@@ -135,23 +137,30 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
 
   const handleUpdateRegistrationWindow = async () => {
     if (!regWindowEvent) return;
+    if (registrationAccepted && (!regStart || !regEnd)) {
+      toast.error('Registration start and end date & time are required when registration is accepted');
+      return;
+    }
     if (regStart && regEnd && new Date(regEnd) < new Date(regStart)) {
       toast.error('Registration end time cannot be earlier than start time');
       return;
     }
     setSavingRegWindow(true);
     try {
-      const payload: Record<string, any> = {};
-      if (regStart) payload.registration_start_datetime = new Date(regStart).toISOString();
-      if (regEnd) payload.registration_deadline = new Date(regEnd).toISOString();
+      const payload = {
+        registration_accepted: registrationAccepted,
+        outside_campus_registration: outsideCampusRegistration,
+        registration_start_datetime: registrationAccepted && regStart ? new Date(regStart).toISOString() : null,
+        registration_deadline: registrationAccepted && regEnd ? new Date(regEnd).toISOString() : null,
+      };
 
       await eventService.update(regWindowEvent.id, payload);
-      toast.success('Registration window updated successfully');
+      toast.success('Registration updated successfully');
       setRegWindowEvent(null);
       fetchEvents();
       fetchCounts();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Failed to update registration window');
+      toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Failed to update registration');
     } finally {
       setSavingRegWindow(false);
     }
@@ -205,10 +214,12 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
                 <Button size="sm" icon={<Send className="w-4 h-4" />} onClick={() => initiateSubmit(ev)}>Submit</Button>
                 <Button variant="danger" size="sm" icon={<Trash2 className="w-4 h-4" />} onClick={() => handleDelete(ev)} />
               </>}
-              {['approved','ongoing','pending_director'].includes(ev.status) && (
+              {ev.status === 'approved' && new Date(ev.start_datetime) > new Date() && (
                 <>
                   <Button variant="secondary" size="sm" onClick={() => { 
                     setRegWindowEvent(ev); 
+                    setRegistrationAccepted(Boolean(ev.registration_accepted));
+                    setOutsideCampusRegistration(Boolean(ev.outside_campus_registration));
                     if (ev.registration_start_datetime) {
                       const d = new Date(ev.registration_start_datetime);
                       const tzOffset = d.getTimezoneOffset() * 60000;
@@ -223,7 +234,7 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
                     } else {
                       setRegEnd('');
                     }
-                  }}>Edit Registration Window</Button>
+                  }}>Edit Registration</Button>
                   <Button variant="danger" size="sm" onClick={() => { setCancelEvent(ev); setCancelReason(''); }}>Cancel</Button>
                 </>
               )}
@@ -265,19 +276,40 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
       />
 
       <Modal open={!!regWindowEvent} onClose={() => { setRegWindowEvent(null); }}
-        title="Edit Registration Window"
+        title="Edit Registration"
         footer={<>
           <Button variant="secondary" onClick={() => setRegWindowEvent(null)}>Back</Button>
-          <Button loading={savingRegWindow} onClick={handleUpdateRegistrationWindow}>Save Schedule</Button>
+          <Button loading={savingRegWindow} onClick={handleUpdateRegistrationWindow}>Save Registration</Button>
         </>}>
         <div className="space-y-4">
-          <p className="text-xs text-[var(--text-muted)]">
-            Configure the student registration start and end date & time. Updating the registration schedule will be saved directly and will not reset approval status.
-          </p>
-          <Input type="datetime-local" label="Student Registration Start Date & Time" 
-            value={regStart} onChange={e => setRegStart(e.target.value)} />
-          <Input type="datetime-local" label="Student Registration End Date & Time" 
-            value={regEnd} onChange={e => setRegEnd(e.target.value)} />
+          <Toggle
+            checked={registrationAccepted}
+            onChange={(value) => {
+              setRegistrationAccepted(value);
+              if (!value) {
+                setOutsideCampusRegistration(false);
+                setRegStart('');
+                setRegEnd('');
+              }
+            }}
+            label="Registration Accepted"
+          />
+          <Toggle
+            checked={outsideCampusRegistration}
+            onChange={(value) => {
+              setOutsideCampusRegistration(value);
+              if (value) setRegistrationAccepted(true);
+            }}
+            label="Outside Campus Registration Accepted"
+          />
+          {registrationAccepted && (
+            <>
+              <Input type="datetime-local" label="Registration Start Date & Time"
+                value={regStart} onChange={e => setRegStart(e.target.value)} required />
+              <Input type="datetime-local" label="Registration End Date & Time"
+                value={regEnd} onChange={e => setRegEnd(e.target.value)} required />
+            </>
+          )}
         </div>
       </Modal>
 

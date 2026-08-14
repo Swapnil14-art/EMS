@@ -361,11 +361,15 @@ async def list_events(
                 Event.start_datetime <= now,
                 Event.end_datetime >= now,
             )
-        elif status in ("past", "archived"):
+        elif status == "past":
             query = query.where(
-                Event.status.in_(["approved", "ongoing", "completed", "archived"]),
-                Event.end_datetime < now,
+                or_(
+                    Event.status.in_(["completed", "archived"]),
+                    and_(Event.status.in_(["approved", "ongoing"]), Event.end_datetime < now)
+                )
             )
+        elif status == "archived":
+            query = query.where(Event.status == "archived")
         else:
             if "," in status:
                 status_list = [s.strip() for s in status.split(",") if s.strip()]

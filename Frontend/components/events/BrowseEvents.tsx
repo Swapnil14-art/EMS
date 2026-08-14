@@ -17,10 +17,15 @@ const COORDINATOR_STATUS_TABS = [
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'ongoing', label: 'Ongoing' },
   { value: 'past', label: 'Past' },
-  { value: 'pending_associate_dean,pending_director,pending_coordinator_parallel', label: 'Pending' },
+  { value: 'pending_associate_dean,pending_director,pending_coordinator_parallel,suggested_changes', label: 'Pending' },
+  { value: 'pending_coordinator_parallel', label: 'Parallel Coordinator Pending' },
+  { value: 'pending_associate_dean', label: 'Dean Pending' },
+  { value: 'pending_director', label: 'Director Pending' },
   { value: 'draft', label: 'Draft' },
+  { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'archived', label: 'Archived' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 const RND_FILTER_OPTIONS = [
@@ -35,13 +40,23 @@ interface BrowseEventsProps { hideHeader?: boolean; title?: string; subtitle?: s
 
 export function BrowseEvents({ hideHeader, title = 'Browse Events', subtitle = "Discover what's happening on campus" }: BrowseEventsProps) {
   const { user } = useAuthStore();
-  const isCoordinator = user?.role === 'club_coordinator';
-  const statusTabs = isCoordinator ? COORDINATOR_STATUS_TABS : DEFAULT_STATUS_TABS;
+  const isCoordinatorOrStaff = Boolean(user?.role && ['club_coordinator', 'associate_dean', 'director', 'super_admin'].includes(user.role));
+  const statusTabs = isCoordinatorOrStaff ? COORDINATOR_STATUS_TABS : DEFAULT_STATUS_TABS;
 
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState(isCoordinator ? '' : 'upcoming');
+  const [tab, setTab] = useState(isCoordinatorOrStaff ? '' : 'upcoming');
+  const [hasInitializedTab, setHasInitializedTab] = useState(false);
   const [search, setSearch] = useState('');
   const [rndFilter, setRndFilter] = useState('all');
+
+  useEffect(() => {
+    if (user && !hasInitializedTab) {
+      if (['club_coordinator', 'associate_dean', 'director', 'super_admin'].includes(user.role)) {
+        setTab('');
+      }
+      setHasInitializedTab(true);
+    }
+  }, [user, hasInitializedTab]);
 
   const debouncedSearch = useDebouncedValue(search);
 
@@ -59,7 +74,7 @@ export function BrowseEvents({ hideHeader, title = 'Browse Events', subtitle = "
 
   useEffect(() => setPage(1), [tab, debouncedSearch, rndFilter]);
 
-  const tabsToRender = isCoordinator
+  const tabsToRender = isCoordinatorOrStaff
     ? statusTabs
     : statusTabs.map(item => ({ ...item, label: `${item.label} (${defaultCounts[item.value as keyof typeof defaultCounts] ?? 0})` }));
 
