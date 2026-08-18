@@ -14,7 +14,7 @@ class EventRndReport(Base):
 
     # Core report fields
     event_summary = Column(Text, nullable=False)
-    actual_budget = Column(Numeric(10, 2), nullable=False)
+    actual_budget = Column(Numeric(20, 2), nullable=False)
     outcomes = Column(Text, nullable=False)
     issues = Column(Text, nullable=True)
     feedback = Column(Text, nullable=True)
@@ -33,8 +33,8 @@ class EventRndReport(Base):
     program_type = Column(String(100), nullable=True)
 
     # Objective and learning benefit
-    objective = Column(String(200), nullable=True)
-    learning_benefit = Column(String(300), nullable=True)
+    objective = Column(Text, nullable=True)
+    learning_benefit = Column(Text, nullable=True)
 
     # Guest speakers
     guest_speakers = Column(JSON, nullable=True)

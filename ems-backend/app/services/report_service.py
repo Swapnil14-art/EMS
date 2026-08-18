@@ -23,6 +23,36 @@ from app.config import settings
 TEMPLATE_DOCX = os.path.join(os.path.dirname(__file__), "..", "templates", "report_template.docx")
 
 
+def _resolve_path(path_or_url: str) -> str:
+    """
+    Convert a URL-relative path (e.g. '/uploads/events/2/report/photos/abc.jpg')
+    to a filesystem path (e.g. 'storage/events/2/report/photos/abc.jpg').
+    If the path is already a filesystem path, return it as-is.
+    """
+    if not path_or_url:
+        return path_or_url
+    p = path_or_url.lstrip("/")
+    if p.startswith("uploads/"):
+        p = p[len("uploads/"):]
+    fs_path = os.path.join(settings.STORAGE_ROOT, p)
+    if os.path.exists(fs_path):
+        return fs_path
+    # Fallback: maybe it's already a direct filesystem path
+    if os.path.exists(path_or_url):
+        return path_or_url
+    return fs_path
+
+
+def _safe_rel_attr(obj, rel_name, attr_name, default="N/A"):
+    try:
+        rel = getattr(obj, rel_name, None)
+        if rel is not None:
+            return getattr(rel, attr_name, default) or default
+    except Exception:
+        pass
+    return default
+
+
 def _copy_header_footer_from_template(target_doc: Document, template_path: str):
     """
     Copy header and footer XML (including images) from the template docx
@@ -45,15 +75,25 @@ def _add_bold_label_value(doc: Document, label: str, value: str):
 def _add_section_heading(doc: Document, text: str):
     """Add a styled section heading."""
     p = doc.add_paragraph()
-    p.style = doc.styles["Heading 2"]
+    try:
+        p.style = doc.styles["Heading 2"]
+    except Exception:
+        pass
     run = p.add_run(text)
+    run.bold = True
+    run.font.size = Pt(13)
     return p
 
 
 def _add_subsection_heading(doc: Document, text: str):
     p = doc.add_paragraph()
-    p.style = doc.styles["Heading 3"]
-    p.add_run(text)
+    try:
+        p.style = doc.styles["Heading 3"]
+    except Exception:
+        pass
+    run = p.add_run(text)
+    run.bold = True
+    run.font.size = Pt(11.5)
     return p
 
 
@@ -108,12 +148,16 @@ def generate_event_report(event: Event, report: EventReport) -> str:
 
     # ── PAGE TITLE ──────────────────────────────────────────────────────────
     title = doc.add_paragraph()
+    title.paragraph_format.space_before = Pt(36)
+    title.paragraph_format.space_after = Pt(6)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = title.add_run("Report on")
     run.bold = True
     run.font.size = Pt(14)
 
     subtitle = doc.add_paragraph()
+    subtitle.paragraph_format.space_before = Pt(0)
+    subtitle.paragraph_format.space_after = Pt(18)
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     event_title_text = f'"{event.title}"'
     run2 = subtitle.add_run(event_title_text)
@@ -146,7 +190,8 @@ def generate_event_report(event: Event, report: EventReport) -> str:
     doc.add_paragraph()
 
     # ── VENUE & DATES ────────────────────────────────────────────────────────
-    _add_bold_label_value(doc, "Venue: ", event.venue_custom or (event.venue.name if event.venue else "N/A"))
+    venue_str = event.venue_custom or _safe_rel_attr(event, "venue", "name", "N/A")
+    _add_bold_label_value(doc, "Venue: ", venue_str)
     _add_bold_label_value(doc, "Start Date: ", event.start_datetime.strftime("%d %B %Y"))
     _add_bold_label_value(doc, "End Date: ", event.end_datetime.strftime("%d %B %Y"))
     _add_bold_label_value(doc, "Time: ", f"{event.start_datetime.strftime('%I:%M %p')} – {event.end_datetime.strftime('%I:%M %p')}")
@@ -157,7 +202,8 @@ def generate_event_report(event: Event, report: EventReport) -> str:
     )
     _add_bold_label_value(doc, "Duration (hrs): ", str(duration_hrs))
     _add_bold_label_value(doc, "Department: ", event.school_department or "N/A")
-    _add_bold_label_value(doc, "Organizing Club: ", event.club.name if event.club else "Non-Club Event")
+    club_str = _safe_rel_attr(event, "club", "name", "Non-Club Event")
+    _add_bold_label_value(doc, "Organizing Club: ", club_str)
     doc.add_paragraph()
 
     # ── SOCIAL MEDIA LINKS ────────────────────────────────────────────────────
@@ -255,27 +301,29 @@ def generate_event_report(event: Event, report: EventReport) -> str:
         _add_bold_label_value(doc, "Attendance Document: ", os.path.basename(report.attendance_doc_path))
 
     # Flier (1 compulsory)
-    if report.flier_path and os.path.exists(report.flier_path):
+    flier_fs = _resolve_path(report.flier_path) if report.flier_path else None
+    if flier_fs and os.path.exists(flier_fs):
         _add_subsection_heading(doc, "Event Flier")
         try:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
             if preserve_ratio:
-                with PILImage.open(report.flier_path) as img:
+                with PILImage.open(flier_fs) as img:
                     w_px, h_px = img.size
                 w_in = w_px / 96.0
                 h_in = h_px / 96.0
-                max_w = 4.0
-                max_h = 3.0
+                max_w = 4.5
+                max_h = 3.5
                 if w_in > max_w or h_in > max_h:
                     ratio = min(max_w / w_in, max_h / h_in)
                     w_in = w_in * ratio
                     h_in = h_in * ratio
-                doc.add_picture(report.flier_path, width=Inches(w_in), height=Inches(h_in))
+                run.add_picture(flier_fs, width=Inches(w_in), height=Inches(h_in))
             else:
-                doc.add_picture(report.flier_path, width=Inches(4.0), height=Inches(3.0))
-            fp = doc.add_paragraph(os.path.basename(report.flier_path))
-            fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run.add_picture(flier_fs, width=Inches(4.5), height=Inches(3.5))
         except Exception:
-            doc.add_paragraph(f"Flier: {os.path.basename(report.flier_path)}")
+            pass
 
     # Event photos (4–8, embed up to 8)
     photo_dir = os.path.join(settings.STORAGE_ROOT, "events", str(event.id), "report", "photos")
@@ -285,35 +333,29 @@ def generate_event_report(event: Event, report: EventReport) -> str:
             if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp"))
         ])
         if photos:
-            _add_subsection_heading(doc, "Event Photos")
+            _add_subsection_heading(doc, f"Event Photos ({len(photos[:8])} photographs)")
             for photo in photos[:8]:
                 photo_path = os.path.join(photo_dir, photo)
                 try:
+                    p = doc.add_paragraph()
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = p.add_run()
                     if preserve_ratio:
                         with PILImage.open(photo_path) as img:
                             w_px, h_px = img.size
                         w_in = w_px / 96.0
                         h_in = h_px / 96.0
-                        max_w = 3.0
-                        max_h = 2.0
+                        max_w = 4.5
+                        max_h = 3.2
                         if w_in > max_w or h_in > max_h:
                             ratio = min(max_w / w_in, max_h / h_in)
                             w_in = w_in * ratio
                             h_in = h_in * ratio
-                        doc.add_picture(photo_path, width=Inches(w_in), height=Inches(h_in))
+                        run.add_picture(photo_path, width=Inches(w_in), height=Inches(h_in))
                     else:
-                        doc.add_picture(photo_path, width=Inches(3.0), height=Inches(2.0))
-                    pp = doc.add_paragraph(photo)
-                    pp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        run.add_picture(photo_path, width=Inches(4.5), height=Inches(3.2))
                 except Exception:
-                    doc.add_paragraph(f"Photo: {photo}")
-
-    # ── FOOTER NOTE ────────────────────────────────────────────────────────────
-    doc.add_paragraph()
-    footer_note = doc.add_paragraph(
-        f"Report generated on {datetime.now().strftime('%d %B %Y at %I:%M %p')}"
-    )
-    footer_note.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                    pass
 
     # ── SAVE ───────────────────────────────────────────────────────────────────
     report_dir = os.path.join(settings.STORAGE_ROOT, "events", str(event.id), "report")
@@ -327,7 +369,7 @@ def generate_event_report(event: Event, report: EventReport) -> str:
     if not template_path:
         _try_inject_header_footer(output_path)
 
-    return output_path
+    return f"/uploads/events/{event.id}/report/generated_report.docx"
 
 
 def _try_inject_header_footer(docx_path: str):

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { FileText, Upload, CheckCircle2, Sparkles, ChevronDown, Download } from 'lucide-react';
-import { eventService, rndReportService } from '@/lib/services';
+import { eventService, rndReportService, fileService } from '@/lib/services';
 import { Select, Button, Alert } from '@/components/ui';
 import { formatDate } from '@/lib/utils';
 import type { Event } from '@/types';
@@ -108,6 +108,9 @@ export default function ClubCoordinatorRnDReportPage() {
     setUploaded(true);
     setShowGenerator(false);
     fetchEvents();
+    if (selectedId) {
+      fetchReport(selectedId);
+    }
   };
 
   return (
@@ -189,9 +192,9 @@ export default function ClubCoordinatorRnDReportPage() {
               </div>
 
               <div className="mb-4">
-                {(reportData?.generated_report_path || uploaded) && (
+                {(reportData?.generated_report_path || uploaded || selectedId) && (
                   <a 
-                    href={`/api/admin/files/${reportData?.generated_report_path?.replace(/^\/+/, '') || ''}`} 
+                    href={reportData?.generated_report_path ? fileService.getFileUrl(reportData.generated_report_path) : (selectedId ? `/api/rnd-reports/${selectedId}/generate` : '#')} 
                     target="_blank" 
                     rel="noopener noreferrer" 
                     className="btn-secondary gap-2 w-full justify-center h-11"
@@ -268,7 +271,7 @@ export default function ClubCoordinatorRnDReportPage() {
               {reportFilePath && (
                 <div className="mb-4">
                   <a
-                    href={`/api/admin/files/${reportFilePath.replace(/^\/+/, '')}`}
+                    href={fileService.getFileUrl(reportFilePath)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn-secondary gap-2 w-full justify-center h-11"
