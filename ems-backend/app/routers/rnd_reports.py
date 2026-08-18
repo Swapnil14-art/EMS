@@ -17,6 +17,18 @@ from app.utils.additional_perms import has_perm
 
 router = APIRouter()
 
+
+def _resolve_to_fs(path_or_url: str) -> str:
+    """Convert a URL-relative path to a filesystem path."""
+    if not path_or_url:
+        return path_or_url
+    p = path_or_url.lstrip("/")
+    if p.startswith("uploads/"):
+        p = p[len("uploads/"):]
+    if p.startswith("storage/"):
+        p = p[len("storage/"):]
+    return os.path.join(settings.STORAGE_ROOT, p)
+
 RND_WRITE_ROLES = {"club_coordinator"}
 RND_READ_ROLES  = {"club_coordinator", "super_admin", "associate_dean", "director"}
 
@@ -121,12 +133,13 @@ async def submit_rnd_report(
 
     await db.flush()
 
+    from app.services.rnd_report_service import generate_rnd_report
+    path = generate_rnd_report(event, report)
+    report.generated_report_path = path
+
     event.status = "archived"
     await db.commit()
     await db.refresh(report)
-
-    from app.tasks.rnd_report_tasks import generate_rnd_report_task
-    generate_rnd_report_task.delay(event_id, report.id)
 
     return report
 
@@ -233,7 +246,8 @@ async def download_rnd_report(
     if not report:
         raise HTTPException(status_code=404, detail="No RnD report found for this event")
 
-    if not report.generated_report_path or not os.path.exists(report.generated_report_path):
+    fs_path = _resolve_to_fs(report.generated_report_path) if report.generated_report_path else None
+    if not fs_path or not os.path.exists(fs_path):
         event = await db.get(
             Event, event_id,
             options=[
@@ -249,9 +263,10 @@ async def download_rnd_report(
         path = generate_rnd_report(event, report)
         report.generated_report_path = path
         await db.commit()
+        fs_path = _resolve_to_fs(path)
 
     return FileResponse(
-        path=report.generated_report_path,
+        path=fs_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=f"event_{event_id}_rnd_report.docx",
     )

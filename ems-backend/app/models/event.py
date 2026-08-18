@@ -76,7 +76,7 @@ class Event(Base):
 
     # Section G — Documents/Media
     poster_path = Column(Text, nullable=True)
-    budget = Column(Numeric(10, 2), nullable=False)
+    budget = Column(Numeric(20, 2), nullable=False)
     comments = Column(Text, nullable=True)
     participant_doc_path = Column(Text, nullable=True)
 

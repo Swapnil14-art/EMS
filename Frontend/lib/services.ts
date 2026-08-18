@@ -1,4 +1,4 @@
-import api from '@/lib/api';
+import api, { getAccessToken } from '@/lib/api';
 import {
   mapUserFromApi,
   mapLoginResponse,
@@ -816,7 +816,11 @@ export const notificationService = {
 
 export const fileService = {
   getFileUrl: (filePath: string) => {
-    return `/api/admin/files/${filePath}`;
+    const cleanPath = (filePath || '').replace(/^\/+/, '');
+    const token = getAccessToken();
+    return token
+      ? `/api/admin/files/${cleanPath}?token=${encodeURIComponent(token)}`
+      : `/api/admin/files/${cleanPath}`;
   },
 };
 

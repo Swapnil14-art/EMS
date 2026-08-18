@@ -1,26 +1,42 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from jose import JWTError
+from typing import Optional
 
 from app.database import get_db
 from app.auth.jwt_handler import decode_access_token
 from app.models.user import User
 from app.models.system_config import SystemSettings
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Validates Bearer JWT and returns the current User object."""
-    token = credentials.credentials
+    """Validates Bearer JWT or query param/cookie and returns the current User object."""
+    raw_token = None
+    if credentials:
+        raw_token = credentials.credentials
+    elif request.query_params.get("token"):
+        raw_token = request.query_params.get("token")
+    elif request.cookies.get("access_token"):
+        raw_token = request.cookies.get("access_token")
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(raw_token)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -45,14 +61,23 @@ async def get_current_user(
 bearer_scheme_optional = HTTPBearer(auto_error=False)
 
 async def get_optional_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme_optional),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    if not credentials:
+    raw_token = None
+    if credentials:
+        raw_token = credentials.credentials
+    elif request.query_params.get("token"):
+        raw_token = request.query_params.get("token")
+    elif request.cookies.get("access_token"):
+        raw_token = request.cookies.get("access_token")
+
+    if not raw_token:
         payload = {}
     else:
         try:
-            payload = decode_access_token(credentials.credentials)
+            payload = decode_access_token(raw_token)
         except JWTError:
             payload = {}
 
