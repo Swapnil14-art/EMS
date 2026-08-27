@@ -542,12 +542,12 @@ export default function ReportGenerator({ event, onComplete, isRnD = false }: Re
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: isRnD ? 'RnD REPORT ON' : 'REPORT ON', bold: true, size: 24, font: 'Times New Roman' })],
-        spacing: { before: 200, after: 60 },
+        spacing: { before: 520, after: 100 },
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: `"${event.title}"`, bold: true, size: 24, font: 'Times New Roman' })],
-        spacing: { after: 120 },
+        spacing: { after: 180 },
       }),
 
       spacer(),
@@ -941,19 +941,19 @@ export default function ReportGenerator({ event, onComplete, isRnD = false }: Re
       </SectionCard>
 
       {/* Auto-filled event details */}
-      <div className="p-5 rounded-2xl bg-gradient-to-br from-[var(--status-info-text)] to-[var(--status-info-text)] border border-[var(--status-info-text)]">
-        <h3 className="text-sm font-display font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-[var(--status-info-text)]" />
-          Event Details
-          <span className="text-xs font-normal text-[var(--text-muted)]">(auto-filled)</span>
+      <div className="p-5 rounded-2xl bg-slate-50 border border-slate-300 shadow-sm">
+        <h3 className="text-sm font-display font-bold text-black mb-3 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-blue-600" />
+          <span className="text-black font-bold">Event Details</span>
+          <span className="text-xs font-semibold text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md">(auto-filled)</span>
         </h3>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-          <div><span className="font-medium text-[var(--text-secondary)]">Title:</span> <span className="text-[var(--text-primary)]">{event.title}</span></div>
-          <div><span className="font-medium text-[var(--text-secondary)]">Type:</span> <span className="text-[var(--text-primary)] capitalize">{event.event_type}</span></div>
-          <div><span className="font-medium text-[var(--text-secondary)]">Start:</span> <span className="text-[var(--text-primary)]">{formatDateTime(event.start_datetime)}</span></div>
-          <div><span className="font-medium text-[var(--text-secondary)]">End:</span> <span className="text-[var(--text-primary)]">{formatDateTime(event.end_datetime)}</span></div>
-          <div><span className="font-medium text-[var(--text-secondary)]">Venue:</span> <span className="text-[var(--text-primary)]">{event.venue?.name || event.venue_custom || '—'}</span></div>
-          <div><span className="font-medium text-[var(--text-secondary)]">Dept:</span> <span className="text-[var(--text-primary)]">{event.school_department || '—'}</span></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2.5 text-sm">
+          <div><span className="font-bold text-black">Title:</span> <span className="text-black ml-1 font-semibold">{event.title}</span></div>
+          <div><span className="font-bold text-black">Type:</span> <span className="text-black ml-1 capitalize font-semibold">{event.event_type}</span></div>
+          <div><span className="font-bold text-black">Start:</span> <span className="text-black ml-1 font-semibold">{formatDateTime(event.start_datetime)}</span></div>
+          <div><span className="font-bold text-black">End:</span> <span className="text-black ml-1 font-semibold">{formatDateTime(event.end_datetime)}</span></div>
+          <div><span className="font-bold text-black">Venue:</span> <span className="text-black ml-1 font-semibold">{event.venue?.name || event.venue_custom || '—'}</span></div>
+          <div><span className="font-bold text-black">Dept:</span> <span className="text-black ml-1 font-semibold">{event.school_department || '—'}</span></div>
         </div>
       </div>
 
@@ -1381,9 +1381,9 @@ export default function ReportGenerator({ event, onComplete, isRnD = false }: Re
               <img src={LOGO_PATH_RIGHT} alt="ICC Logo" className="w-12 h-6 object-contain shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             </div>
 
-            {/* Title */}
-            <div className="text-center py-4">
-              <p className="font-bold text-lg text-black font-serif">REPORT ON</p>
+            {/* Title with generous vertical padding after header */}
+            <div className="text-center pt-8 pb-6">
+              <p className="font-bold text-lg text-black font-serif mb-1">REPORT ON</p>
               <p className="font-bold text-base text-black font-serif">"{event.title}"</p>
             </div>
 

@@ -17,6 +17,18 @@ from app.utils.additional_perms import has_perm
 
 router = APIRouter()
 
+
+def _resolve_to_fs(path_or_url: str) -> str:
+    """Convert a URL-relative path to a filesystem path."""
+    if not path_or_url:
+        return path_or_url
+    p = path_or_url.lstrip("/")
+    if p.startswith("uploads/"):
+        p = p[len("uploads/"):]
+    if p.startswith("storage/"):
+        p = p[len("storage/"):]
+    return os.path.join(settings.STORAGE_ROOT, p)
+
 REPORT_WRITE_ROLES = {"club_coordinator"}
 REPORT_READ_ROLES  = {"club_coordinator", "super_admin", "associate_dean", "director"}
 
@@ -119,12 +131,13 @@ async def submit_report(
 
     await db.flush()
 
+    from app.services.report_service import generate_event_report
+    path = generate_event_report(event, report)
+    report.generated_report_path = path
+
     event.status = "archived"
     await db.commit()
     await db.refresh(report)
-
-    from app.tasks.report_tasks import generate_report_task
-    generate_report_task.delay(event_id, report.id)
 
     return report
 
@@ -231,7 +244,8 @@ async def download_report(
     if not report:
         raise HTTPException(status_code=404, detail="No report found for this event")
 
-    if not report.generated_report_path or not os.path.exists(report.generated_report_path):
+    fs_path = _resolve_to_fs(report.generated_report_path) if report.generated_report_path else None
+    if not fs_path or not os.path.exists(fs_path):
         event = await db.get(
             Event, event_id,
             options=[
@@ -247,9 +261,10 @@ async def download_report(
         path = generate_event_report(event, report)
         report.generated_report_path = path
         await db.commit()
+        fs_path = _resolve_to_fs(path)
 
     return FileResponse(
-        path=report.generated_report_path,
+        path=fs_path,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         filename=f"event_{event_id}_report.docx",
     )
