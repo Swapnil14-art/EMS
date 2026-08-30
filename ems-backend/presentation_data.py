@@ -331,8 +331,8 @@ def seed():
         year = NOW.year
         # Event A: Aug 20, 09:00 – 17:00 IST (UTC+5:30)
         ist_offset = timedelta(hours=5, minutes=30)
-        ev_a_start = datetime(year, 8, 20, 9, 0, 0, tzinfo=timezone(ist_offset))
-        ev_a_end   = datetime(year, 8, 20, 17, 0, 0, tzinfo=timezone(ist_offset))
+        ev_a_start = datetime(year, 8, 25, 9, 0, 0, tzinfo=timezone(ist_offset))
+        ev_a_end   = datetime(year, 8, 28, 17, 0, 0, tzinfo=timezone(ist_offset))
         # Registration window: TODAY – 7 days ago  to  30 days from now (window is OPEN)
         reg_start  = NOW - timedelta(days=7)
         reg_end    = NOW + timedelta(days=30)
@@ -383,10 +383,12 @@ def seed():
                 created_by=coord1.id,
                 responsible_coordinator_id=coord1.id,
                 current_approval_step=4,
+                poster_path="/login-bg.jpg",
             )
             db.add(event_a); db.flush()
             print(f"  + Event A id={event_a.id}")
         else:
+            event_a.poster_path = "/login-bg.jpg"
             print(f"  · Event A exists id={event_a.id}")
 
         # Attach venue to event_venues table as well
