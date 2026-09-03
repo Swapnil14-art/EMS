@@ -139,6 +139,8 @@ export interface EventApproval {
   role_at_approval: string;
   sequence_order: number;
   status: 'pending' | 'approved' | 'rejected' | 'suggested_changes';
+  /** Raw status field returned by the approval-history API. */
+  action?: 'pending' | 'approved' | 'rejected' | 'suggested_changes';
   remarks?: string;
   venue_clash_override: boolean;
   venue_clash_override_reason?: string;

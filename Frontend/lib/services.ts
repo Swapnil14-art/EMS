@@ -517,7 +517,11 @@ export const approvalService = {
   // GET /approvals/{event_id}/history — full approval chain for an event
   getHistory: async (eventId: number): Promise<EventApproval[]> => {
     const res = await api.get(`/approvals/${eventId}/history`);
-    return Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    const history = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    return history.map((item: EventApproval) => ({
+      ...item,
+      status: item.action || item.status,
+    }));
   },
 
   // Fallback for all history if needed (admin/coordinator views)
