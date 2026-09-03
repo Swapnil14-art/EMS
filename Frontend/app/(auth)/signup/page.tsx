@@ -10,7 +10,14 @@ import { authService, systemService } from '@/lib/services';
 import { Button, Input, Alert } from '@/components/ui';
 
 const schema = z.object({
-  email: z.string().email('Enter a valid email').endsWith('@nmims.in', 'Must be your official @nmims.in email'),
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Enter a valid email')
+    .refine(
+      (val) => val.toLowerCase().endsWith('@nmims.in') || val.toLowerCase().endsWith('@nmims.edu'),
+      { message: 'Email must contain @nmims.in or @nmims.edu.' }
+    ),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -22,7 +29,7 @@ export default function RegisterPage() {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    mode: 'onChange',
+    mode: 'onSubmit',
   });
 
   // Check if signup is disabled via public config (no auth needed)
@@ -128,7 +135,6 @@ export default function RegisterPage() {
             <>
               <div className="mb-6">
                 <h2 className="font-display font-bold text-[var(--text-primary)] text-3xl">Create Account</h2>
-                <p className="text-[var(--text-secondary)] mt-1">Student registration using @nmims.in email</p>
               </div>
 
               {apiError && <Alert type="error" className="mb-5"><span>{apiError}</span></Alert>}

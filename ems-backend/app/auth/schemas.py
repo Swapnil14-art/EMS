@@ -8,8 +8,8 @@ class SignupRequest(BaseModel):
     @field_validator("email")
     def validate_nmims_domain(cls, v: str):
         domain = v.split("@")[-1].lower()
-        if not domain.startswith("nmims.") and domain not in ["nmims.in", "nmims.edu"]:
-            raise ValueError("Email must belong to the @nmims.* domain.")
+        if domain not in ["nmims.in", "nmims.edu"]:
+            raise ValueError("Email must contain @nmims.in or @nmims.edu.")
         return v.lower()
 
 

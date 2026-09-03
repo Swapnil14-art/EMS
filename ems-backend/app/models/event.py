@@ -26,6 +26,7 @@ class Event(Base):
     is_sponsored = Column(Boolean, nullable=False, default=False)
     custom_approval_chain = Column(JSONB, nullable=True)
     departments_involved = Column(JSONB, nullable=True)  # List of strings
+    objectives = Column(JSONB, nullable=True)  # List of strings
 
     # Section B — Dates/Times
     start_datetime = Column(TIMESTAMP(timezone=True), nullable=False)

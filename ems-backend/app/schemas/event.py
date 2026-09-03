@@ -26,6 +26,7 @@ class EventCreate(BaseModel):
     collaborating_club_ids: Optional[List[int]] = None
     is_sponsored: bool = False
     sponsor_name: Optional[str] = None
+    objectives: Optional[List[str]] = None
     start_datetime: datetime
     end_datetime: datetime
     registration_start_datetime: Optional[datetime] = None
@@ -87,8 +88,10 @@ class EventUpdate(BaseModel):
     event_incharge_contact: Optional[str] = None
     target_audience: Optional[str] = None
     is_collaborative: Optional[bool] = None
-    is_sponsored: Optional[bool] = None
+    collaborating_club_ids: Optional[List[int]] = None
+    is_sponsored: bool = False
     sponsor_name: Optional[str] = None
+    objectives: Optional[List[str]] = None
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
     registration_start_datetime: Optional[datetime] = None
@@ -219,6 +222,7 @@ class EventOut(BaseModel):
     club_id: Optional[int]
     is_collaborative: bool
     is_sponsored: bool
+    objectives: Optional[List[str]] = []
     start_datetime: datetime
     end_datetime: datetime
     registration_start_datetime: Optional[datetime]

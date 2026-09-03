@@ -620,6 +620,7 @@ async def get_event(
         "venue_custom": event.venue_custom,
         "venue_type": event.venue_type,
         "departments_involved": event.departments_involved or [],
+        "objectives": event.objectives or [],
         "seating_arrangement": event.seating_arrangement,
         "budget": event.budget,
         "budget_breakdown": event.budget_breakdown,
@@ -834,6 +835,7 @@ async def create_event(
             venue_custom=body.venue_custom,
             venue_type=body.venue_type,
             departments_involved=body.departments_involved,
+            objectives=[o.strip() for o in (body.objectives or []) if o and o.strip()] if body.objectives else None,
             seating_arrangement=body.seating_arrangement,
             seating_other_detail=body.seating_other_detail,
             tables_required=body.tables_required,
@@ -1095,19 +1097,35 @@ async def update_event(
             err_msg = f"Venue clash detected! The venue is already booked for: {detail_str}. Please choose a different venue or time slot."
             raise HTTPException(status_code=409, detail=err_msg)
 
+        if 'objectives' in update_data:
+            event.objectives = [o.strip() for o in (body.objectives or []) if o and o.strip()] if body.objectives else None
+
         if body.venue_ids is not None:
             from sqlalchemy import delete
             await db.execute(delete(EventVenue).where(EventVenue.event_id == event.id))
             for vid in body.venue_ids:
                 db.add(EventVenue(event_id=event.id, venue_id=vid))
 
+        if body.collaborating_club_ids is not None:
+            from sqlalchemy import delete
+            await db.execute(delete(EventCollaboratingClub).where(EventCollaboratingClub.event_id == event.id))
+            if event.is_collaborative:
+                for cid in body.collaborating_club_ids:
+                    db.add(EventCollaboratingClub(event_id=event.id, club_id=cid))
+
+        if body.is_sponsored and body.sponsor_name:
+            if event.sponsors:
+                event.sponsors[0].name = body.sponsor_name
+            else:
+                db.add(EventSponsor(event_id=event.id, name=body.sponsor_name))
+
         # Status reset logic
         is_collab = event.is_collaborative and event.collaborating_clubs
-        if event.status == "draft":
-            pass  # stays draft
+        if event.status in ["draft", "suggested_changes"]:
+            pass  # stays draft / suggested_changes when saving changes
         elif event.status in [
             "pending_associate_dean", "pending_coordinator_parallel",
-            "pending_director", "suggested_changes",
+            "pending_director",
         ]:
             # For collaborative events, restart from coordinator parallel approval
             if is_collab:
@@ -1217,7 +1235,11 @@ async def submit_event(
             if event.created_by != current_user.id and current_user.role != "super_admin":
                 raise HTTPException(status_code=403, detail="Only the event creator can submit")
 
-        allowed_statuses = ["draft", "suggested_changes"]
+        allowed_statuses = [
+            "draft", "suggested_changes",
+            "pending_associate_dean", "pending_coordinator_parallel",
+            "pending_dean", "pending_director",
+        ]
         if event.status not in allowed_statuses:
             raise HTTPException(
                 status_code=400,

@@ -272,6 +272,9 @@ export interface Event {
   report_path?: string;
   report_url?: string;
   rnd_report?: EventRndReport;
+  documents?: EventDocument[];
+  sponsor_name?: string;
+  collaborating_clubs?: { id: number; club_id: number; name: string; coordinators?: { id: number; email: string }[] }[];
 
   // R&D classification
   is_rnd_event?: boolean;
