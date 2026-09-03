@@ -4,6 +4,15 @@ from datetime import datetime, date, time
 from decimal import Decimal
 
 
+class BudgetItem(BaseModel):
+    category: str
+    amount: Decimal
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class EventCreate(BaseModel):
     title: str
     event_type: str
@@ -56,7 +65,8 @@ class EventCreate(BaseModel):
     volunteers: bool = False
     volunteers_details: Optional[str] = None
     other_requirements: Optional[str] = None
-    budget: Decimal
+    budget: Optional[Decimal] = None
+    budget_breakdown: Optional[List[BudgetItem]] = None
     comments: Optional[str] = None
     # R&D fields
     is_rnd_event: bool = False
@@ -119,6 +129,7 @@ class EventUpdate(BaseModel):
     volunteers_details: Optional[str] = None
     other_requirements: Optional[str] = None
     budget: Optional[Decimal] = None
+    budget_breakdown: Optional[List[BudgetItem]] = None
     comments: Optional[str] = None
     # R&D fields
     is_rnd_event: Optional[bool] = None
@@ -219,6 +230,7 @@ class EventOut(BaseModel):
     departments_involved: Optional[List[str]] = []
     seating_arrangement: Optional[str]
     budget: Decimal
+    budget_breakdown: Optional[List[BudgetItem]] = None
     comments: Optional[str]
     poster_path: Optional[str]
     participant_doc_path: Optional[str]

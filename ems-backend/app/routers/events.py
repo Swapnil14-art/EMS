@@ -5,6 +5,7 @@ from sqlalchemy import select, and_, or_, func, cast, String
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 import logging
 import traceback
 
@@ -621,6 +622,7 @@ async def get_event(
         "departments_involved": event.departments_involved or [],
         "seating_arrangement": event.seating_arrangement,
         "budget": event.budget,
+        "budget_breakdown": event.budget_breakdown,
         "comments": event.comments,
         "poster_path": event.poster_path,
         "status": event.status,
@@ -778,6 +780,41 @@ async def create_event(
                 chosen = random.choice(posters)
                 random_poster_path = f"/api/static/default_posters/{chosen}"
 
+        # Budget and breakdown calculation & validation
+        final_budget = Decimal('0.00')
+        stored_breakdown = None
+
+        if body.budget_breakdown is not None and len(body.budget_breakdown) > 0:
+            calc_total = Decimal('0.00')
+            stored_breakdown = []
+            for item in body.budget_breakdown:
+                amt = Decimal(str(item.amount))
+                if amt < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget item amount cannot be negative")
+                cat = item.category.strip() if item.category else ""
+                if not cat:
+                    raise HTTPException(status_code=400, detail="Each budget item must have a category or description")
+                calc_total += amt
+                stored_breakdown.append({
+                    "category": cat,
+                    "amount": float(amt),
+                    "description": item.description.strip() if item.description else None
+                })
+
+            if body.budget is not None:
+                provided_budget = Decimal(str(body.budget))
+                if abs(provided_budget - calc_total) > Decimal('0.01'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Estimated budget total does not match the sum of breakdown items"
+                    )
+            final_budget = calc_total
+        else:
+            if body.budget is not None:
+                final_budget = Decimal(str(body.budget))
+                if final_budget < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget cannot be negative")
+
         event = Event(
             title=body.title,
             event_type=body.event_type,
@@ -829,7 +866,8 @@ async def create_event(
             outside_campus_registration=outside_campus,
             registration_accepted=reg_accepted,
             other_requirements=body.other_requirements,
-            budget=body.budget,
+            budget=final_budget,
+            budget_breakdown=stored_breakdown,
             comments=body.comments,
             poster_path=random_poster_path,
             created_by=current_user.id,
@@ -976,7 +1014,36 @@ async def update_event(
         if 'transport' in update_data and not update_data['transport']: update_data['transport_details'] = None
         if 'security' in update_data and not update_data['security']: update_data['security_details'] = None
         if 'printing' in update_data and not update_data['printing']: update_data['printing_details'] = None
-        if 'volunteers' in update_data and not update_data['volunteers']: update_data['volunteers_details'] = None
+        # Budget breakdown handling in update
+        if 'budget_breakdown' in update_data and update_data['budget_breakdown'] is not None:
+            calc_total = Decimal('0.00')
+            stored_breakdown = []
+            for item in body.budget_breakdown or []:
+                amt = Decimal(str(item.amount))
+                if amt < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget item amount cannot be negative")
+                cat = item.category.strip() if item.category else ""
+                if not cat:
+                    raise HTTPException(status_code=400, detail="Each budget item must have a category or description")
+                calc_total += amt
+                stored_breakdown.append({
+                    "category": cat,
+                    "amount": float(amt),
+                    "description": item.description.strip() if item.description else None
+                })
+            if 'budget' in update_data and update_data['budget'] is not None:
+                provided_budget = Decimal(str(body.budget))
+                if abs(provided_budget - calc_total) > Decimal('0.01'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Estimated budget total does not match the sum of breakdown items"
+                    )
+            update_data['budget'] = calc_total
+            update_data['budget_breakdown'] = stored_breakdown
+        elif 'budget' in update_data and update_data['budget'] is not None:
+            provided_budget = Decimal(str(body.budget))
+            if provided_budget < Decimal('0.00'):
+                raise HTTPException(status_code=400, detail="Budget cannot be negative")
 
         for field, value in update_data.items():
             if hasattr(event, field):

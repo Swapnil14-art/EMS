@@ -178,6 +178,12 @@ export interface EventRegistration {
   registered_at: string;
 }
 
+export interface BudgetItem {
+  category: string;
+  amount: number;
+  description?: string;
+}
+
 // API mapped from /events endpoint
 export interface Event {
   id: number;
@@ -254,6 +260,7 @@ export interface Event {
   other_requirements?: string;
 
   budget?: number;
+  budget_breakdown?: BudgetItem[];
   comments?: string;
 
   poster_path?: string;

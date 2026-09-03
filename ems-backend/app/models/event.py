@@ -77,6 +77,7 @@ class Event(Base):
     # Section G — Documents/Media
     poster_path = Column(Text, nullable=True)
     budget = Column(Numeric(20, 2), nullable=False)
+    budget_breakdown = Column(JSONB, nullable=True)
     comments = Column(Text, nullable=True)
     participant_doc_path = Column(Text, nullable=True)
 

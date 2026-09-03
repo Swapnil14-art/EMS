@@ -493,6 +493,11 @@ _No request body required._
   "volunteers_details": "20 student volunteers",
   "other_requirements": null,
   "budget": 50000.00,
+  "budget_breakdown": [
+    { "category": "Prize Money", "amount": 25000.00 },
+    { "category": "Food", "amount": 15000.00 },
+    { "category": "Marketing", "amount": 10000.00 }
+  ],
   "comments": "Flagship annual event"
 }
 ```

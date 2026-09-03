@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import {
   Info, Calendar, MapPin, Monitor, UtensilsCrossed,
   Package, FileText, CheckCircle2, Ticket, Users, FlaskConical,
-  ArrowLeft, Download, ExternalLink, Link as LinkIcon, Loader2, XCircle, MessageSquare, AlertTriangle
+  ArrowLeft, Download, ExternalLink, Link as LinkIcon, Loader2, XCircle, MessageSquare, AlertTriangle,
+  IndianRupee
 } from 'lucide-react';
 import type { Event } from '@/types';
 import { formatDateTime } from '@/lib/utils';
@@ -172,7 +173,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             <Field label="Contact" value={event.event_incharge_contact} />
             {event.is_club_event && event.club?.name && <Field label="Organizing Club" value={event.club.name} />}
             {event.is_club_event && event.club?.coordinators && event.club.coordinators.length > 0 && <Field label="Club Coordinator Email" value={event.club.coordinators.map((c: any) => c.email).join(', ')} />}
-            <Field label="Est. Budget" value={event.budget ? `₹ ${event.budget.toLocaleString()}` : undefined} />
+            <Field label="Total Budget" value={event.budget !== undefined && event.budget !== null ? `₹ ${Number(event.budget).toLocaleString('en-IN')}` : undefined} />
           </div>
         </div>
 
@@ -247,6 +248,86 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             </div>
           </div>
         )}
+
+        {/* Budget Breakdown Section for Approvers & Reviewers */}
+        <div className="space-y-4 p-5 bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-emerald-100 dark:border-emerald-900/40">
+            <div>
+              <h2 className="section-title flex items-center gap-2 text-lg text-emerald-900 dark:text-emerald-200 m-0">
+                <IndianRupee className="w-5 h-5 text-emerald-600 dark:text-emerald-400" /> Budget Breakdown & Allocations
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Itemized expense allocations submitted by the event coordinator for review & approval.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 bg-white dark:bg-[var(--card-bg)] px-4 py-2 rounded-xl border border-emerald-300 dark:border-emerald-700 shadow-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Total Budget:</span>
+              <span className="text-lg font-bold text-emerald-700 dark:text-emerald-400 font-mono">
+                ₹ {Number(event.budget || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          {event.budget_breakdown && event.budget_breakdown.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-emerald-200/70 dark:border-emerald-900/50 text-[11px] uppercase tracking-wider font-bold text-emerald-900 dark:text-emerald-300">
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Category / Description</th>
+                    <th className="py-2.5 px-3 text-right">Allocation (₹)</th>
+                    <th className="py-2.5 px-3 text-right">% of Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-emerald-100/60 dark:divide-emerald-950/40 font-medium">
+                  {event.budget_breakdown.map((item, idx) => {
+                    const total = Number(event.budget) || 0;
+                    const pct = total > 0 ? ((Number(item.amount) / total) * 100).toFixed(1) : '0';
+                    return (
+                      <tr key={idx} className="hover:bg-white/40 dark:hover:bg-black/10 transition-colors">
+                        <td className="py-2.5 px-3 text-xs text-[var(--text-muted)] font-mono">{idx + 1}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="font-semibold text-[var(--text-primary)]">{item.category}</span>
+                          {item.description && (
+                            <p className="text-xs text-[var(--text-muted)] mt-0.5">{item.description}</p>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-[var(--text-primary)]">
+                          ₹ {Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-xs text-[var(--text-secondary)] font-mono">
+                          {pct}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-emerald-300 dark:border-emerald-800 font-bold bg-white/50 dark:bg-black/20">
+                    <td colSpan={2} className="py-2.5 px-3 text-right text-xs uppercase tracking-wider text-[var(--text-primary)]">
+                      Total Calculated Budget:
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono text-emerald-700 dark:text-emerald-400">
+                      ₹ {Number(event.budget || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-xs font-mono text-emerald-700 dark:text-emerald-400">
+                      100%
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <div className="p-4 bg-white/60 dark:bg-black/20 rounded-xl border border-dashed border-emerald-300 dark:border-emerald-800 text-sm flex items-center justify-between">
+              <span className="text-[var(--text-secondary)]">
+                Estimated Total Budget: <strong className="text-[var(--text-primary)]">₹ {Number(event.budget || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+              </span>
+              <span className="text-xs text-[var(--text-muted)] italic">
+                (Legacy event proposal without itemized breakdown)
+              </span>
+            </div>
+          )}
+        </div>
 
         {/* Section G: Collaboration & Sponsorship */}
         {(event.is_collaborative || event.is_sponsored) && (

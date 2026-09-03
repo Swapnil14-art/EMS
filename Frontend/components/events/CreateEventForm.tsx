@@ -1,12 +1,13 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Info, Calendar, MapPin, Monitor, UtensilsCrossed,
-  Package, FileText, ChevronRight, ChevronLeft, Save, Send, ArrowLeft, Plus, Trash2, FlaskConical
+  Package, FileText, ChevronRight, ChevronLeft, Save, Send, ArrowLeft, Plus, Trash2, FlaskConical,
+  IndianRupee
 } from 'lucide-react';
 import { Button, Input, Select, Textarea, Toggle, Alert, Combobox } from '@/components/ui';
 import { eventService, venueService, clubService, departmentService } from '@/lib/services';
@@ -21,6 +22,12 @@ const toUTCISOString = (localDatetime: string): string => {
   if (isNaN(date.getTime())) return localDatetime;
   return date.toISOString();
 };
+
+const budgetItemSchema = z.object({
+  category: z.string().optional(),
+  amount: z.coerce.number().optional(),
+  description: z.string().optional(),
+});
 
 const schema = z.object({
   // Section A
@@ -85,6 +92,7 @@ const schema = z.object({
   other_requirements: z.string().optional(),
   // Section G
   budget: z.coerce.number().optional(),
+  budget_breakdown: z.array(budgetItemSchema).optional(),
   comments: z.string().optional(),
   // R&D
   is_rnd_event: z.boolean().default(false),
@@ -95,6 +103,21 @@ const schema = z.object({
   outside_campus_registration: z.boolean().default(false),
   registration_accepted: z.boolean().default(false),
 }).superRefine((data, ctx) => {
+  if (data.budget_breakdown && data.budget_breakdown.length > 0) {
+    let sum = 0;
+    for (let i = 0; i < data.budget_breakdown.length; i++) {
+      const item = data.budget_breakdown[i];
+      const hasCat = !!(item.category && item.category.trim() !== '');
+      const hasAmt = item.amount !== undefined && !isNaN(item.amount) && item.amount > 0;
+      if (hasAmt && !hasCat) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Category is required when amount is entered', path: ['budget_breakdown', i, 'category'] });
+      }
+      if (item.amount !== undefined && !isNaN(item.amount) && item.amount < 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Amount cannot be negative', path: ['budget_breakdown', i, 'amount'] });
+      }
+      sum += (hasAmt ? Number(item.amount) : 0);
+    }
+  }
   if (data.start_datetime && data.end_datetime) {
     const start = new Date(data.start_datetime);
     const end = new Date(data.end_datetime);
@@ -287,7 +310,7 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
     if (departmentService) departmentService.list().then(res => setDepartments(res as any[])).catch(() => {});
   }, [user?.club_id]);
 
-  const { register, control, handleSubmit, watch, trigger, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, control, handleSubmit, watch, trigger, setValue, getValues, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
       event_incharge_name: user?.name || '',
@@ -314,6 +337,10 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
       rnd_tentative_date: '',
       outside_campus_registration: false,
       registration_accepted: false,
+      budget: 0,
+      budget_breakdown: [
+        { category: '', amount: undefined as any, description: '' },
+      ],
     },
   });
 
@@ -338,6 +365,34 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
   const { fields: venueFields, append: appendVenue, remove: removeVenue } = useFieldArray({
     control, name: 'venue_selections' as never
   });
+
+  const { fields: budgetFields, append: appendBudget, remove: removeBudget } = useFieldArray({
+    control, name: 'budget_breakdown' as never
+  });
+
+  const [displayedTotal, setDisplayedTotal] = useState<number>(0);
+
+  const recalculateTotal = () => {
+    const items = getValues('budget_breakdown') || [];
+    const total = items.reduce((sum: number, item: any) => {
+      const val = parseFloat(item?.amount as any) || 0;
+      return sum + (val > 0 ? val : 0);
+    }, 0);
+    setDisplayedTotal(total);
+    setValue('budget', total, { shouldValidate: true });
+    return total;
+  };
+
+  const handleAddBudgetItem = () => {
+    appendBudget({ category: '', amount: undefined as any, description: '' });
+  };
+
+  const handleRemoveBudgetItem = (idx: number) => {
+    removeBudget(idx);
+    setTimeout(() => {
+      recalculateTotal();
+    }, 50);
+  };
 
   const watchFood = watch('food_items');
   const watchBeverage = watch('beverage_items');
@@ -411,6 +466,22 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
         outside_campus_registration: outsideCampus,
         registration_accepted: regAccepted,
+        budget_breakdown: (() => {
+          const items = (data.budget_breakdown || [])
+            .filter((item: any) => item && item.category && item.category.trim() !== '')
+            .map((item: any) => ({
+              category: item.category.trim(),
+              amount: Math.max(0, parseFloat(item.amount as any) || 0),
+              description: item.description?.trim() || undefined,
+            }));
+          return items;
+        })(),
+        budget: (() => {
+          const items = (data.budget_breakdown || [])
+            .filter((item: any) => item && item.category && item.category.trim() !== '')
+            .map((item: any) => Math.max(0, parseFloat(item.amount as any) || 0));
+          return items.reduce((acc, a) => acc + a, 0);
+        })(),
       };
       let id = createdId;
       if (!id) {
@@ -474,6 +545,22 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
         outside_campus_registration: outsideCampus,
         registration_accepted: regAccepted,
+        budget_breakdown: (() => {
+          const items = (data.budget_breakdown || [])
+            .filter((item: any) => item && item.category && item.category.trim() !== '')
+            .map((item: any) => ({
+              category: item.category.trim(),
+              amount: Math.max(0, parseFloat(item.amount as any) || 0),
+              description: item.description?.trim() || undefined,
+            }));
+          return items;
+        })(),
+        budget: (() => {
+          const items = (data.budget_breakdown || [])
+            .filter((item: any) => item && item.category && item.category.trim() !== '')
+            .map((item: any) => Math.max(0, parseFloat(item.amount as any) || 0));
+          return items.reduce((acc, a) => acc + a, 0);
+        })(),
       };
         let id = createdId;
         if (!id) {
@@ -545,6 +632,22 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
         rnd_tentative_date: bufferedData.is_rnd_event ? bufferedData.rnd_tentative_date : null,
         outside_campus_registration: outsideCampus,
         registration_accepted: regAccepted,
+        budget_breakdown: (() => {
+          const items = (bufferedData.budget_breakdown || [])
+            .filter((item: any) => item && item.category && item.category.trim() !== '')
+            .map((item: any) => ({
+              category: item.category.trim(),
+              amount: Math.max(0, parseFloat(item.amount as any) || 0),
+              description: item.description?.trim() || undefined,
+            }));
+          return items;
+        })(),
+        budget: (() => {
+          const items = (bufferedData.budget_breakdown || [])
+            .filter((item: any) => item && item.category && item.category.trim() !== '')
+            .map((item: any) => Math.max(0, parseFloat(item.amount as any) || 0));
+          return items.reduce((acc, a) => acc + a, 0);
+        })(),
       };
 
       let id = createdId;
@@ -1121,7 +1224,113 @@ export default function CreateEventForm({ basePath }: { basePath: string }) {
               {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] mt-2 font-semibold">New poster: {posterFile.name}</span>}
               {!posterFile && <p className="text-xs text-[var(--text-muted)] mt-2 font-semibold">No poster uploaded — default will be used if none is uploaded</p>}
             </div>
-            <Input label="Estimated Budget (₹)" type="number" placeholder="e.g. 25000" {...register('budget')} />
+            {/* Detailed Budget Breakdown */}
+            <div
+              className="space-y-4 p-5 rounded-2xl border border-[var(--card-border)] bg-[var(--surface-subtle)]"
+              onBlur={() => recalculateTotal()}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold text-base text-[var(--text-primary)] flex items-center gap-2">
+                    <IndianRupee className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Budget Breakdown
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                    Itemize your proposed expense categories below. The total budget is automatically calculated when you finish entering the amounts and click outside.
+                  </p>
+                </div>
+              </div>
+
+              {/* Items List */}
+              <div className="space-y-3">
+                {budgetFields.map((field, idx) => (
+                  <div key={field.id} className="p-3.5 bg-white dark:bg-[var(--card-bg)] rounded-xl border border-[var(--card-border)] shadow-sm space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                        Budget Item #{idx + 1}
+                      </span>
+                      {budgetFields.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveBudgetItem(idx)}
+                          className="text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] h-7 px-2"
+                          icon={<Trash2 className="w-3.5 h-3.5" />}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                      <div className="sm:col-span-7">
+                        <Input
+                          label="Category / Description *"
+                          placeholder="e.g. Prize Money, Food, Marketing, Venue, etc."
+                          {...register(`budget_breakdown.${idx}.category` as const, {
+                            onBlur: () => recalculateTotal(),
+                          })}
+                          error={errors.budget_breakdown?.[idx]?.category?.message}
+                        />
+                      </div>
+                      <div className="sm:col-span-5">
+                        <Input
+                          label="Allocated Amount (₹) *"
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="e.g. 5000"
+                          {...register(`budget_breakdown.${idx}.amount` as const, {
+                            valueAsNumber: true,
+                            onBlur: () => recalculateTotal(),
+                          })}
+                          error={errors.budget_breakdown?.[idx]?.amount?.message}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {budgetFields.length === 0 && (
+                  <div className="p-6 text-center border-2 border-dashed border-[var(--card-border)] rounded-xl bg-white/50 dark:bg-black/10">
+                    <p className="text-sm text-[var(--text-muted)] mb-3">No budget items added yet.</p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleAddBudgetItem}
+                      icon={<Plus className="w-4 h-4" />}
+                    >
+                      Add Budget Item
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Bar & Total Calculation */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleAddBudgetItem}
+                  icon={<Plus className="w-4 h-4" />}
+                >
+                  Add Item
+                </Button>
+
+                <div className="flex items-center gap-3 p-3 bg-white dark:bg-[var(--card-bg)] rounded-xl border border-[var(--card-border)] shadow-sm">
+                  <div className="text-right">
+                    <span className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider block">
+                      Calculated Total Budget
+                    </span>
+                    <span className="text-lg font-bold text-[rgb(var(--color-primary))] font-mono block">
+                      ₹ {displayedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
             <Textarea label="Additional Comments" placeholder="Any other notes for the approvers…" {...register('comments')} rows={4} />
 
             {/* Summary */}

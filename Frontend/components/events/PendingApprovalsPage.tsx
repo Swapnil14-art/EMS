@@ -81,6 +81,16 @@ export default function PendingApprovalsPage({ hideHeader }: { hideHeader?: bool
                     {event.creator && (
                       <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" />{event.creator.name}</span>
                     )}
+                    {event.budget !== undefined && event.budget !== null && (
+                      <span className="flex items-center gap-1 font-semibold text-[rgb(var(--color-primary))]">
+                        ₹{Number(event.budget).toLocaleString('en-IN')}
+                        {event.budget_breakdown && event.budget_breakdown.length > 0 && (
+                          <span className="text-[10px] bg-[var(--surface-subtle)] text-[var(--text-secondary)] px-1.5 py-0.5 rounded border border-[var(--border-subtle)] font-normal">
+                            {event.budget_breakdown.length} items breakdown
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </div>
                   {event.is_sponsored && (
                     <p className="text-xs text-[var(--status-warning-text)] font-medium mt-2">💰 Sponsored event</p>
