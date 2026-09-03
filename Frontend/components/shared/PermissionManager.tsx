@@ -12,7 +12,19 @@ interface AdditionalUser {
   status: string;
   department: string | null;
   extra_permissions: string[];
+  coordinator_type: CoordinatorType;
 }
+
+type CoordinatorType = 'student' | 'Faculty' | null;
+
+const STUDENT_COORDINATOR_DEFAULTS = ['registration', 'view_events', 'view_event_details'];
+const FACULTY_COORDINATOR_DEFAULTS = [
+  ...STUDENT_COORDINATOR_DEFAULTS,
+  'view_event_status',
+  'view_rnd_reports',
+  'submit_reports',
+  'submit_rnd_reports',
+];
 
 interface Props {
   /** Whether the viewer is super_admin (can grant manage_permissions) */
@@ -27,6 +39,7 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
   const [saving, setSaving] = useState<number | null>(null);
   // local edits: userId -> Set of perm codes
   const [edits, setEdits] = useState<Record<number, Set<string>>>({});
+  const [coordinatorTypes, setCoordinatorTypes] = useState<Record<number, CoordinatorType>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,6 +56,9 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
         init[u.id] = new Set(u.extra_permissions);
       });
       setEdits(init);
+      setCoordinatorTypes(Object.fromEntries(
+        usersRes.data.map((u: AdditionalUser) => [u.id, u.coordinator_type ?? null])
+      ));
     } catch (err: any) {
       toast.error('Failed to load data');
     } finally {
@@ -60,14 +76,32 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
     });
   };
 
+  const selectCoordinatorType = (userId: number, type: Exclude<CoordinatorType, null>) => {
+    const currentlySelected = coordinatorTypes[userId] ?? null;
+    const nextType = currentlySelected === type ? null : type;
+    setCoordinatorTypes(prev => ({ ...prev, [userId]: nextType }));
+
+    // Selecting a type is a convenience preset only. Administrators remain free
+    // to toggle every individual permission afterwards.
+    if (nextType) {
+      const defaults = nextType === 'student' ? STUDENT_COORDINATOR_DEFAULTS : FACULTY_COORDINATOR_DEFAULTS;
+      setEdits(prev => {
+        const next = new Set(prev[userId] ?? []);
+        defaults.forEach(permission => next.add(permission));
+        return { ...prev, [userId]: next };
+      });
+    }
+  };
+
   const save = async (userId: number) => {
     setSaving(userId);
     try {
       const perms = Array.from(edits[userId] ?? []);
-      await permissionService.setPermissions(userId, perms);
+      const coordinatorType = coordinatorTypes[userId] ?? null;
+      await permissionService.setPermissions(userId, perms, coordinatorType);
       toast.success('Permissions saved');
       // Update local user list
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, extra_permissions: perms } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, extra_permissions: perms, coordinator_type: coordinatorType } : u));
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Save failed');
     } finally {
@@ -82,7 +116,7 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
     const current = edits[userId] ?? new Set();
     if (original.size !== current.size) return true;
     for (const p of Array.from(original)) if (!current.has(p)) return true;
-    return false;
+    return (u.coordinator_type ?? null) !== (coordinatorTypes[userId] ?? null);
   };
 
   // Permissions visible to this manager
@@ -151,6 +185,29 @@ export default function PermissionManager({ isSuperAdmin = false }: Props) {
                     >
                       Save
                     </Button>
+                  </div>
+                </div>
+
+                {/* Coordinator audience — intentionally checkbox-shaped so either
+                    one can be cleared, while the handler keeps them exclusive. */}
+                <div className="mb-5 rounded-xl border border-[var(--card-border)] bg-[var(--surface-subtle)] p-3">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">Coordinator type</p>
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">Choose at most one. Selecting a type applies a recommended permission preset; every permission remains editable.</p>
+                  <div className="mt-3 flex flex-wrap gap-4">
+                    {([
+                      ['student', 'Student coordinator'],
+                      ['Faculty', 'Faculty coordinator'],
+                    ] as const).map(([type, label]) => (
+                      <label key={type} className="flex cursor-pointer items-center gap-2 text-sm text-[var(--text-primary)]">
+                        <input
+                          type="checkbox"
+                          checked={(coordinatorTypes[u.id] ?? null) === type}
+                          onChange={() => selectCoordinatorType(u.id, type)}
+                          className="h-4 w-4 rounded border-[var(--border-subtle)] accent-[rgb(var(--color-primary))]"
+                        />
+                        {label}
+                      </label>
+                    ))}
                   </div>
                 </div>
 

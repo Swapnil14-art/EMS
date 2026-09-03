@@ -41,6 +41,7 @@ export interface User {
   profile_completed?: boolean;      // derived from login response require_profile_completion
   // Dynamic permissions for 'additional' role users
   extra_permissions?: string[];
+  coordinator_type?: 'student' | 'Faculty' | null;
   created_at?: string;
   updated_at?: string;
 }

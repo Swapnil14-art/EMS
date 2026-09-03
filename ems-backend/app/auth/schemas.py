@@ -65,6 +65,7 @@ class UserInfo(BaseModel):
     is_first_login: bool
     sap_id: Optional[str] = None
     extra_permissions: Optional[list[str]] = []
+    coordinator_type: Optional[str] = None
 
     class Config:
         from_attributes = True

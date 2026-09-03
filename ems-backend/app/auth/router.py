@@ -81,6 +81,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         "is_first_login": user.is_first_login,
         "is_profile_complete": bool(user.name) if user.role in ["student", "club_coordinator"] else True,
         "extra_permissions": user.extra_permissions or [],
+        "coordinator_type": user.coordinator_type,
     }
     
     return TokenResponse(
@@ -187,6 +188,7 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
         "is_first_login": user.is_first_login,
         "is_profile_complete": bool(user.name) if user.role in ["student", "club_coordinator"] else True,
         "extra_permissions": user.extra_permissions or [],
+        "coordinator_type": user.coordinator_type,
     }
     
     return TokenResponse(

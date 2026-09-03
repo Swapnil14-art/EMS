@@ -75,6 +75,9 @@ function buildAdditionalNav(perms: string[]): NavItem[] {
   if (perms.includes('view_events') || perms.includes('view_event_details')) {
     items.push({ label: 'Events', href: '/additional/events', icon: <Calendar className="w-4.5 h-4.5" /> });
   }
+  if (perms.includes('registration')) {
+    items.push({ label: 'My Registrations', href: '/student/registrations', icon: <GraduationCap className="w-4.5 h-4.5" /> });
+  }
   if (perms.includes('view_reports') || perms.includes('submit_reports')) {
     items.push({ label: 'Reports', href: '/additional/reports', icon: <FileText className="w-4.5 h-4.5" /> });
   }

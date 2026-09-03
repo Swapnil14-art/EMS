@@ -35,7 +35,10 @@ from app.schemas.event import (
 )
 from app.services.storage_service import save_file, delete_file
 from app.services.venue_clash_service import check_venue_clash
-from app.services.email_service import notify_event_cancelled, notify_event_details_updated
+from app.services.email_service import (
+    notify_event_cancelled, notify_event_details_updated,
+    notify_faculty_and_coordinators_involved
+)
 from app.utils.permissions import can_edit_event, can_cancel_event, can_view_internal_docs
 from app.utils.diff import take_event_snapshot, compute_diff
 
@@ -55,6 +58,47 @@ def synchronize_registration_audience(event: Event) -> None:
         event.outside_campus_registration = False
         event.registration_start_datetime = None
         event.registration_deadline = None
+
+
+async def _get_involved_faculty_and_coordinators_emails(db: AsyncSession, event: Event) -> List[str]:
+    """Build unique list of email addresses for Faculty Involved and Coordinators for an event."""
+    emails = []
+
+    # 1. Faculty involved emails provided in event form submission
+    if event.faculty_involved_emails:
+        for em in event.faculty_involved_emails:
+            if em:
+                emails.append(str(em).strip().lower())
+
+    # 2. Event creator email
+    if event.created_by:
+        from app.models.user import User
+        creator = await db.get(User, event.created_by)
+        if creator and creator.email:
+            emails.append(creator.email.strip().lower())
+
+    # 3. Primary club coordinator email
+    if event.club_id:
+        from app.models.club import Club
+        from app.models.user import User
+        club = await db.get(Club, event.club_id)
+        if club and club.coordinator_id:
+            coord = await db.get(User, club.coordinator_id)
+            if coord and coord.email:
+                emails.append(coord.email.strip().lower())
+
+    # 4. Collaborating club coordinators emails
+    if event.collaborating_clubs:
+        from app.models.club import Club
+        from app.models.user import User
+        for collab in event.collaborating_clubs:
+            collab_club = await db.get(Club, collab.club_id)
+            if collab_club and collab_club.coordinator_id:
+                coord = await db.get(User, collab_club.coordinator_id)
+                if coord and coord.email:
+                    emails.append(coord.email.strip().lower())
+
+    return list(set(emails))
 
 def is_student_eligible_for_event(user: User, event: Event) -> bool:
     """
@@ -917,6 +961,15 @@ async def create_event(
 
         await db.commit()
         await db.refresh(event)
+
+        # Notify all Faculty Involved & Coordinators that event was created
+        try:
+            involved_emails = await _get_involved_faculty_and_coordinators_emails(db, event)
+            if involved_emails:
+                notify_faculty_and_coordinators_involved(event, involved_emails, event_action="created")
+        except Exception as e:
+            logger.error(f"Error sending creation notifications for event {event.id}: {e}")
+
         return {"id": event.id, "status": event.status, "message": "Event created as draft"}
     except HTTPException:
         raise
@@ -1194,9 +1247,10 @@ async def update_event(
                     EventRegistration.status == "registered",
                 )
             )
-            students = reg_result.scalars().all()
-            if students:
-                notify_event_details_updated(event, students)
+            # Student email notifications disabled per requirement
+            # if students:
+            #     notify_event_details_updated(event, students)
+            pass
 
         event.last_edited_by = current_user.id
         event.last_edited_at = now
@@ -1337,6 +1391,15 @@ async def submit_event(
                         notify_event_submitted(event, dean)
 
         await db.commit()
+
+        # Notify all Faculty Involved & Coordinators that event was submitted
+        try:
+            involved_emails = await _get_involved_faculty_and_coordinators_emails(db, event)
+            if involved_emails:
+                notify_faculty_and_coordinators_involved(event, involved_emails, event_action="submitted")
+        except Exception as e:
+            logger.error(f"Error sending submission notifications for event {event.id}: {e}")
+
         return {"message": "Event submitted", "status": event.status}
     except HTTPException:
         raise

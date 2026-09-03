@@ -30,6 +30,7 @@ export function mapUserFromApi(apiUser: any): User {
     is_club_coordinator_requested: apiUser.is_club_coordinator_requested,
     club_name: apiUser.club_name,
     extra_permissions: apiUser.extra_permissions || [],
+    coordinator_type: apiUser.coordinator_type ?? null,
     // Derived convenience fields
     is_active: (apiUser.status || 'active') === 'active',
     force_password_change: apiUser.is_first_login ?? apiUser.force_password_change ?? false,
