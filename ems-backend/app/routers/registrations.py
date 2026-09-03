@@ -51,10 +51,10 @@ async def register_for_event(
         )
 
     # Registration accepted check
-    if not event.registration_accepted:
+    if not event.registration_accepted or not event.student_registration_enabled:
         raise HTTPException(
             status_code=403,
-            detail="Registration is not accepted for this event",
+            detail="Student registration is not accepted for this event",
         )
 
     # Registration start time & deadline checks

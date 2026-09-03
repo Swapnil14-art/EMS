@@ -34,6 +34,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
   const [regEnd, setRegEnd] = useState('');
   const [registrationAccepted, setRegistrationAccepted] = useState(false);
   const [outsideCampusRegistration, setOutsideCampusRegistration] = useState(false);
+  const [studentRegistrationEnabled, setStudentRegistrationEnabled] = useState(false);
+  const [facultyRegistrationEnabled, setFacultyRegistrationEnabled] = useState(false);
   const [savingRegWindow, setSavingRegWindow] = useState(false);
   const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
   
@@ -137,7 +139,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
 
   const handleUpdateRegistrationWindow = async () => {
     if (!regWindowEvent) return;
-    if (registrationAccepted && (!regStart || !regEnd)) {
+    const effectiveRegistrationAccepted = outsideCampusRegistration || studentRegistrationEnabled || facultyRegistrationEnabled;
+    if (effectiveRegistrationAccepted && (!regStart || !regEnd)) {
       toast.error('Registration start and end date & time are required when registration is accepted');
       return;
     }
@@ -148,10 +151,12 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
     setSavingRegWindow(true);
     try {
       const payload = {
-        registration_accepted: registrationAccepted,
+        registration_accepted: effectiveRegistrationAccepted,
         outside_campus_registration: outsideCampusRegistration,
-        registration_start_datetime: registrationAccepted && regStart ? new Date(regStart).toISOString() : null,
-        registration_deadline: registrationAccepted && regEnd ? new Date(regEnd).toISOString() : null,
+        student_registration_enabled: studentRegistrationEnabled,
+        faculty_registration_enabled: facultyRegistrationEnabled,
+        registration_start_datetime: effectiveRegistrationAccepted && regStart ? new Date(regStart).toISOString() : null,
+        registration_deadline: effectiveRegistrationAccepted && regEnd ? new Date(regEnd).toISOString() : null,
       };
 
       await eventService.update(regWindowEvent.id, payload);
@@ -220,6 +225,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
                     setRegWindowEvent(ev); 
                     setRegistrationAccepted(Boolean(ev.registration_accepted));
                     setOutsideCampusRegistration(Boolean(ev.outside_campus_registration));
+                    setStudentRegistrationEnabled(Boolean(ev.student_registration_enabled));
+                    setFacultyRegistrationEnabled(Boolean(ev.faculty_registration_enabled));
                     if (ev.registration_start_datetime) {
                       const d = new Date(ev.registration_start_datetime);
                       const tzOffset = d.getTimezoneOffset() * 60000;
@@ -288,6 +295,8 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
               setRegistrationAccepted(value);
               if (!value) {
                 setOutsideCampusRegistration(false);
+                setStudentRegistrationEnabled(false);
+                setFacultyRegistrationEnabled(false);
                 setRegStart('');
                 setRegEnd('');
               }
@@ -298,10 +307,22 @@ export function MyEvents({ basePath, hideHeader }: { basePath: string; hideHeade
             checked={outsideCampusRegistration}
             onChange={(value) => {
               setOutsideCampusRegistration(value);
-              if (value) setRegistrationAccepted(true);
+              if (value) { setRegistrationAccepted(true); setStudentRegistrationEnabled(true); }
             }}
             label="Outside Campus Registration Accepted"
           />
+          <div className="flex gap-4 text-sm">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={studentRegistrationEnabled} onChange={e => {
+              const value = e.target.checked; setStudentRegistrationEnabled(value);
+              if (value) setRegistrationAccepted(true);
+              else if (!facultyRegistrationEnabled && !outsideCampusRegistration) { setRegistrationAccepted(false); setRegStart(''); setRegEnd(''); }
+            }} /> Student</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={facultyRegistrationEnabled} onChange={e => {
+              const value = e.target.checked; setFacultyRegistrationEnabled(value);
+              if (value) setRegistrationAccepted(true);
+              else if (!studentRegistrationEnabled && !outsideCampusRegistration) { setRegistrationAccepted(false); setRegStart(''); setRegEnd(''); }
+            }} /> Faculty</label>
+          </div>
           {registrationAccepted && (
             <>
               <Input type="datetime-local" label="Registration Start Date & Time"

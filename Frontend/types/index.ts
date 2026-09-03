@@ -222,6 +222,7 @@ export interface Event {
   venue_custom?: string;
   venue_type?: string;
   departments_involved?: string[];
+  faculty_involved_emails?: string[];
   seating_arrangement?: string;
   seating_other_detail?: string;
   tables_required?: string;
@@ -286,6 +287,8 @@ export interface Event {
   // Outside campus registration
   outside_campus_registration?: boolean;
   registration_accepted?: boolean;
+  student_registration_enabled?: boolean;
+  faculty_registration_enabled?: boolean;
 
   status: EventStatus;
   created_by: number;

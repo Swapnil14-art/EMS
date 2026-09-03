@@ -169,6 +169,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             <Field label="Event Type" value={event.event_type} />
             <Field label="Organizing School" value={event.school_department} />
             <Field label="Target Audience" value={event.target_audience} />
+            {(event.faculty_involved_emails || []).length > 0 && <Field label="Faculty Involved" value={event.faculty_involved_emails!.join(', ')} />}
             <Field label="Event Incharge" value={event.event_incharge_name} />
             <Field label="Contact" value={event.event_incharge_contact} />
             {event.is_club_event && event.club?.name && <Field label="Organizing Club" value={event.club.name} />}
@@ -185,6 +186,7 @@ export default function FullEventDetailsView({ event }: { event: Event }) {
             <Field label="End Date & Time" value={formatDateTime(event.end_datetime)} />
             {event.registration_start_datetime && <Field label="Registration Start Date & Time" value={formatDateTime(event.registration_start_datetime)} />}
             {event.registration_deadline && <Field label="Registration Deadline" value={formatDateTime(event.registration_deadline)} />}
+            <Field label="Registration Audience" value={[event.student_registration_enabled && 'Student', event.faculty_registration_enabled && 'Faculty'].filter(Boolean).join(', ') || 'None'} />
           </div>
         </div>
 

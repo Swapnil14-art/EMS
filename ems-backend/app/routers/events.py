@@ -44,6 +44,18 @@ router = APIRouter()
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
+def synchronize_registration_audience(event: Event) -> None:
+    """Keep registration switches consistent for UI and direct API updates."""
+    event.registration_accepted = bool(
+        event.outside_campus_registration
+        or event.student_registration_enabled
+        or event.faculty_registration_enabled
+    )
+    if not event.registration_accepted:
+        event.outside_campus_registration = False
+        event.registration_start_datetime = None
+        event.registration_deadline = None
+
 def is_student_eligible_for_event(user: User, event: Event) -> bool:
     """
     Check if a student user is eligible to view/register for an event.
@@ -620,6 +632,7 @@ async def get_event(
         "venue_custom": event.venue_custom,
         "venue_type": event.venue_type,
         "departments_involved": event.departments_involved or [],
+        "faculty_involved_emails": event.faculty_involved_emails,
         "objectives": event.objectives or [],
         "seating_arrangement": event.seating_arrangement,
         "budget": event.budget,
@@ -637,6 +650,8 @@ async def get_event(
         "rnd_tentative_date": event.rnd_tentative_date.isoformat() if event.rnd_tentative_date else None,
         "registration_accepted": event.registration_accepted,
         "outside_campus_registration": event.outside_campus_registration,
+        "student_registration_enabled": event.student_registration_enabled,
+        "faculty_registration_enabled": event.faculty_registration_enabled,
         "registration_count": registration_count,
         "is_registered": is_registered,
         "links": [{"id": l.id, "link_type": l.link_type, "url": l.url, "label": l.label}
@@ -741,11 +756,9 @@ async def create_event(
 
         # Registration dates and toggle synchronization handling
         outside_campus = body.outside_campus_registration
-        reg_accepted = body.registration_accepted
-        if outside_campus:
-            reg_accepted = True
-        if not reg_accepted:
-            outside_campus = False
+        student_registration_enabled = body.student_registration_enabled
+        faculty_registration_enabled = body.faculty_registration_enabled
+        reg_accepted = bool(outside_campus or student_registration_enabled or faculty_registration_enabled)
 
         reg_start = None
         reg_deadline = None
@@ -835,6 +848,7 @@ async def create_event(
             venue_custom=body.venue_custom,
             venue_type=body.venue_type,
             departments_involved=body.departments_involved,
+            faculty_involved_emails=[str(email) for email in body.faculty_involved_emails] if body.faculty_involved_emails else None,
             objectives=[o.strip() for o in (body.objectives or []) if o and o.strip()] if body.objectives else None,
             seating_arrangement=body.seating_arrangement,
             seating_other_detail=body.seating_other_detail,
@@ -867,6 +881,8 @@ async def create_event(
             volunteers_details=body.volunteers_details,
             outside_campus_registration=outside_campus,
             registration_accepted=reg_accepted,
+            student_registration_enabled=student_registration_enabled,
+            faculty_registration_enabled=faculty_registration_enabled,
             other_requirements=body.other_requirements,
             budget=final_budget,
             budget_breakdown=stored_breakdown,
@@ -933,7 +949,7 @@ async def update_event(
         now = datetime.now(timezone.utc)
         update_data = body.model_dump(exclude_unset=True)
 
-        reg_config_keys = {"registration_start_datetime", "registration_deadline", "registration_accepted", "outside_campus_registration"}
+        reg_config_keys = {"registration_start_datetime", "registration_deadline", "registration_accepted", "outside_campus_registration", "student_registration_enabled", "faculty_registration_enabled"}
         is_registration_dates_only = bool(update_data) and set(update_data.keys()).issubset(reg_config_keys)
 
         # Special case: Editing registration schedule alone for any event (including approved/ongoing)
@@ -947,8 +963,15 @@ async def update_event(
                 event.registration_accepted = body.registration_accepted
                 if not body.registration_accepted:
                     event.outside_campus_registration = False
+                    event.student_registration_enabled = False
+                    event.faculty_registration_enabled = False
                     event.registration_start_datetime = None
                     event.registration_deadline = None
+
+            if "student_registration_enabled" in update_data:
+                event.student_registration_enabled = body.student_registration_enabled
+            if "faculty_registration_enabled" in update_data:
+                event.faculty_registration_enabled = body.faculty_registration_enabled
 
             if "registration_start_datetime" in update_data:
                 reg_s = body.registration_start_datetime
@@ -962,13 +985,7 @@ async def update_event(
                     reg_e = reg_e.replace(tzinfo=timezone.utc)
                 event.registration_deadline = reg_e
 
-            # Sync check
-            if event.outside_campus_registration:
-                event.registration_accepted = True
-            if not event.registration_accepted:
-                event.outside_campus_registration = False
-                event.registration_start_datetime = None
-                event.registration_deadline = None
+            synchronize_registration_audience(event)
 
             if event.registration_accepted:
                 if not event.registration_start_datetime or not event.registration_deadline:
@@ -1052,12 +1069,7 @@ async def update_event(
                 setattr(event, field, value)
 
         # Toggle synchronization on general update
-        if event.outside_campus_registration:
-            event.registration_accepted = True
-        if not event.registration_accepted:
-            event.outside_campus_registration = False
-            event.registration_start_datetime = None
-            event.registration_deadline = None
+        synchronize_registration_audience(event)
 
         if event.registration_accepted:
             if not event.registration_start_datetime or not event.registration_deadline:

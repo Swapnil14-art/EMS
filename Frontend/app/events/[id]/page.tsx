@@ -100,7 +100,7 @@ export default function PublicEventDetailPage() {
 
   const isRegistrationAccepted = !!event.registration_accepted;
 
-  const canRegister = isRegistrationAccepted &&
+  const canRegister = isRegistrationAccepted && !!event.student_registration_enabled &&
                       ['approved', 'ongoing'].includes(event.status) &&
                       user?.role === 'student' &&
                       !registrationDisabled &&

@@ -45,6 +45,7 @@ const schema = z.object({
   event_type: z.string().min(1, 'Select event type'),
   school_department: z.string().optional(),
   departments_involved: z.array(z.string()).min(1, 'Select at least one department'),
+  faculty_involved_emails: z.array(z.string()).optional(),
   event_incharge_name: z.string().min(2, 'Incharge name required'),
   event_incharge_contact: z.string().min(10, 'Valid contact required'),
   target_audience: z.string().optional(),
@@ -113,6 +114,8 @@ const schema = z.object({
   rnd_tentative_date: z.string().optional(),
   outside_campus_registration: z.boolean().default(false),
   registration_accepted: z.boolean().default(false),
+  student_registration_enabled: z.boolean().default(false),
+  faculty_registration_enabled: z.boolean().default(false),
 }).superRefine((data, ctx) => {
   if (data.budget_breakdown && data.budget_breakdown.length > 0) {
     let sum = 0;
@@ -286,6 +289,9 @@ const DEPARTMENTS_INVOLVED_OPTIONS = [
   { value: 'college_wide', label: 'College Wide' },
 ];
 
+const normalizeFacultyEmail = (email: string) => email.trim().toLowerCase();
+const isAllowedFacultyEmail = (email: string) => /^[^\s@]+@[^\s@]+\.(edu|in)$/i.test(email);
+
 function SectionProgress({ current, total }: { current: number; total: number }) {
   return (
     <div className="flex items-center gap-1 mt-4 mb-2">
@@ -367,6 +373,8 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
   const [sponsorFile, setSponsorFile] = useState<File | null>(null);
   const [existingSponsorDoc, setExistingSponsorDoc] = useState<string | null>(null);
   const sponsorRef = useRef<HTMLInputElement>(null);
+  const [facultyEmailInput, setFacultyEmailInput] = useState('');
+  const [facultyEmailError, setFacultyEmailError] = useState('');
 
   const { register, control, handleSubmit, watch, trigger, setValue, getValues, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -376,6 +384,7 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       event_incharge_contact: '+91 ',
       is_club_event: true, is_collaborative: false, collaborating_club_ids: [],
       departments_involved: [], venue_ids: [],
+      faculty_involved_emails: [],
       venue_selections: [{ venue_type: '', venue_ids: [] }],
       is_sponsored: false, sponsor_name: '',
       it_projector: false, it_audio: false, it_wifi: false, it_laptop: false,
@@ -396,6 +405,8 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       rnd_tentative_date: '',
       outside_campus_registration: false,
       registration_accepted: false,
+      student_registration_enabled: false,
+      faculty_registration_enabled: false,
       budget: 0,
       budget_breakdown: [
         { category: '', amount: undefined as any, description: '' },
@@ -457,6 +468,7 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
           event_type: ev.event_type || '',
           school_department: ev.school_department || user?.department?.name || '',
           departments_involved: deptsInvolved,
+          faculty_involved_emails: Array.isArray(ev.faculty_involved_emails) ? ev.faculty_involved_emails : [],
           event_incharge_name: ev.event_incharge_name || user?.name || '',
           event_incharge_contact: ev.event_incharge_contact || '+91 ',
           target_audience: ev.target_audience || '',
@@ -514,6 +526,8 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
           rnd_tentative_date: ev.rnd_tentative_date || '',
           outside_campus_registration: !!ev.outside_campus_registration,
           registration_accepted: !!ev.registration_accepted,
+          student_registration_enabled: !!ev.student_registration_enabled,
+          faculty_registration_enabled: !!ev.faculty_registration_enabled,
         });
       }
       setLoadingEvent(false);
@@ -524,9 +538,27 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
 
   const watchRegistrationAccepted = watch('registration_accepted');
   const watchOutsideCampus = watch('outside_campus_registration');
+  const watchStudentRegistration = watch('student_registration_enabled');
+  const watchFacultyRegistration = watch('faculty_registration_enabled');
   const isRegRequired = watchRegistrationAccepted || watchOutsideCampus;
   const watchIsRnd = watch('is_rnd_event');
   const watchRndTheme = watch('rnd_activity_theme');
+
+  const addFacultyEmail = () => {
+    const email = normalizeFacultyEmail(facultyEmailInput);
+    if (!isAllowedFacultyEmail(email)) {
+      setFacultyEmailError('Enter a valid faculty email ending exactly in .edu or .in.');
+      return;
+    }
+    const current = getValues('faculty_involved_emails') || [];
+    if (current.includes(email)) {
+      setFacultyEmailError('This faculty email has already been added.');
+      return;
+    }
+    setValue('faculty_involved_emails', [...current, email], { shouldDirty: true, shouldValidate: true });
+    setFacultyEmailInput('');
+    setFacultyEmailError('');
+  };
 
   const SECTIONS = [
     ...BASE_SECTIONS,
@@ -608,7 +640,7 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       const venueTypes = data.venue_selections.map(s => s.venue_type).filter(Boolean);
       const allVenueIds = data.venue_selections.flatMap(s => s.venue_ids || []);
       
-      const regAccepted = data.registration_accepted || data.outside_campus_registration;
+      const regAccepted = data.outside_campus_registration || data.student_registration_enabled || data.faculty_registration_enabled;
       const outsideCampus = data.outside_campus_registration && regAccepted;
 
       const payloadData = { 
@@ -642,6 +674,8 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
         rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
         outside_campus_registration: outsideCampus,
         registration_accepted: regAccepted,
+        student_registration_enabled: data.student_registration_enabled,
+        faculty_registration_enabled: data.faculty_registration_enabled,
         budget_breakdown: (() => {
           const items = (data.budget_breakdown || [])
             .filter((item: any) => item && item.category && item.category.trim() !== '')
@@ -687,7 +721,7 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
         const venueTypes = data.venue_selections.map(s => s.venue_type).filter(Boolean);
         const allVenueIds = data.venue_selections.flatMap(s => s.venue_ids || []);
 
-        const regAccepted = data.registration_accepted || data.outside_campus_registration;
+        const regAccepted = data.outside_campus_registration || data.student_registration_enabled || data.faculty_registration_enabled;
         const outsideCampus = data.outside_campus_registration && regAccepted;
 
         const payloadData = {
@@ -721,6 +755,8 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
           rnd_tentative_date: data.is_rnd_event ? data.rnd_tentative_date : null,
           outside_campus_registration: outsideCampus,
           registration_accepted: regAccepted,
+          student_registration_enabled: data.student_registration_enabled,
+          faculty_registration_enabled: data.faculty_registration_enabled,
           budget_breakdown: (() => {
             const items = (data.budget_breakdown || [])
               .filter((item: any) => item && item.category && item.category.trim() !== '')
@@ -774,7 +810,7 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       const venueTypes = bufferedData.venue_selections.map(s => s.venue_type).filter(Boolean);
       const allVenueIds = bufferedData.venue_selections.flatMap(s => s.venue_ids || []);
 
-      const regAccepted = bufferedData.registration_accepted || bufferedData.outside_campus_registration;
+      const regAccepted = bufferedData.outside_campus_registration || bufferedData.student_registration_enabled || bufferedData.faculty_registration_enabled;
       const outsideCampus = bufferedData.outside_campus_registration && regAccepted;
 
       const payloadData = {
@@ -808,6 +844,8 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
         rnd_tentative_date: bufferedData.is_rnd_event ? bufferedData.rnd_tentative_date : null,
         outside_campus_registration: outsideCampus,
         registration_accepted: regAccepted,
+        student_registration_enabled: bufferedData.student_registration_enabled,
+        faculty_registration_enabled: bufferedData.faculty_registration_enabled,
         budget_breakdown: (() => {
           const items = (bufferedData.budget_breakdown || [])
             .filter((item: any) => item && item.category && item.category.trim() !== '')
@@ -965,6 +1003,36 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
               {errors.departments_involved && <p className="text-xs text-[var(--text-danger)]">{errors.departments_involved.message}</p>}
             </div>
 
+            <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Faculty Involved</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Optional. Add faculty email addresses ending in .edu or .in.</p>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  value={facultyEmailInput}
+                  onChange={(e) => { setFacultyEmailInput(e.target.value); setFacultyEmailError(''); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFacultyEmail(); } }}
+                  placeholder="faculty@example.edu"
+                  className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                  aria-label="Faculty email"
+                />
+                <Button type="button" variant="secondary" onClick={addFacultyEmail} icon={<Plus className="w-4 h-4" />}>Add</Button>
+              </div>
+              {facultyEmailError && <p className="text-xs text-[var(--text-danger)]">{facultyEmailError}</p>}
+              {(watch('faculty_involved_emails') || []).length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {(watch('faculty_involved_emails') || []).map((email) => (
+                    <span key={email} className="inline-flex items-center gap-1 rounded-full bg-[var(--status-info-bg)] px-3 py-1 text-xs font-medium text-[var(--status-info-text)]">
+                      {email}
+                      <button type="button" onClick={() => setValue('faculty_involved_emails', (getValues('faculty_involved_emails') || []).filter((item) => item !== email), { shouldDirty: true })} aria-label={`Remove ${email}`} className="ml-1 font-bold">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <Input label="Event Incharge Name" placeholder="Full name" error={errors.event_incharge_name?.message} {...register('event_incharge_name')} />
               <Input label="Incharge Contact" placeholder="+91 XXXXXXXXXX" error={errors.event_incharge_contact?.message} {...register('event_incharge_contact')} />
@@ -1077,8 +1145,12 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
                     checked={field.value}
                     onChange={(val) => {
                       field.onChange(val);
-                      if (!val) {
+                      if (val) {
+                        setValue('student_registration_enabled', true);
+                      } else {
                         setValue('outside_campus_registration', false);
+                        setValue('student_registration_enabled', false);
+                        setValue('faculty_registration_enabled', false);
                         setValue('registration_start_datetime', '');
                         setValue('registration_deadline', '');
                       }
@@ -1087,6 +1159,37 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
                   />
                 )} />
 
+                <div className="ml-1 space-y-2">
+                  <p className="text-xs font-semibold text-[var(--text-secondary)]">Registration audience</p>
+                  <div className="flex flex-wrap gap-4 text-sm text-[var(--text-primary)]">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={watchStudentRegistration} onChange={(e) => {
+                        const selected = e.target.checked;
+                        setValue('student_registration_enabled', selected);
+                        if (selected) setValue('registration_accepted', true);
+                        else if (!watchFacultyRegistration && !watchOutsideCampus) {
+                          setValue('registration_accepted', false);
+                          setValue('registration_start_datetime', '');
+                          setValue('registration_deadline', '');
+                        }
+                      }} /> Student
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={watchFacultyRegistration} onChange={(e) => {
+                        const selected = e.target.checked;
+                        setValue('faculty_registration_enabled', selected);
+                        if (selected) setValue('registration_accepted', true);
+                        else if (!watchStudentRegistration && !watchOutsideCampus) {
+                          setValue('registration_accepted', false);
+                          setValue('registration_start_datetime', '');
+                          setValue('registration_deadline', '');
+                        }
+                      }} /> Faculty
+                    </label>
+                  </div>
+                  <p className="text-xs text-[var(--text-muted)]">Faculty selection is recorded for the event; the current registration endpoint supports student accounts only.</p>
+                </div>
+
                 <Controller name="outside_campus_registration" control={control} render={({ field }) => (
                   <Toggle
                     checked={field.value}
@@ -1094,6 +1197,7 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
                       field.onChange(val);
                       if (val) {
                         setValue('registration_accepted', true);
+                        setValue('student_registration_enabled', true);
                       }
                     }}
                     label="Outside Campus Registration Accepted"

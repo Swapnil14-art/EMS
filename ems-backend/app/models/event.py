@@ -26,6 +26,7 @@ class Event(Base):
     is_sponsored = Column(Boolean, nullable=False, default=False)
     custom_approval_chain = Column(JSONB, nullable=True)
     departments_involved = Column(JSONB, nullable=True)  # List of strings
+    faculty_involved_emails = Column(JSONB, nullable=True)  # Arbitrary faculty email addresses
     objectives = Column(JSONB, nullable=True)  # List of strings
 
     # Section B — Dates/Times
@@ -92,6 +93,8 @@ class Event(Base):
     # Outside Campus Registration
     outside_campus_registration = Column(Boolean, nullable=False, default=False)
     registration_accepted = Column(Boolean, nullable=False, default=False)
+    student_registration_enabled = Column(Boolean, nullable=False, default=False, server_default="false")
+    faculty_registration_enabled = Column(Boolean, nullable=False, default=False, server_default="false")
 
     # Tracking
     status = Column(String(60), nullable=False, default="draft", index=True)
