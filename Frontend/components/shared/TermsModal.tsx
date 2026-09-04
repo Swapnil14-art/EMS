@@ -67,6 +67,7 @@ export function TermsModal({ open, onClose, onConfirm, loading }: TermsModalProp
             <li>I guarantee that any required budget estimates are justified and have preliminary consent from the respective authority.</li>
             <li>I acknowledge that the IT and infrastructure requests are subject to final availability and approval by the administrative team.</li>
             <li>I agree to take full responsibility for the overall coordination, discipline, and successful execution of this event.</li>
+            <li>I, being the Club Coordinator/Faculty In-Charge of the event, take full responsibility for the event.</li>
           </ol>
         </div>
 

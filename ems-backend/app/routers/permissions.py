@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
-from typing import List
+from typing import List, Literal, Optional
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -21,6 +21,8 @@ router = APIRouter()
 
 class PermissionSet(BaseModel):
     permissions: List[str]
+    # Kept nullable so clearing both checkboxes removes the coordinator audience.
+    coordinator_type: Optional[Literal["student", "Faculty"]] = None
 
 
 class PermissionAction(BaseModel):
@@ -65,6 +67,7 @@ async def list_additional_users(
                 "status": u.status,
                 "department": u.department.name if u.department else None,
                 "extra_permissions": u.extra_permissions or [],
+                "coordinator_type": u.coordinator_type,
             }
             for u in users
         ]
@@ -94,8 +97,13 @@ async def set_permissions(
         raise HTTPException(status_code=403, detail="Only super_admin can grant manage_permissions")
 
     user.extra_permissions = list(set(body.permissions))
+    user.coordinator_type = body.coordinator_type
     await db.commit()
-    return {"message": "Permissions updated", "extra_permissions": user.extra_permissions}
+    return {
+        "message": "Permissions updated",
+        "extra_permissions": user.extra_permissions,
+        "coordinator_type": user.coordinator_type,
+    }
 
 
 @router.post("/{user_id}/grant")

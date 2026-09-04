@@ -41,6 +41,7 @@ export interface User {
   profile_completed?: boolean;      // derived from login response require_profile_completion
   // Dynamic permissions for 'additional' role users
   extra_permissions?: string[];
+  coordinator_type?: 'student' | 'Faculty' | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -139,6 +140,8 @@ export interface EventApproval {
   role_at_approval: string;
   sequence_order: number;
   status: 'pending' | 'approved' | 'rejected' | 'suggested_changes';
+  /** Raw status field returned by the approval-history API. */
+  action?: 'pending' | 'approved' | 'rejected' | 'suggested_changes';
   remarks?: string;
   venue_clash_override: boolean;
   venue_clash_override_reason?: string;
@@ -174,6 +177,12 @@ export interface EventRegistration {
   student_email: string;
   status: 'registered' | 'cancelled';
   registered_at: string;
+}
+
+export interface BudgetItem {
+  category: string;
+  amount: number;
+  description?: string;
 }
 
 // API mapped from /events endpoint
@@ -214,6 +223,7 @@ export interface Event {
   venue_custom?: string;
   venue_type?: string;
   departments_involved?: string[];
+  faculty_involved_emails?: string[];
   seating_arrangement?: string;
   seating_other_detail?: string;
   tables_required?: string;
@@ -252,6 +262,7 @@ export interface Event {
   other_requirements?: string;
 
   budget?: number;
+  budget_breakdown?: BudgetItem[];
   comments?: string;
 
   poster_path?: string;
@@ -263,6 +274,9 @@ export interface Event {
   report_path?: string;
   report_url?: string;
   rnd_report?: EventRndReport;
+  documents?: EventDocument[];
+  sponsor_name?: string;
+  collaborating_clubs?: { id: number; club_id: number; name: string; coordinators?: { id: number; email: string }[] }[];
 
   // R&D classification
   is_rnd_event?: boolean;
@@ -274,6 +288,8 @@ export interface Event {
   // Outside campus registration
   outside_campus_registration?: boolean;
   registration_accepted?: boolean;
+  student_registration_enabled?: boolean;
+  faculty_registration_enabled?: boolean;
 
   status: EventStatus;
   created_by: number;

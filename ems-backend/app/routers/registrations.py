@@ -16,16 +16,40 @@ from app.models.system_config import SystemSettings
 from app.services.email_service import notify_registration_confirmation
 from app.routers.events import is_student_eligible_for_event
 from app.schemas.event import VisitorRegistrationCreate
+from app.utils.additional_perms import has_perm
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
+def _is_event_registration_user(user: User, event: Event) -> bool:
+    """Return whether this user may use the in-campus registration flow."""
+    if user.role == "student":
+        return bool(event.student_registration_enabled)
+
+    if user.role != "additional" or not has_perm(user, "registration"):
+        return False
+
+    if user.coordinator_type == "student":
+        return bool(event.student_registration_enabled)
+    if user.coordinator_type == "Faculty":
+        return bool(event.faculty_registration_enabled)
+    return False
+
+
+def _registration_access_message(user: User) -> str:
+    if user.role == "additional" and not has_perm(user, "registration"):
+        return "Missing permission: registration"
+    if user.role == "additional" and not user.coordinator_type:
+        return "Select a coordinator type before registering for events"
+    return "Registration is not enabled for your coordinator type on this event"
+
+
 @router.post("/{event_id}/register")
 async def register_for_event(
     event_id: int,
-    current_user: User = Depends(require_roles("student")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Register the current student for an event."""
@@ -50,11 +74,12 @@ async def register_for_event(
             detail="Registration is only open for approved or ongoing events",
         )
 
-    # Registration accepted check
-    if not event.registration_accepted:
+    # Registration accepted and audience checks. Additional users must have the
+    # Registration permission and a coordinator type matching the event audience.
+    if not event.registration_accepted or not _is_event_registration_user(current_user, event):
         raise HTTPException(
             status_code=403,
-            detail="Registration is not accepted for this event",
+            detail=_registration_access_message(current_user),
         )
 
     # Registration start time & deadline checks
@@ -123,10 +148,16 @@ async def register_for_event(
 @router.delete("/{event_id}/cancel")
 async def cancel_registration(
     event_id: int,
-    current_user: User = Depends(require_roles("student")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel the current student's registration."""
+    event = await db.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if not _is_event_registration_user(current_user, event):
+        raise HTTPException(status_code=403, detail=_registration_access_message(current_user))
+
     result = await db.execute(
         select(EventRegistration).where(
             EventRegistration.event_id == event_id,
@@ -181,10 +212,13 @@ async def list_registrations(
 
 @router.get("/my")
 async def my_registrations(
-    current_user: User = Depends(require_roles("student")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Return all events the current student is registered for."""
+    if current_user.role not in ("student", "additional"):
+        raise HTTPException(status_code=403, detail="Only student or coordinator registrations are available here")
+
     result = await db.execute(
         select(Event, EventRegistration)
         .join(EventRegistration, EventRegistration.event_id == Event.id)

@@ -5,6 +5,7 @@ from sqlalchemy import select, and_, or_, func, cast, String
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 import logging
 import traceback
 
@@ -34,7 +35,10 @@ from app.schemas.event import (
 )
 from app.services.storage_service import save_file, delete_file
 from app.services.venue_clash_service import check_venue_clash
-from app.services.email_service import notify_event_cancelled, notify_event_details_updated
+from app.services.email_service import (
+    notify_event_cancelled, notify_event_details_updated,
+    notify_faculty_and_coordinators_involved
+)
 from app.utils.permissions import can_edit_event, can_cancel_event, can_view_internal_docs
 from app.utils.diff import take_event_snapshot, compute_diff
 
@@ -42,6 +46,59 @@ router = APIRouter()
 
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
+
+def synchronize_registration_audience(event: Event) -> None:
+    """Keep registration switches consistent for UI and direct API updates."""
+    event.registration_accepted = bool(
+        event.outside_campus_registration
+        or event.student_registration_enabled
+        or event.faculty_registration_enabled
+    )
+    if not event.registration_accepted:
+        event.outside_campus_registration = False
+        event.registration_start_datetime = None
+        event.registration_deadline = None
+
+
+async def _get_involved_faculty_and_coordinators_emails(db: AsyncSession, event: Event) -> List[str]:
+    """Build unique list of email addresses for Faculty Involved and Coordinators for an event."""
+    emails = []
+
+    # 1. Faculty involved emails provided in event form submission
+    if event.faculty_involved_emails:
+        for em in event.faculty_involved_emails:
+            if em:
+                emails.append(str(em).strip().lower())
+
+    # 2. Event creator email
+    if event.created_by:
+        from app.models.user import User
+        creator = await db.get(User, event.created_by)
+        if creator and creator.email:
+            emails.append(creator.email.strip().lower())
+
+    # 3. Primary club coordinator email
+    if event.club_id:
+        from app.models.club import Club
+        from app.models.user import User
+        club = await db.get(Club, event.club_id)
+        if club and club.coordinator_id:
+            coord = await db.get(User, club.coordinator_id)
+            if coord and coord.email:
+                emails.append(coord.email.strip().lower())
+
+    # 4. Collaborating club coordinators emails
+    if event.collaborating_clubs:
+        from app.models.club import Club
+        from app.models.user import User
+        for collab in event.collaborating_clubs:
+            collab_club = await db.get(Club, collab.club_id)
+            if collab_club and collab_club.coordinator_id:
+                coord = await db.get(User, collab_club.coordinator_id)
+                if coord and coord.email:
+                    emails.append(coord.email.strip().lower())
+
+    return list(set(emails))
 
 def is_student_eligible_for_event(user: User, event: Event) -> bool:
     """
@@ -619,8 +676,11 @@ async def get_event(
         "venue_custom": event.venue_custom,
         "venue_type": event.venue_type,
         "departments_involved": event.departments_involved or [],
+        "faculty_involved_emails": event.faculty_involved_emails,
+        "objectives": event.objectives or [],
         "seating_arrangement": event.seating_arrangement,
         "budget": event.budget,
+        "budget_breakdown": event.budget_breakdown,
         "comments": event.comments,
         "poster_path": event.poster_path,
         "status": event.status,
@@ -634,6 +694,8 @@ async def get_event(
         "rnd_tentative_date": event.rnd_tentative_date.isoformat() if event.rnd_tentative_date else None,
         "registration_accepted": event.registration_accepted,
         "outside_campus_registration": event.outside_campus_registration,
+        "student_registration_enabled": event.student_registration_enabled,
+        "faculty_registration_enabled": event.faculty_registration_enabled,
         "registration_count": registration_count,
         "is_registered": is_registered,
         "links": [{"id": l.id, "link_type": l.link_type, "url": l.url, "label": l.label}
@@ -738,11 +800,9 @@ async def create_event(
 
         # Registration dates and toggle synchronization handling
         outside_campus = body.outside_campus_registration
-        reg_accepted = body.registration_accepted
-        if outside_campus:
-            reg_accepted = True
-        if not reg_accepted:
-            outside_campus = False
+        student_registration_enabled = body.student_registration_enabled
+        faculty_registration_enabled = body.faculty_registration_enabled
+        reg_accepted = bool(outside_campus or student_registration_enabled or faculty_registration_enabled)
 
         reg_start = None
         reg_deadline = None
@@ -778,6 +838,41 @@ async def create_event(
                 chosen = random.choice(posters)
                 random_poster_path = f"/api/static/default_posters/{chosen}"
 
+        # Budget and breakdown calculation & validation
+        final_budget = Decimal('0.00')
+        stored_breakdown = None
+
+        if body.budget_breakdown is not None and len(body.budget_breakdown) > 0:
+            calc_total = Decimal('0.00')
+            stored_breakdown = []
+            for item in body.budget_breakdown:
+                amt = Decimal(str(item.amount))
+                if amt < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget item amount cannot be negative")
+                cat = item.category.strip() if item.category else ""
+                if not cat:
+                    raise HTTPException(status_code=400, detail="Each budget item must have a category or description")
+                calc_total += amt
+                stored_breakdown.append({
+                    "category": cat,
+                    "amount": float(amt),
+                    "description": item.description.strip() if item.description else None
+                })
+
+            if body.budget is not None:
+                provided_budget = Decimal(str(body.budget))
+                if abs(provided_budget - calc_total) > Decimal('0.01'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Estimated budget total does not match the sum of breakdown items"
+                    )
+            final_budget = calc_total
+        else:
+            if body.budget is not None:
+                final_budget = Decimal(str(body.budget))
+                if final_budget < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget cannot be negative")
+
         event = Event(
             title=body.title,
             event_type=body.event_type,
@@ -797,6 +892,8 @@ async def create_event(
             venue_custom=body.venue_custom,
             venue_type=body.venue_type,
             departments_involved=body.departments_involved,
+            faculty_involved_emails=[str(email) for email in body.faculty_involved_emails] if body.faculty_involved_emails else None,
+            objectives=[o.strip() for o in (body.objectives or []) if o and o.strip()] if body.objectives else None,
             seating_arrangement=body.seating_arrangement,
             seating_other_detail=body.seating_other_detail,
             tables_required=body.tables_required,
@@ -828,8 +925,11 @@ async def create_event(
             volunteers_details=body.volunteers_details,
             outside_campus_registration=outside_campus,
             registration_accepted=reg_accepted,
+            student_registration_enabled=student_registration_enabled,
+            faculty_registration_enabled=faculty_registration_enabled,
             other_requirements=body.other_requirements,
-            budget=body.budget,
+            budget=final_budget,
+            budget_breakdown=stored_breakdown,
             comments=body.comments,
             poster_path=random_poster_path,
             created_by=current_user.id,
@@ -861,6 +961,15 @@ async def create_event(
 
         await db.commit()
         await db.refresh(event)
+
+        # Notify all Faculty Involved & Coordinators that event was created
+        try:
+            involved_emails = await _get_involved_faculty_and_coordinators_emails(db, event)
+            if involved_emails:
+                notify_faculty_and_coordinators_involved(event, involved_emails, event_action="created")
+        except Exception as e:
+            logger.error(f"Error sending creation notifications for event {event.id}: {e}")
+
         return {"id": event.id, "status": event.status, "message": "Event created as draft"}
     except HTTPException:
         raise
@@ -893,7 +1002,7 @@ async def update_event(
         now = datetime.now(timezone.utc)
         update_data = body.model_dump(exclude_unset=True)
 
-        reg_config_keys = {"registration_start_datetime", "registration_deadline", "registration_accepted", "outside_campus_registration"}
+        reg_config_keys = {"registration_start_datetime", "registration_deadline", "registration_accepted", "outside_campus_registration", "student_registration_enabled", "faculty_registration_enabled"}
         is_registration_dates_only = bool(update_data) and set(update_data.keys()).issubset(reg_config_keys)
 
         # Special case: Editing registration schedule alone for any event (including approved/ongoing)
@@ -907,8 +1016,15 @@ async def update_event(
                 event.registration_accepted = body.registration_accepted
                 if not body.registration_accepted:
                     event.outside_campus_registration = False
+                    event.student_registration_enabled = False
+                    event.faculty_registration_enabled = False
                     event.registration_start_datetime = None
                     event.registration_deadline = None
+
+            if "student_registration_enabled" in update_data:
+                event.student_registration_enabled = body.student_registration_enabled
+            if "faculty_registration_enabled" in update_data:
+                event.faculty_registration_enabled = body.faculty_registration_enabled
 
             if "registration_start_datetime" in update_data:
                 reg_s = body.registration_start_datetime
@@ -922,13 +1038,7 @@ async def update_event(
                     reg_e = reg_e.replace(tzinfo=timezone.utc)
                 event.registration_deadline = reg_e
 
-            # Sync check
-            if event.outside_campus_registration:
-                event.registration_accepted = True
-            if not event.registration_accepted:
-                event.outside_campus_registration = False
-                event.registration_start_datetime = None
-                event.registration_deadline = None
+            synchronize_registration_audience(event)
 
             if event.registration_accepted:
                 if not event.registration_start_datetime or not event.registration_deadline:
@@ -976,19 +1086,43 @@ async def update_event(
         if 'transport' in update_data and not update_data['transport']: update_data['transport_details'] = None
         if 'security' in update_data and not update_data['security']: update_data['security_details'] = None
         if 'printing' in update_data and not update_data['printing']: update_data['printing_details'] = None
-        if 'volunteers' in update_data and not update_data['volunteers']: update_data['volunteers_details'] = None
+        # Budget breakdown handling in update
+        if 'budget_breakdown' in update_data and update_data['budget_breakdown'] is not None:
+            calc_total = Decimal('0.00')
+            stored_breakdown = []
+            for item in body.budget_breakdown or []:
+                amt = Decimal(str(item.amount))
+                if amt < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget item amount cannot be negative")
+                cat = item.category.strip() if item.category else ""
+                if not cat:
+                    raise HTTPException(status_code=400, detail="Each budget item must have a category or description")
+                calc_total += amt
+                stored_breakdown.append({
+                    "category": cat,
+                    "amount": float(amt),
+                    "description": item.description.strip() if item.description else None
+                })
+            if 'budget' in update_data and update_data['budget'] is not None:
+                provided_budget = Decimal(str(body.budget))
+                if abs(provided_budget - calc_total) > Decimal('0.01'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Estimated budget total does not match the sum of breakdown items"
+                    )
+            update_data['budget'] = calc_total
+            update_data['budget_breakdown'] = stored_breakdown
+        elif 'budget' in update_data and update_data['budget'] is not None:
+            provided_budget = Decimal(str(body.budget))
+            if provided_budget < Decimal('0.00'):
+                raise HTTPException(status_code=400, detail="Budget cannot be negative")
 
         for field, value in update_data.items():
             if hasattr(event, field):
                 setattr(event, field, value)
 
         # Toggle synchronization on general update
-        if event.outside_campus_registration:
-            event.registration_accepted = True
-        if not event.registration_accepted:
-            event.outside_campus_registration = False
-            event.registration_start_datetime = None
-            event.registration_deadline = None
+        synchronize_registration_audience(event)
 
         if event.registration_accepted:
             if not event.registration_start_datetime or not event.registration_deadline:
@@ -1028,19 +1162,35 @@ async def update_event(
             err_msg = f"Venue clash detected! The venue is already booked for: {detail_str}. Please choose a different venue or time slot."
             raise HTTPException(status_code=409, detail=err_msg)
 
+        if 'objectives' in update_data:
+            event.objectives = [o.strip() for o in (body.objectives or []) if o and o.strip()] if body.objectives else None
+
         if body.venue_ids is not None:
             from sqlalchemy import delete
             await db.execute(delete(EventVenue).where(EventVenue.event_id == event.id))
             for vid in body.venue_ids:
                 db.add(EventVenue(event_id=event.id, venue_id=vid))
 
+        if body.collaborating_club_ids is not None:
+            from sqlalchemy import delete
+            await db.execute(delete(EventCollaboratingClub).where(EventCollaboratingClub.event_id == event.id))
+            if event.is_collaborative:
+                for cid in body.collaborating_club_ids:
+                    db.add(EventCollaboratingClub(event_id=event.id, club_id=cid))
+
+        if body.is_sponsored and body.sponsor_name:
+            if event.sponsors:
+                event.sponsors[0].name = body.sponsor_name
+            else:
+                db.add(EventSponsor(event_id=event.id, name=body.sponsor_name))
+
         # Status reset logic
         is_collab = event.is_collaborative and event.collaborating_clubs
-        if event.status == "draft":
-            pass  # stays draft
+        if event.status in ["draft", "suggested_changes"]:
+            pass  # stays draft / suggested_changes when saving changes
         elif event.status in [
             "pending_associate_dean", "pending_coordinator_parallel",
-            "pending_director", "suggested_changes",
+            "pending_director",
         ]:
             # For collaborative events, restart from coordinator parallel approval
             if is_collab:
@@ -1097,9 +1247,10 @@ async def update_event(
                     EventRegistration.status == "registered",
                 )
             )
-            students = reg_result.scalars().all()
-            if students:
-                notify_event_details_updated(event, students)
+            # Student email notifications disabled per requirement
+            # if students:
+            #     notify_event_details_updated(event, students)
+            pass
 
         event.last_edited_by = current_user.id
         event.last_edited_at = now
@@ -1150,7 +1301,11 @@ async def submit_event(
             if event.created_by != current_user.id and current_user.role != "super_admin":
                 raise HTTPException(status_code=403, detail="Only the event creator can submit")
 
-        allowed_statuses = ["draft", "suggested_changes"]
+        allowed_statuses = [
+            "draft", "suggested_changes",
+            "pending_associate_dean", "pending_coordinator_parallel",
+            "pending_dean", "pending_director",
+        ]
         if event.status not in allowed_statuses:
             raise HTTPException(
                 status_code=400,
@@ -1236,6 +1391,15 @@ async def submit_event(
                         notify_event_submitted(event, dean)
 
         await db.commit()
+
+        # Notify all Faculty Involved & Coordinators that event was submitted
+        try:
+            involved_emails = await _get_involved_faculty_and_coordinators_emails(db, event)
+            if involved_emails:
+                notify_faculty_and_coordinators_involved(event, involved_emails, event_action="submitted")
+        except Exception as e:
+            logger.error(f"Error sending submission notifications for event {event.id}: {e}")
+
         return {"message": "Event submitted", "status": event.status}
     except HTTPException:
         raise

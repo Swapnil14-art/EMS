@@ -125,8 +125,11 @@ export async function clickTableSort(page: Page, columnName: string) {
 export async function searchInTable(page: Page, query: string) {
   const searchInput = page.getByPlaceholder(/search/i).first();
   await searchInput.fill(query);
-  // Give debounce time to fire
-  await page.waitForTimeout(500);
+  // Give debounce time to fire and wait for network
+  await page.waitForResponse(
+    (response) => response.url().toLowerCase().includes('search') || response.request().method() === 'GET',
+    { timeout: 5000 }
+  ).catch(() => {});
 }
 
 // ─── API Helpers ─────────────────────────────────────────────────────────────

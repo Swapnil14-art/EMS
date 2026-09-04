@@ -1,5 +1,5 @@
 """
-Seed script for test data: Departments, Venues, Clubs, and Users (all 4 non-admin roles).
+Seed script for the complete EMS test matrix: reference data, users, and event scenarios.
 
 Usage (Docker — recommended):
     docker exec ems_backend python seed_all_test_data.py
@@ -95,7 +95,12 @@ def upsert_club(db, *, name: str, description: str,
 
 
 def upsert_user(db, *, email: str, name: str, role: str,
-                department_id: int = None, club_id: int = None) -> User:
+                department_id: int = None, club_id: int = None,
+                extra_permissions: list[str] | None = None,
+                coordinator_type: str | None = None,
+                sap_id: str | None = None, branch: str | None = None,
+                course: str | None = None, year_of_study: str | None = None,
+                phone_number: str | None = None) -> User:
     user = db.query(User).filter_by(email=email).first()
     if not user:
         user = User(
@@ -107,6 +112,13 @@ def upsert_user(db, *, email: str, name: str, role: str,
             is_first_login=False,
             department_id=department_id,
             club_id=club_id,
+            extra_permissions=extra_permissions or [],
+            coordinator_type=coordinator_type,
+            sap_id=sap_id,
+            branch=branch,
+            course=course,
+            year_of_study=year_of_study,
+            phone_number=phone_number,
         )
         db.add(user)
         db.flush()
@@ -119,13 +131,20 @@ def upsert_user(db, *, email: str, name: str, role: str,
         user.role = role
         user.department_id = department_id
         user.club_id = club_id
+        user.extra_permissions = extra_permissions or []
+        user.coordinator_type = coordinator_type
+        user.sap_id = sap_id
+        user.branch = branch
+        user.course = course
+        user.year_of_study = year_of_study
+        user.phone_number = phone_number
         print(f"  · User already exists (updated): {name} <{email}>  role={role}")
     return user
 
 
 # ── main seed logic ─────────────────────────────────────────────────────────
 
-def seed():
+def seed(include_events: bool = True):
     with Session() as db:
 
         # ────────────────────────────────────────────────────────────────────
@@ -208,6 +227,8 @@ def seed():
         print("\n👤 Users")
 
         # ── Director ────────────────────────────────────────────────────────
+        upsert_user(db, email="admin@nmims.in",
+                    name="System Administrator", role="super_admin")
         upsert_user(db, email="director@nmims.in",
                     name="Dr. Rajesh Mehta", role="director")
 
@@ -243,13 +264,49 @@ def seed():
         # ── Students ────────────────────────────────────────────────────────
         upsert_user(db, email="student1@nmims.in",
                     name="Arjun Nair", role="student",
-                    department_id=dept_engg.id)
+                    department_id=dept_engg.id, sap_id="70412300001",
+                    branch="Computer Engineering", course="B.Tech",
+                    year_of_study="Y3", phone_number="9876500001")
         upsert_user(db, email="student2@nmims.in",
                     name="Pooja Reddy", role="student",
-                    department_id=dept_agri.id)
+                    department_id=dept_agri.id, sap_id="70412300002",
+                    branch="Agronomy", course="B.Sc", year_of_study="Y2",
+                    phone_number="9876500002")
         upsert_user(db, email="student3@nmims.in",
                     name="Vikram Singh", role="student",
-                    department_id=dept_phrm.id)
+                    department_id=dept_phrm.id, sap_id="70412300003",
+                    branch="Pharmaceutics", course="B.Pharm", year_of_study="Y4",
+                    phone_number="9876500003")
+
+        # ── Additional role matrix ─────────────────────────────────────────
+        # These accounts cover no access, normal dynamic access, permission
+        # delegation, and both event-registration coordinator audiences.
+        upsert_user(db, email="additional.viewer@nmims.in",
+                    name="Ananya Viewer", role="additional", department_id=dept_engg.id,
+                    extra_permissions=["view_events", "view_event_details"])
+        upsert_user(db, email="additional.manager@nmims.in",
+                    name="Pranav Permission Manager", role="additional", department_id=dept_engg.id,
+                    extra_permissions=["view_events", "view_event_details", "manage_permissions"])
+        upsert_user(db, email="additional.full@nmims.in",
+                    name="Full Permission Additional User", role="additional", department_id=dept_phrm.id,
+                    extra_permissions=[
+                        "registration", "view_events", "view_event_details", "view_event_status",
+                        "view_documents", "view_reports", "view_rnd_reports", "submit_reports",
+                        "submit_rnd_reports",
+                    ])
+        upsert_user(db, email="additional.none@nmims.in",
+                    name="No Permission User", role="additional", department_id=dept_agri.id)
+        upsert_user(db, email="student.coordinator@nmims.in",
+                    name="Riya Student Coordinator", role="additional", department_id=dept_engg.id,
+                    coordinator_type="student",
+                    extra_permissions=["registration", "view_events", "view_event_details"])
+        upsert_user(db, email="faculty.coordinator@nmims.in",
+                    name="Dr. Meera Faculty Coordinator", role="additional", department_id=dept_engg.id,
+                    coordinator_type="Faculty",
+                    extra_permissions=[
+                        "registration", "view_events", "view_event_details", "view_event_status",
+                        "view_rnd_reports", "submit_reports", "submit_rnd_reports",
+                    ])
 
         db.commit()
 
@@ -282,6 +339,12 @@ def seed():
         print("═" * 55)
         print(f"\n  🔑  Default password for all seeded users: {DEFAULT_PASSWORD}")
         print()
+
+    if include_events:
+        # Import lazily to avoid a circular import when seed_event_data needs
+        # reference data before it creates the scenario events.
+        from seed_event_data import seed_events
+        seed_events(create_prerequisites=False)
 
 
 if __name__ == "__main__":

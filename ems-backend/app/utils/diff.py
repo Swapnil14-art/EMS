@@ -49,6 +49,7 @@ def take_event_snapshot(event) -> dict:
         "venue_type": event.venue_type,
         "seating_arrangement": event.seating_arrangement,
         "budget": str(event.budget) if event.budget else None,
+        "budget_breakdown": event.budget_breakdown,
         "it_projector": event.it_projector,
         "it_audio": event.it_audio,
         "it_wifi": event.it_wifi,

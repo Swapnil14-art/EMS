@@ -5,6 +5,7 @@ from typing import List
 
 # All valid permission codes mapped to human-readable labels
 PERMISSION_CATALOG: dict[str, str] = {
+    "registration":        "Registration — Register for events enabled for the selected coordinator type",
     "view_events":         "View Events — Browse the public event list",
     "view_event_details":  "View Event Details — Open full event detail pages",
     "view_event_status":   "View Approval Status — See approval history & current step",

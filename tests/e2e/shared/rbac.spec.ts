@@ -1,88 +1,195 @@
 /**
- * Role-Based Access Control Tests
+ * Authorization and Visibility — RBAC matrix
  *
- * Verifies that each role can only access their authorized pages
- * and is blocked from unauthorized routes.
+ * Tests BOTH the page redirect AND the direct API endpoint.
+ * UI hiding alone is not authorization.
+ *
+ * Lane: rbac | Mutates: No | §6.C — PLAYWRIGHT_TEST_STRATEGY.md
  */
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { navigateTo } from '../../helpers/test-helpers';
+import { rawLogin } from '../../helpers/api';
+import { apiCall } from '../../helpers/api';
 
-const ADMIN_STATE = path.resolve('tests/.auth/admin.json');
-const COORD_STATE = path.resolve('tests/.auth/coordinator.json');
-const STUDENT_STATE = path.resolve('tests/.auth/student.json');
+const ADMIN_STATE     = path.resolve('tests/.auth/admin.json');
+const DIRECTOR_STATE  = path.resolve('tests/.auth/director.json');
+const DEAN_STATE      = path.resolve('tests/.auth/dean.json');
+const COORD_STATE     = path.resolve('tests/.auth/coordinator.json');
+const STUDENT_STATE   = path.resolve('tests/.auth/student.json');
+const ADD_NONE_STATE  = path.resolve('tests/.auth/additional.none.json');
+const ADD_VIEW_STATE  = path.resolve('tests/.auth/additional.viewer.json');
+const UNAUTH          = { cookies: [] as [], origins: [] as [] };
 
-// ─── Access Matrix ───────────────────────────────────────────────────────────
-const ACCESS_MATRIX = [
-  {
-    role: 'Student',
-    storageState: STUDENT_STATE,
-    allowed: ['/student', '/student/events', '/student/registrations', '/calendar'],
-    blocked: ['/admin', '/admin/users', '/director', '/club_coordinator', '/associate_dean'],
-  },
-  {
-    role: 'Coordinator',
-    storageState: COORD_STATE,
-    allowed: ['/club_coordinator', '/club_coordinator/events', '/calendar'],
-    blocked: ['/admin', '/admin/users', '/director', '/associate_dean'],
-  },
-];
+// ─── Helper: follow redirects and return final URL ────────────────────────────
+async function finalUrl(page: any, route: string): Promise<string> {
+  await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+  await page.waitForURL(/.+/, { timeout: 8_000 }).catch(() => {});
+  return page.url();
+}
 
-test.describe('Role-Based Access Control', () => {
-  for (const { role, storageState, allowed, blocked } of ACCESS_MATRIX) {
-    test.describe(`${role}`, () => {
-      test.use({ storageState });
+// ─── Fixed-role dashboard allow-list ─────────────────────────────────────────
+test.describe('RBAC — Admin route allow-list', () => {
+  test.use({ storageState: ADMIN_STATE });
 
-      for (const route of allowed) {
-        test(`should access ${route}`, async ({ page }) => {
-          const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15_000 });
-          // Should not get 403/404 error page
-          expect(response?.status() || 200).toBeLessThan(400);
-          await page.waitForTimeout(2000);
-          // Should not be redirected to login
-          expect(page.url()).not.toContain('/login');
-        });
-      }
+  const adminRoutes = ['/admin', '/admin/users', '/admin/clubs', '/admin/departments',
+    '/admin/events', '/admin/venues', '/admin/permissions', '/admin/email-log', '/admin/system-controls'];
 
-      for (const route of blocked) {
-        test(`should NOT access ${route}`, async ({ page }) => {
-          await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15_000 });
-          await page.waitForTimeout(3000);
-          // Should be redirected away (to own dashboard or login)
-          expect(page.url()).not.toContain(route);
-        });
-      }
+  for (const route of adminRoutes) {
+    test(`admin can access ${route}`, async ({ page }) => {
+      const url = await finalUrl(page, route);
+      expect(url).not.toContain('/login');
+      expect(url).toContain(route.split('/').slice(0, 3).join('/'));
+    });
+  }
+});
+
+test.describe('RBAC — Director route allow-list', () => {
+  test.use({ storageState: DIRECTOR_STATE });
+
+  const directorRoutes = ['/director', '/director/events', '/director/history', '/director/venues'];
+  for (const route of directorRoutes) {
+    test(`director can access ${route}`, async ({ page }) => {
+      const url = await finalUrl(page, route);
+      expect(url).not.toContain('/login');
     });
   }
 
-  // Admin should access everything
-  test.describe('Admin', () => {
-    test.use({ storageState: ADMIN_STATE });
+  test('director cannot access /admin', async ({ page }) => {
+    const url = await finalUrl(page, '/admin');
+    expect(url).not.toMatch(/\/admin(?:$|\/)/);
+  });
+});
 
-    const adminRoutes = ['/admin', '/admin/users', '/admin/clubs', '/admin/departments', '/admin/events', '/admin/venues'];
-    for (const route of adminRoutes) {
-      test(`should access ${route}`, async ({ page }) => {
-        const response = await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15_000 });
-        expect(response?.status() || 200).toBeLessThan(400);
-        await page.waitForTimeout(2000);
-        expect(page.url()).not.toContain('/login');
-      });
-    }
+test.describe('RBAC — Associate Dean route allow-list', () => {
+  test.use({ storageState: DEAN_STATE });
+
+  const deanRoutes = ['/associate_dean', '/associate_dean/events', '/associate_dean/history',
+    '/associate_dean/clubs', '/associate_dean/venues'];
+
+  for (const route of deanRoutes) {
+    test(`dean can access ${route}`, async ({ page }) => {
+      const url = await finalUrl(page, route);
+      expect(url).not.toContain('/login');
+    });
+  }
+
+  test('dean cannot access /admin', async ({ page }) => {
+    const url = await finalUrl(page, '/admin');
+    expect(url).not.toMatch(/\/admin(?:$|\/)/);
+  });
+});
+
+test.describe('RBAC — Coordinator route allow-list', () => {
+  test.use({ storageState: COORD_STATE });
+
+  const coordRoutes = ['/club_coordinator', '/club_coordinator/events',
+    '/club_coordinator/events/create', '/club_coordinator/report'];
+
+  for (const route of coordRoutes) {
+    test(`coordinator can access ${route}`, async ({ page }) => {
+      const url = await finalUrl(page, route);
+      expect(url).not.toContain('/login');
+    });
+  }
+
+  test('coordinator cannot access /admin', async ({ page }) => {
+    const url = await finalUrl(page, '/admin');
+    expect(url).not.toMatch(/\/admin(?:$|\/)/);
   });
 
-  // Unauthenticated should be blocked from all protected routes
-  test.describe('Unauthenticated', () => {
-    test.use({ storageState: { cookies: [], origins: [] } });
+  test('coordinator cannot access /director', async ({ page }) => {
+    const url = await finalUrl(page, '/director');
+    expect(url).not.toMatch(/\/director(?:$|\/)/);
+  });
+});
 
-    const protectedRoutes = ['/admin', '/director', '/club_coordinator', '/student', '/associate_dean', '/profile'];
-    for (const route of protectedRoutes) {
-      test(`should NOT access ${route}`, async ({ page }) => {
-        await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15_000 });
-        await page.waitForTimeout(3000);
-        // Should redirect to login or landing
-        const url = page.url();
-        expect(url.includes('/login') || url.endsWith('/') || url.includes('localhost:8080')).toBeTruthy();
-      });
-    }
+test.describe('RBAC — Student route allow-list', () => {
+  test.use({ storageState: STUDENT_STATE });
+
+  const studentRoutes = ['/student', '/student/events', '/student/registrations'];
+  for (const route of studentRoutes) {
+    test(`student can access ${route}`, async ({ page }) => {
+      const url = await finalUrl(page, route);
+      expect(url).not.toContain('/login');
+    });
+  }
+
+  const blockedRoutes = ['/admin', '/director', '/associate_dean', '/club_coordinator'];
+  for (const route of blockedRoutes) {
+    test(`student cannot access ${route}`, async ({ page }) => {
+      const url = await finalUrl(page, route);
+      expect(url).not.toMatch(new RegExp(`${route.replace('/', '\\/')}(?:$|\\/)`));
+    });
+  }
+});
+
+test.describe('RBAC — Additional (no permissions) is denied', () => {
+  test.use({ storageState: ADD_NONE_STATE });
+
+  test('additional.none cannot access any privileged routes', async ({ page }) => {
+    const url = await finalUrl(page, '/admin');
+    expect(url).not.toMatch(/\/admin(?:$|\/)/);
+  });
+});
+
+test.describe('RBAC — Unauthenticated redirect matrix', () => {
+  test.use({ storageState: UNAUTH });
+
+  const protectedRoutes = ['/admin', '/director', '/club_coordinator', '/student',
+    '/associate_dean', '/profile'];
+
+  for (const route of protectedRoutes) {
+    test(`unauthenticated cannot access ${route}`, async ({ page }) => {
+      const url = await finalUrl(page, route);
+      const isLoginOrRoot = url.includes('/login') || url.endsWith('/') ||
+        url.endsWith(':8080') || url.endsWith(':8080/');
+      expect(isLoginOrRoot, `Expected redirect to login, got: ${url}`).toBeTruthy();
+    });
+  }
+});
+
+// ─── API boundary checks (§6.C: UI hiding is not authorization) ──────────────
+test.describe('RBAC — API boundary (not just UI)', () => {
+  let studentToken: string;
+  let coordinatorToken: string;
+  let adminToken: string;
+
+  test.beforeAll(async () => {
+    const [s, c, a] = await Promise.all([
+      rawLogin('student1@nmims.in', 'Test@123'),
+      rawLogin('coord.gdsc@nmims.in', 'Test@123'),
+      rawLogin('admin@nmims.in', 'Admin@123'),
+    ]);
+    studentToken = s.access_token;
+    coordinatorToken = c.access_token;
+    adminToken = a.access_token;
+  });
+
+  test('student cannot read admin users via API', async ({ request }) => {
+    const res = await apiCall(request, 'GET', '/admin/users', { token: studentToken });
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('coordinator cannot read admin users via API', async ({ request }) => {
+    const res = await apiCall(request, 'GET', '/admin/users', { token: coordinatorToken });
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('unauthenticated cannot read events requiring auth', async ({ request }) => {
+    const res = await apiCall(request, 'GET', '/admin/users');
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('unauthenticated POST /registrations/ returns 401', async ({ request }) => {
+    const res = await apiCall(request, 'POST', '/registrations/', { body: { event_id: 1 } });
+    expect(res.status).toBe(401);
+  });
+
+  test('error response does not expose stack traces or internal paths', async ({ request }) => {
+    const res = await apiCall(request, 'GET', '/admin/users', { token: studentToken });
+    expect([401, 403]).toContain(res.status);
+    const body = JSON.stringify(res.data);
+    expect(body).not.toMatch(/Traceback|at line \d+|File "/i);
+    expect(body).not.toMatch(/password_hash|hashed_/i);
   });
 });

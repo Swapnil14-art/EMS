@@ -41,6 +41,7 @@ class UserOut(UserBase):
     department: Optional[SimpleDepartment] = None
     club: Optional[SimpleClub] = None
     extra_permissions: Optional[list[str]] = []
+    coordinator_type: Optional[str] = None
 
     class Config:
         from_attributes = True

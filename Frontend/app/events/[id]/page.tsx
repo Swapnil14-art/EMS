@@ -100,9 +100,14 @@ export default function PublicEventDetailPage() {
 
   const isRegistrationAccepted = !!event.registration_accepted;
 
+  const isStudentRegistration = user?.role === 'student' && !!event.student_registration_enabled;
+  const isCoordinatorRegistration = user?.role === 'additional' &&
+    user.extra_permissions?.includes('registration') &&
+    ((user.coordinator_type === 'student' && !!event.student_registration_enabled) ||
+      (user.coordinator_type === 'Faculty' && !!event.faculty_registration_enabled));
   const canRegister = isRegistrationAccepted &&
                       ['approved', 'ongoing'].includes(event.status) &&
-                      user?.role === 'student' &&
+                      (isStudentRegistration || isCoordinatorRegistration) &&
                       !registrationDisabled &&
                       !isBeforeRegStart &&
                       !isAfterRegEnd;
@@ -305,7 +310,7 @@ export default function PublicEventDetailPage() {
                         </Button>
                       ) : (
                         <Button
-                          onClick={() => router.push(`/student/events/${id}/register`)}
+                          onClick={isCoordinatorRegistration ? handleRegister : () => router.push(`/student/events/${id}/register`)}
                           variant="primary"
                           className="w-full justify-center"
                         >

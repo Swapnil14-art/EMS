@@ -37,6 +37,7 @@ EVENTS
        coord   : coord.tech@nmims.in
 """
 
+from app import database
 import sys
 from datetime import datetime, timezone, timedelta
 
@@ -383,10 +384,12 @@ def seed():
                 created_by=coord1.id,
                 responsible_coordinator_id=coord1.id,
                 current_approval_step=4,
+                poster_path="/login-bg.jpg",
             )
             db.add(event_a); db.flush()
             print(f"  + Event A id={event_a.id}")
         else:
+            event_a.poster_path = "/login-bg.jpg"
             print(f"  · Event A exists id={event_a.id}")
 
         # Attach venue to event_venues table as well

@@ -97,14 +97,14 @@ export default defineConfig({
     },
   ],
 
-  /* ── Dev Server ─────────────────────────────────────────────────────────── */
-  // Docker Compose is managed externally; just verify it's up
-  webServer: {
-    command: 'echo "Docker services expected to be running"',
-    url: `${API_URL}/health`,
-    reuseExistingServer: true,
-    timeout: 10_000,
-  },
+  // /* ── Dev Server ─────────────────────────────────────────────────────────── */
+  // // Docker Compose is managed externally; just verify it's up
+  // webServer: {
+  //   command: 'echo "Docker services expected to be running"',
+  //   url: `${API_URL}/health`,
+  //   reuseExistingServer: true,
+  //   timeout: 10_000,
+  // },
 });
 
 // Export for use in fixtures

@@ -1,7 +1,16 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional, List
 from datetime import datetime, date, time
 from decimal import Decimal
+
+
+class BudgetItem(BaseModel):
+    category: str
+    amount: Decimal
+    description: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class EventCreate(BaseModel):
@@ -17,6 +26,7 @@ class EventCreate(BaseModel):
     collaborating_club_ids: Optional[List[int]] = None
     is_sponsored: bool = False
     sponsor_name: Optional[str] = None
+    objectives: Optional[List[str]] = None
     start_datetime: datetime
     end_datetime: datetime
     registration_start_datetime: Optional[datetime] = None
@@ -26,6 +36,7 @@ class EventCreate(BaseModel):
     venue_custom: Optional[str] = None
     venue_type: Optional[str] = None
     departments_involved: Optional[List[str]] = None
+    faculty_involved_emails: Optional[List[EmailStr]] = None
     seating_arrangement: Optional[str] = None
     seating_other_detail: Optional[str] = None
     tables_required: Optional[str] = None
@@ -56,7 +67,8 @@ class EventCreate(BaseModel):
     volunteers: bool = False
     volunteers_details: Optional[str] = None
     other_requirements: Optional[str] = None
-    budget: Decimal
+    budget: Optional[Decimal] = None
+    budget_breakdown: Optional[List[BudgetItem]] = None
     comments: Optional[str] = None
     # R&D fields
     is_rnd_event: bool = False
@@ -67,6 +79,23 @@ class EventCreate(BaseModel):
     # Outside campus registration
     outside_campus_registration: bool = False
     registration_accepted: bool = False
+    student_registration_enabled: bool = False
+    faculty_registration_enabled: bool = False
+
+    @field_validator("faculty_involved_emails")
+    @classmethod
+    def validate_faculty_involved_emails(cls, emails):
+        if emails is None:
+            return None
+        normalized = []
+        for email in emails:
+            value = str(email).strip().lower()
+            if not value.endswith((".edu", ".in")):
+                raise ValueError("Faculty email addresses must end exactly in .edu or .in")
+            if value in normalized:
+                raise ValueError("Faculty email addresses must be unique")
+            normalized.append(value)
+        return normalized
 
 
 class EventUpdate(BaseModel):
@@ -77,8 +106,10 @@ class EventUpdate(BaseModel):
     event_incharge_contact: Optional[str] = None
     target_audience: Optional[str] = None
     is_collaborative: Optional[bool] = None
-    is_sponsored: Optional[bool] = None
+    collaborating_club_ids: Optional[List[int]] = None
+    is_sponsored: bool = False
     sponsor_name: Optional[str] = None
+    objectives: Optional[List[str]] = None
     start_datetime: Optional[datetime] = None
     end_datetime: Optional[datetime] = None
     registration_start_datetime: Optional[datetime] = None
@@ -88,6 +119,7 @@ class EventUpdate(BaseModel):
     venue_custom: Optional[str] = None
     venue_type: Optional[str] = None
     departments_involved: Optional[List[str]] = None
+    faculty_involved_emails: Optional[List[EmailStr]] = None
     seating_arrangement: Optional[str] = None
     seating_other_detail: Optional[str] = None
     tables_required: Optional[str] = None
@@ -119,6 +151,7 @@ class EventUpdate(BaseModel):
     volunteers_details: Optional[str] = None
     other_requirements: Optional[str] = None
     budget: Optional[Decimal] = None
+    budget_breakdown: Optional[List[BudgetItem]] = None
     comments: Optional[str] = None
     # R&D fields
     is_rnd_event: Optional[bool] = None
@@ -129,10 +162,27 @@ class EventUpdate(BaseModel):
     # Outside campus registration
     outside_campus_registration: Optional[bool] = None
     registration_accepted: Optional[bool] = None
+    student_registration_enabled: Optional[bool] = None
+    faculty_registration_enabled: Optional[bool] = None
     # Post-start editable fields only
     registration_link: Optional[str] = None
     payment_link: Optional[str] = None
     oc_form_link: Optional[str] = None
+
+    @field_validator("faculty_involved_emails")
+    @classmethod
+    def validate_faculty_involved_emails(cls, emails):
+        if emails is None:
+            return None
+        normalized = []
+        for email in emails:
+            value = str(email).strip().lower()
+            if not value.endswith((".edu", ".in")):
+                raise ValueError("Faculty email addresses must end exactly in .edu or .in")
+            if value in normalized:
+                raise ValueError("Faculty email addresses must be unique")
+            normalized.append(value)
+        return normalized
 
 
 class EventLinkCreate(BaseModel):
@@ -208,6 +258,7 @@ class EventOut(BaseModel):
     club_id: Optional[int]
     is_collaborative: bool
     is_sponsored: bool
+    objectives: Optional[List[str]] = []
     start_datetime: datetime
     end_datetime: datetime
     registration_start_datetime: Optional[datetime]
@@ -217,8 +268,10 @@ class EventOut(BaseModel):
     venue_custom: Optional[str]
     venue_type: Optional[str]
     departments_involved: Optional[List[str]] = []
+    faculty_involved_emails: Optional[List[EmailStr]] = None
     seating_arrangement: Optional[str]
     budget: Decimal
+    budget_breakdown: Optional[List[BudgetItem]] = None
     comments: Optional[str]
     poster_path: Optional[str]
     participant_doc_path: Optional[str]
@@ -235,6 +288,8 @@ class EventOut(BaseModel):
     # Outside campus registration
     outside_campus_registration: bool = False
     registration_accepted: bool = False
+    student_registration_enabled: bool = False
+    faculty_registration_enabled: bool = False
 
     class Config:
         from_attributes = True

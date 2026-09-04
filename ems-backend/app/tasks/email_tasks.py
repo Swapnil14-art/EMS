@@ -19,7 +19,10 @@ def send_email(
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = settings.SMTP_FROM
+        if settings.SMTP_FROM_NAME:
+            msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM}>"
+        else:
+            msg["From"] = settings.SMTP_FROM
         msg["To"] = recipient
         msg.attach(MIMEText(body_html, "html"))
 
@@ -32,7 +35,10 @@ def send_email(
         _log_email(recipient, email_type, event_id, "sent")
 
     except Exception as exc:
-        _log_email(recipient, email_type, event_id, "failed", str(exc))
+        err_msg = str(exc)
+        if settings.SMTP_PASSWORD and settings.SMTP_PASSWORD in err_msg:
+            err_msg = err_msg.replace(settings.SMTP_PASSWORD, "******")
+        _log_email(recipient, email_type, event_id, "failed", err_msg)
         raise self.retry(exc=exc, countdown=60)
 
 

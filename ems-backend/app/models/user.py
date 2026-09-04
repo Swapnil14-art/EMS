@@ -23,6 +23,8 @@ class User(Base):
     club_coordinator_request = Column(Boolean, nullable=False, default=False)
     # Dynamic permission list for 'additional' role users (JSON array of permission codes)
     extra_permissions = Column(JSON, nullable=True, default=list)
+    # Optional registration audience for Additional-role coordinators: student|Faculty
+    coordinator_type = Column(String(20), nullable=True)
 
     status = Column(String(20), nullable=False, default="active")  # active|inactive
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())

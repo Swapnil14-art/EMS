@@ -11,6 +11,7 @@ interface ApprovalChainProps {
 
 const ROLE_LABELS: Record<string, string> = {
   dean: 'Dean',
+  associate_dean: 'Dean',
   director: 'Director',
 };
 
@@ -23,6 +24,8 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
     <div className="space-y-3">
       {approvals?.map((approval, index) => {
         const isLast = index === approvals?.length - 1;
+        const isChangeSuggestion = approval.status === 'suggested_changes'
+          && ['dean', 'associate_dean', 'director'].includes(approval.role_at_approval);
 
         return (
           <div key={approval.id} className="relative">
@@ -35,6 +38,7 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
               'rounded-2xl border-2 p-4 transition-colors',
               approval.status === 'approved' ? 'border-[var(--status-success-text)] bg-[var(--status-success-bg)]' :
               approval.status === 'rejected' ? 'border-[var(--status-danger-text)] bg-[var(--status-danger-bg)]' :
+              isChangeSuggestion ? 'border-[var(--status-warning-text)] bg-[var(--status-warning-bg)]' :
               'border-[var(--card-border)] bg-[var(--surface-bg)]'
             )}>
               <div className="flex items-start gap-3">
@@ -62,10 +66,12 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
                       'badge text-xs',
                       approval.status === 'approved' ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' :
                       approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' :
+                      isChangeSuggestion ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]' :
                       'border border-[var(--border-strong)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
                     )}>
                       {approval.status === 'approved' ? 'Approved' :
-                       approval.status === 'rejected' ? 'Rejected' : 'Pending'}
+                       approval.status === 'rejected' ? 'Rejected' :
+                       isChangeSuggestion ? 'Change Suggested' : 'Pending'}
                     </span>
                   </div>
 
@@ -78,9 +84,11 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
                   {approval.remarks && (
                     <div className={cn(
                       'mt-2 p-3 rounded-xl text-xs',
-                      approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
+                      approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' :
+                      isChangeSuggestion ? 'border border-[var(--status-warning-text)] bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] font-medium' :
+                      'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
                     )}>
-                      <span className="font-semibold">Remarks: </span>{approval.remarks}
+                      <span className="font-semibold">{isChangeSuggestion ? 'Change Suggested: ' : 'Remarks: '}</span>{approval.remarks}
                     </div>
                   )}
 

@@ -415,3 +415,50 @@ def notify_collab_chain_restarted(event: Any, coordinators: List[Any], edited_by
     body = _build_email_html(content_html)
     for coord in coordinators:
         send_email.delay(coord.email, subject, body, event.id, "collab_chain_restarted")
+
+
+def notify_faculty_and_coordinators_involved(event: Any, recipients: List[str], event_action: str = "created"):
+    """
+    Notify all Faculty Involved and involved Coordinators when an event is created or submitted.
+    Does NOT send to Dean or Director.
+    """
+    if not recipients:
+        return
+
+    # Deduplicate valid emails
+    unique_emails = set()
+    for em in recipients:
+        if em and isinstance(em, str) and "@" in em:
+            unique_emails.add(em.strip().lower())
+
+    if not unique_emails:
+        return
+
+    action_text = "created and listed" if event_action == "created" else "submitted for approval"
+    subject = f"[EMS] Event {event_action.title()}: {event.title}"
+    content_html = f"""
+    <h2>Event Notification — You Are Listed as Involved</h2>
+    <p>Dear Faculty / Coordinator,</p>
+    <p>The event proposal <b>{event.title}</b> has been {action_text}. You are listed as an involved Faculty In-Charge or Coordinator for this event.</p>
+    
+    <table>
+      <tr><td>Event Title</td><td>{event.title}</td></tr>
+      <tr><td>Event Type</td><td>{event.event_type}</td></tr>
+      <tr><td>School / Department</td><td>{getattr(event, 'school_department', None) or 'N/A'}</td></tr>
+      <tr><td>Event In-Charge</td><td>{event.event_incharge_name} ({event.event_incharge_contact})</td></tr>
+      <tr><td>Date &amp; Time</td><td>{event.start_datetime.strftime('%d %B %Y, %I:%M %p')}</td></tr>
+      <tr><td>Venue</td><td>{getattr(event, 'venue_custom', None) or 'Predefined Venue'}</td></tr>
+      <tr><td>Proposed Budget</td><td>&#8377;{float(event.budget):,.2f}</td></tr>
+    </table>
+    
+    <div class="alert">
+        <p style="margin: 0;">You can log in to the EMS portal to view complete event details, schedule, and assets.</p>
+    </div>
+    <div class="center-align">
+        <a href="{settings.FRONTEND_URL}/events/{event.id}" class="btn">View Event Details</a>
+    </div>
+    """
+    body = _build_email_html(content_html)
+    for email in unique_emails:
+        send_email.delay(email, subject, body, event.id, "faculty_involved_notification")
+

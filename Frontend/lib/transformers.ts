@@ -30,6 +30,7 @@ export function mapUserFromApi(apiUser: any): User {
     is_club_coordinator_requested: apiUser.is_club_coordinator_requested,
     club_name: apiUser.club_name,
     extra_permissions: apiUser.extra_permissions || [],
+    coordinator_type: apiUser.coordinator_type ?? null,
     // Derived convenience fields
     is_active: (apiUser.status || 'active') === 'active',
     force_password_change: apiUser.is_first_login ?? apiUser.force_password_change ?? false,
@@ -107,10 +108,31 @@ export function mapEventToApi(formData: any): any {
     delete payload.venue_id;
   }
 
+  // Handle budget and budget_breakdown
+  if ('budget_breakdown' in payload && Array.isArray(payload.budget_breakdown)) {
+    payload.budget_breakdown = payload.budget_breakdown
+      .filter((item: any) => item && typeof item.category === 'string' && item.category.trim() !== '')
+      .map((item: any) => ({
+        category: item.category.trim(),
+        amount: Math.max(0, parseFloat(item.amount) || 0),
+        ...(item.description ? { description: item.description.trim() } : {}),
+      }));
+
+    if (payload.budget_breakdown.length > 0) {
+      const calculatedTotal = payload.budget_breakdown.reduce(
+        (sum: number, item: any) => sum + (item.amount || 0),
+        0
+      );
+      payload.budget = calculatedTotal;
+    }
+  }
+
   // Ensure budget is a number if provided
   if ('budget' in payload) {
     if (payload.budget === undefined || payload.budget === null || payload.budget === '') {
       payload.budget = 0;
+    } else {
+      payload.budget = Math.max(0, parseFloat(payload.budget) || 0);
     }
   }
 

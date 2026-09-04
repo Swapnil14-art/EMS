@@ -29,12 +29,12 @@ class Settings(BaseSettings):
     CELERY_BROKER_URL: str = "redis://redis:6379/0"
     CELERY_RESULT_BACKEND: str = "redis://redis:6379/1"
 
-    SMTP_HOST: str = "smtp.nmims.in"
+    SMTP_HOST: str = "smtp-relay.brevo.com"
     SMTP_PORT: int = 587
-    SMTP_USER: str = "noreply@nmims.in"
+    SMTP_USER: str = "a73304001@smtp-brevo.com"
     SMTP_PASSWORD: str = "changeme"
-    SMTP_FROM: str = "noreply@nmims.in"
-    SMTP_FROM_NAME: str = "NMIMS EMS"
+    SMTP_FROM: str = "swapnilsinghdps8288@gmail.com"
+    SMTP_FROM_NAME: str = "EMS"
     SMTP_TLS: bool = True
 
     STORAGE_ROOT: str = "storage"
