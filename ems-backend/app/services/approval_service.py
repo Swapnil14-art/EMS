@@ -5,7 +5,7 @@ Called from the approvals router.
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete as sa_delete
+from sqlalchemy import select, delete as sa_delete, or_, func
 
 from app.models.event import Event, EventCollaboratingClub
 from app.models.event_approval import EventApproval
@@ -364,21 +364,27 @@ async def _is_college_wide_event(db: AsyncSession, event: Event) -> bool:
 
     if club:
         level = str(getattr(club, "level", "department") or "department").strip().lower()
-        if level == "college_wide" or level == "college" or club.department_id is None:
+        if level in ("college_wide", "college") or club.department_id is None:
             return True
 
     if event.departments_involved:
-        depts_upper = [str(d).strip().upper() for d in event.departments_involved]
-        for d in depts_upper:
-            if "COLLEGE" in d or "ALL" in d:
+        for d in event.departments_involved:
+            du = str(d).strip().upper()
+            if du in ("COLLEGE WIDE", "COLLEGE_WIDE", "ALL", "ALL DEPARTMENTS", "COLLEGE"):
+                return True
+            if "COLLEGE WIDE" in du or "COLLEGE-WIDE" in du:
                 return True
 
-    sd = str(event.school_department or "").strip().lower()
-    if "college" in sd or "all" in sd:
+    sd = str(event.school_department or "").strip().upper()
+    if sd in ("COLLEGE WIDE", "COLLEGE_WIDE", "COLLEGE", "ALL", "ALL DEPARTMENTS"):
+        return True
+    if "COLLEGE WIDE" in sd or "COLLEGE-WIDE" in sd:
         return True
 
-    ta = str(event.target_audience or "").strip().lower()
-    if ta in ("college_wide", "college", "all") or "college" in ta or "all" in ta:
+    ta = str(event.target_audience or "").strip().upper()
+    if ta in ("COLLEGE_WIDE", "COLLEGE WIDE", "COLLEGE", "ALL", "ALL DEPARTMENTS"):
+        return True
+    if "COLLEGE WIDE" in ta or "COLLEGE-WIDE" in ta:
         return True
 
     return False
@@ -389,6 +395,7 @@ async def set_non_collab_pending_status(db: AsyncSession, event: Event):
     For college-wide clubs or events with COLLEGE WIDE department involved: goes directly to pending_director and notifies Director.
     For department clubs: goes to pending_associate_dean and notifies Associate Deans."""
     from app.models.club import Club
+    from app.models.department import Department
     club = await db.get(Club, event.club_id) if event.club_id else None
 
     is_college_wide_event = await _is_college_wide_event(db, event)
@@ -403,11 +410,54 @@ async def set_non_collab_pending_status(db: AsyncSession, event: Event):
             notify_pending_director(event, director)
     else:
         event.status = "pending_associate_dean"
+        target_dept_ids = set()
         if club and club.department_id:
+            target_dept_ids.add(club.department_id)
+
+        # Load all departments for robust matching
+        all_depts_res = await db.execute(select(Department))
+        all_depts = all_depts_res.scalars().all()
+
+        text_candidates = []
+        if event.departments_involved:
+            for d in event.departments_involved:
+                text_candidates.append(str(d).strip())
+
+        if event.school_department:
+            for part in str(event.school_department).split(","):
+                text_candidates.append(part.strip())
+
+        if event.target_audience:
+            for part in str(event.target_audience).split(","):
+                text_candidates.append(part.strip())
+
+        for cand in text_candidates:
+            cand_lower = cand.lower()
+            if not cand_lower or cand_lower in ("multiple", "none", "all", "college wide", "college-wide", "college_wide"):
+                continue
+            for dept in all_depts:
+                dept_name_lower = (dept.name or "").lower()
+                dept_code_lower = (dept.code or "").lower()
+                if (
+                    cand_lower == dept_name_lower
+                    or cand_lower == dept_code_lower
+                    or (cand_lower in dept_name_lower and len(cand_lower) >= 3)
+                    or (dept_name_lower in cand_lower and len(dept_name_lower) >= 3)
+                    or (dept_code_lower and dept_code_lower in cand_lower)
+                ):
+                    target_dept_ids.add(dept.id)
+
+        # If still no target dept and creator has a department, consider it as well
+        if not target_dept_ids and event.created_by:
+            creator = await db.get(User, event.created_by)
+            if creator and creator.department_id:
+                target_dept_ids.add(creator.department_id)
+
+        if target_dept_ids:
             dean_result = await db.execute(
                 select(User).where(
                     User.role == "associate_dean",
-                    User.department_id == club.department_id,
+                    User.department_id.in_(target_dept_ids),
                     User.status == "active",
                 )
             )

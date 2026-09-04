@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     APP_SECRET_KEY: str = "changeme"
     DEBUG: bool = False
 
-    DATABASE_URL: str = "postgresql+asyncpg://ems_user:ems_pass@db:5433/ems_db"
-    DATABASE_URL_SYNC: str = "postgresql://ems_user:ems_pass@db:5433/ems_db"
+    DATABASE_URL: str = "postgresql+asyncpg://ems_user:ems_pass@db:5432/ems_db"
+    DATABASE_URL_SYNC: str = "postgresql://ems_user:ems_pass@db:5432/ems_db"
 
     JWT_SECRET: str = "changeme-jwt-secret-min-32-chars!!"
     JWT_REFRESH_SECRET: str = "changeme-refresh-secret-min-32-chars!"
@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     SMTP_FROM: str = "swapnilsinghdps8288@gmail.com"
     SMTP_FROM_NAME: str = "EMS"
     SMTP_TLS: bool = True
+    SMTP_TIMEOUT_SECONDS: int = 20
 
     STORAGE_ROOT: str = "storage"
     FRONTEND_URL: str = "http://localhost:3000"

@@ -369,9 +369,11 @@ async def list_events(
         if current_user.department_id:
             # Also see all events in their department (any status)
             from app.models.club import Club
+            from app.models.department import Department
+            dept = await db.get(Department, current_user.department_id)
             dept_clubs = select(Club.id).where(Club.department_id == current_user.department_id)
-            dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-            dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
+            dept_code = dept.code.strip().lower() if dept and dept.code else ""
+            dept_name = dept.name.strip().lower() if dept and dept.name else ""
             
             # Include events where dept clubs are primary OR collaborating
             collab_match = select(EventCollaboratingClub.event_id).where(
@@ -384,9 +386,17 @@ async def list_events(
             ]
             if dept_code:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_code}%"))
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_code}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_code}%"))
             if dept_name:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_name}%"))
-                
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_name}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_name}%"))
+            
+            # Also match events created by coordinators/users belonging to this department
+            creator_dept_users = select(User.id).where(User.department_id == current_user.department_id)
+            dept_matchers.append(Event.created_by.in_(creator_dept_users.scalar_subquery()))
+
             conditions.append(or_(*dept_matchers))
             
         if manage_only and current_user.department_id:
@@ -1247,10 +1257,9 @@ async def update_event(
                     EventRegistration.status == "registered",
                 )
             )
-            # Student email notifications disabled per requirement
-            # if students:
-            #     notify_event_details_updated(event, students)
-            pass
+            students = reg_result.scalars().all()
+            if students:
+                notify_event_details_updated(event, students)
 
         event.last_edited_by = current_user.id
         event.last_edited_at = now
@@ -1465,8 +1474,17 @@ async def cancel_event(
         )
     )
     students = reg_result.scalars().all()
-    if students:
-        notify_event_cancelled(event, students, body.reason)
+    visitor_result = await db.execute(
+        select(EventRegistration.visitor_email).where(
+            EventRegistration.event_id == event.id,
+            EventRegistration.status == "registered",
+            EventRegistration.participation_type == "visitor",
+        )
+    )
+    visitor_emails = [email for email in visitor_result.scalars().all() if email]
+    recipients = students + visitor_emails
+    if recipients:
+        notify_event_cancelled(event, recipients, body.reason)
 
     await db.commit()
     return {"message": "Event cancelled", "status": "cancelled"}

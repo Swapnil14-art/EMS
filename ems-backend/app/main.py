@@ -1,8 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from fastapi.staticfiles import StaticFiles
 import os
@@ -11,6 +10,7 @@ import time
 import uuid
 
 from app.config import settings
+from app.rate_limit import limiter
 from app.auth.router import router as auth_router
 from app.routers import (
     users, departments, clubs, venues,
@@ -19,7 +19,6 @@ from app.routers import (
     system, notifications, permissions,
 )
 
-limiter = Limiter(key_func=get_remote_address)
 logger = logging.getLogger("ems.request")
 
 

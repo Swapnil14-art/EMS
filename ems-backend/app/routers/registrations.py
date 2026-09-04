@@ -13,7 +13,10 @@ from app.models.user import User
 from app.models.event import Event
 from app.models.event_registration import EventRegistration
 from app.models.system_config import SystemSettings
-from app.services.email_service import notify_registration_confirmation
+from app.services.email_service import (
+    notify_registration_confirmation,
+    notify_visitor_registration_confirmation,
+)
 from app.routers.events import is_student_eligible_for_event
 from app.schemas.event import VisitorRegistrationCreate
 from app.utils.additional_perms import has_perm
@@ -121,6 +124,7 @@ async def register_for_event(
             existing_reg.status = "registered"
             existing_reg.registered_at = now
             await db.commit()
+            notify_registration_confirmation(event, current_user)
             return {"message": "Successfully registered for the event", "event_id": event_id}
 
     # Create new registration if none existed
@@ -137,10 +141,7 @@ async def register_for_event(
         await db.rollback()
         raise HTTPException(status_code=409, detail="You are already registered for this event")
 
-    # Send confirmation email
-    send_registration_email = False
-    if send_registration_email:
-        notify_registration_confirmation(event, current_user)
+    notify_registration_confirmation(event, current_user)
 
     return {"message": "Successfully registered for the event", "event_id": event_id}
 
@@ -360,6 +361,7 @@ async def register_visitor(
             existing_reg.visitor_qualification = body.qualification
             existing_reg.visitor_school_college = body.school_college
             await db.commit()
+            notify_visitor_registration_confirmation(event, body.full_name, body.email)
             return {"message": "Successfully registered for the event", "event_id": event_id}
 
     registration = EventRegistration(
@@ -384,4 +386,5 @@ async def register_visitor(
             detail="This email is already registered for this event",
         )
 
+    notify_visitor_registration_confirmation(event, body.full_name, body.email)
     return {"message": "Successfully registered for the event", "event_id": event_id}

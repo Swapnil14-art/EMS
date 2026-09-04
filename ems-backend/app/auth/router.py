@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app.models.user import User, PreApprovedUser
+from app.models.user import User, PreApprovedUser, PendingSignup
 from app.models.system_config import SystemSettings
 from app.auth.jwt_handler import (
     create_access_token,
@@ -19,14 +19,18 @@ from app.auth.schemas import (
 from app.utils.security import verify_password, get_password_hash, generate_temporary_password
 from app.services.email_service import notify_temporary_password
 from app.dependencies import get_current_user
+from app.rate_limit import limiter
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+PENDING_SIGNUP_MAX_SENDS = 4
+PENDING_SIGNUP_TTL = timedelta(hours=24)
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/hour")
+async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depends(get_db)):
     # Check if user signup is disabled
     config_result = await db.execute(select(SystemSettings).limit(1))
     config = config_result.scalar_one_or_none()
@@ -37,32 +41,49 @@ async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
             detail="User registration is currently disabled by administrator",
         )
 
-    result = await db.execute(select(User).where(User.email == body.email.lower()))
+    email = body.email.lower()
+    result = await db.execute(select(User).where(User.email == email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="User with this email already exists.")
-        
+
+    now = datetime.now(timezone.utc)
     temp_password = generate_temporary_password()
     hashed_password = get_password_hash(temp_password)
-    
-    user = User(
-        email=body.email.lower(),
-        hashed_password=hashed_password,
-        is_first_login=True,
-        role="student",
-        status="active"
-    )
-    db.add(user)
+    pending_result = await db.execute(select(PendingSignup).where(PendingSignup.email == email))
+    pending = pending_result.scalar_one_or_none()
+    if pending and pending.expires_at > now and pending.sent_count >= PENDING_SIGNUP_MAX_SENDS:
+        raise HTTPException(status_code=429, detail="Temporary password request limit reached. Please try again after 24 hours.")
+
+    if pending:
+        pending.hashed_password = hashed_password
+        pending.sent_count = 1 if pending.expires_at <= now else pending.sent_count + 1
+        pending.expires_at = now + PENDING_SIGNUP_TTL
+        pending.last_sent_at = now
+    else:
+        pending = PendingSignup(email=email, hashed_password=hashed_password, sent_count=1, expires_at=now + PENDING_SIGNUP_TTL, last_sent_at=now)
+        db.add(pending)
     await db.commit()
-    
-    notify_temporary_password(body.email.lower(), temp_password, is_reset=False)
-    
-    return {"message": "Signup successful. Check your email for the temporary password."}
+
+    notify_temporary_password(email, temp_password, is_reset=False)
+    return {"message": "Temporary password sent. Use it to log in and activate your account."}
 
 @router.post("/login", response_model=TokenResponse)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
-    
+    if not user:
+        pending_result = await db.execute(select(PendingSignup).where(PendingSignup.email == body.email.lower()))
+        pending = pending_result.scalar_one_or_none()
+        if pending and pending.expires_at <= datetime.now(timezone.utc):
+            await db.delete(pending)
+            await db.commit()
+            pending = None
+        if pending and verify_password(body.password, pending.hashed_password):
+            user = User(email=pending.email, hashed_password=pending.hashed_password, is_first_login=True, role="student", status="active")
+            db.add(user)
+            await db.flush()
+            await db.delete(pending)
+
     if not user or not user.hashed_password or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
         

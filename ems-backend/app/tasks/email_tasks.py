@@ -1,9 +1,14 @@
 from celery import shared_task
 from typing import List, Optional
 import smtplib
+import ssl
+import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from app.config import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 @shared_task(name="app.tasks.email_tasks.send_email", bind=True, max_retries=3)
@@ -26,19 +31,30 @@ def send_email(
         msg["To"] = recipient
         msg.attach(MIMEText(body_html, "html"))
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        with smtplib.SMTP(
+            settings.SMTP_HOST,
+            settings.SMTP_PORT,
+            timeout=settings.SMTP_TIMEOUT_SECONDS,
+        ) as server:
+            server.ehlo()
             if settings.SMTP_TLS:
-                server.starttls()
+                server.starttls(context=ssl.create_default_context())
+                server.ehlo()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.sendmail(settings.SMTP_FROM, recipient, msg.as_string())
 
-        _log_email(recipient, email_type, event_id, "sent")
+        _safe_log_email(recipient, subject, email_type, event_id, "sent")
 
     except Exception as exc:
         err_msg = str(exc)
         if settings.SMTP_PASSWORD and settings.SMTP_PASSWORD in err_msg:
             err_msg = err_msg.replace(settings.SMTP_PASSWORD, "******")
-        _log_email(recipient, email_type, event_id, "failed", err_msg)
+        _safe_log_email(recipient, subject, email_type, event_id, "failed", err_msg)
+        # Authentication failures are permanent until SMTP configuration
+        # changes. Retrying them only creates duplicate log rows.
+        if isinstance(exc, smtplib.SMTPAuthenticationError):
+            logger.error("Email delivery authentication failed for type=%s recipient=%s", email_type, recipient)
+            raise
         raise self.retry(exc=exc, countdown=60)
 
 
@@ -57,6 +73,7 @@ def send_bulk_email(
 
 def _log_email(
     recipient: str,
+    subject: str,
     email_type: str,
     event_id: Optional[int],
     status: str,
@@ -73,6 +90,7 @@ def _log_email(
     with SyncSession() as db:
         log = EmailNotification(
             recipient=recipient,
+            subject=subject,
             type=email_type,
             event_id=event_id,
             status=status,
@@ -80,3 +98,11 @@ def _log_email(
         )
         db.add(log)
         db.commit()
+
+
+def _safe_log_email(*args, **kwargs):
+    """Never retry a successfully delivered email solely because audit logging failed."""
+    try:
+        _log_email(*args, **kwargs)
+    except Exception:
+        logger.exception("Unable to persist email audit record")

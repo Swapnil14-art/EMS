@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, String
 from sqlalchemy.orm import selectinload
 from typing import List
 
@@ -38,9 +38,11 @@ async def pending_approvals(
         )
         if current_user.department_id:
             from app.models.club import Club
+            from app.models.department import Department
+            dept = await db.get(Department, current_user.department_id)
             dept_clubs = select(Club.id).where(Club.department_id == current_user.department_id)
-            dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-            dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
+            dept_code = dept.code.strip().lower() if dept and dept.code else ""
+            dept_name = dept.name.strip().lower() if dept and dept.name else ""
             
             # Collaborative clubs from this department
             collab_match = select(EventCollaboratingClub.event_id).where(
@@ -53,9 +55,17 @@ async def pending_approvals(
             ]
             if dept_code:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_code}%"))
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_code}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_code}%"))
             if dept_name:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_name}%"))
-                
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_name}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_name}%"))
+
+            # Also match events created by coordinators/users belonging to this department
+            creator_dept_users = select(User.id).where(User.department_id == current_user.department_id)
+            dept_matchers.append(Event.created_by.in_(creator_dept_users.scalar_subquery()))
+
             query = query.where(or_(*dept_matchers))
 
     elif current_user.role == "director":

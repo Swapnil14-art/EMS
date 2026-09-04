@@ -49,3 +49,16 @@ class PreApprovedUser(Base):
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 
     creator = relationship("User", foreign_keys=[created_by])
+
+
+class PendingSignup(Base):
+    """A temporary credential issued before a student account is activated."""
+    __tablename__ = "pending_signups"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    hashed_password = Column(String(255), nullable=False)
+    sent_count = Column(Integer, nullable=False, default=1)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    last_sent_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())

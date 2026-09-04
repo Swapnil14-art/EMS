@@ -351,6 +351,12 @@ def notify_registration_confirmation(event: Any, student: Any):
     send_email.delay(student.email, subject, body, event.id, "registration_confirmation")
 
 
+def notify_visitor_registration_confirmation(event: Any, visitor_name: str, visitor_email: str):
+    """Send the same confirmation to an outside-campus visitor."""
+    visitor = type("Visitor", (), {"name": visitor_name, "email": visitor_email})()
+    notify_registration_confirmation(event, visitor)
+
+
 def notify_event_cancelled(event: Any, registered_students: List[Any], reason: str):
     subject = f"[EMS] Important Update: Event Cancelled - {event.title}"
     content_html = f"""
@@ -366,7 +372,7 @@ def notify_event_cancelled(event: Any, registered_students: List[Any], reason: s
     <p>We sincerely apologize for any inconvenience this may cause. Any relevant reimbursements or alternative arrangements will be communicated to you by the organizing committee.</p>
     """
     body = _build_email_html(content_html)
-    emails = [s.email for s in registered_students]
+    emails = [s if isinstance(s, str) else s.email for s in registered_students]
     send_bulk_email.delay(emails, subject, body, event.id, "event_cancelled")
 
 
@@ -461,4 +467,3 @@ def notify_faculty_and_coordinators_involved(event: Any, recipients: List[str], 
     body = _build_email_html(content_html)
     for email in unique_emails:
         send_email.delay(email, subject, body, event.id, "faculty_involved_notification")
-
