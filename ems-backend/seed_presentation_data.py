@@ -27,17 +27,24 @@ EVENTS
        open for outsiders + on-campus registration
        registration window : CURRENTLY OPEN
        venue   : Main Auditorium  (Aug 20 09:00 – Aug 20 17:00)
+                 *** A second event (Event C) is intentionally booked at the
+                     SAME venue & overlapping time – triggers venue clash ***
        coord   : coord.gdsc@nmims.in
        students 1 & 2 are registered
 
-  B) "Cloud Computing Workshop" (COMPLETED – for report demo)
+  B) "Cloud Computing Workshop" (COMPLETED – for doc-upload & report demo)
        status  : completed
        all approval stages done
-       event report submitted
+       documents uploaded + event report submitted
        coord   : coord.tech@nmims.in
+
+  C) "Leadership Summit 2026" (PENDING DIRECTOR APPROVAL)
+       status  : pending_director
+       approval chain: dean approved, director pending
+       venue   : Main Auditorium  (Aug 20 10:00 – Aug 20 16:00)  ← CLASHES with Event A
+       coord   : coord.gdsc@nmims.in
 """
 
-from app import database
 import sys
 from datetime import datetime, timezone, timedelta
 
@@ -326,14 +333,18 @@ def seed():
         db.commit()
 
         # ── 5. EVENT A — LIVE / OPEN REGISTRATION ────────────────────────────
+        # ⚠️  VENUE CLASH NOTE:
+        #     Event A  →  Main Auditorium  |  Aug 20 09:00 – 17:00 IST
+        #     Event C  →  Main Auditorium  |  Aug 20 10:00 – 16:00 IST  (overlaps!)
+        #     During the Event C approval flow the system will flag a venue clash.
         print("\n📅 Event A – TechFest 2026 (LIVE, registration open)")
 
         # Event dates: next Aug 20 using current system year
         year = NOW.year
         # Event A: Aug 20, 09:00 – 17:00 IST (UTC+5:30)
         ist_offset = timedelta(hours=5, minutes=30)
-        ev_a_start = datetime(year, 8, 28, 9, 0, 0, tzinfo=timezone(ist_offset))
-        ev_a_end   = datetime(year, 8, 28, 17, 0, 0, tzinfo=timezone(ist_offset))
+        ev_a_start = datetime(year, 8, 20, 9, 0, 0, tzinfo=timezone(ist_offset))
+        ev_a_end   = datetime(year, 8, 20, 17, 0, 0, tzinfo=timezone(ist_offset))
         # Registration window: TODAY – 7 days ago  to  30 days from now (window is OPEN)
         reg_start  = NOW - timedelta(days=7)
         reg_end    = NOW + timedelta(days=30)
@@ -375,7 +386,13 @@ def seed():
                 volunteers_details="15 student volunteers needed",
                 # Budget & docs
                 budget=25000.00,
-                comments="TechFest 2026 - Innovation Showcase",
+                comments=(
+                    "PRESENTATION NOTE – VENUE CLASH:\n"
+                    "This event occupies Main Auditorium on Aug 20, 09:00–17:00 IST.\n"
+                    "Event C (Leadership Summit) is also booked at Main Auditorium\n"
+                    "on Aug 20, 10:00–16:00 IST — a direct clash.\n"
+                    "The system will detect and flag this during Event C's approval."
+                ),
                 # Registration flags
                 outside_campus_registration=True,   # open to outsiders
                 registration_accepted=True,          # on-campus registration also ON
@@ -384,12 +401,10 @@ def seed():
                 created_by=coord1.id,
                 responsible_coordinator_id=coord1.id,
                 current_approval_step=4,
-                poster_path="/login-bg.jpg",
             )
             db.add(event_a); db.flush()
             print(f"  + Event A id={event_a.id}")
         else:
-            event_a.poster_path = "/login-bg.jpg"
             print(f"  · Event A exists id={event_a.id}")
 
         # Attach venue to event_venues table as well
@@ -461,7 +476,128 @@ def seed():
                      NOW - timedelta(days=43), "Approved.")
         db.commit()
 
-        # No documents uploaded for Event B
+        # Documents for Event B (demonstrating document upload feature)
+        print("  📂 Documents for Event B")
+        add_document(db, event_b.id, "Attendance Sheet",   coord2.id)
+        add_document(db, event_b.id, "Completion Certificate", coord2.id)
+        add_document(db, event_b.id, "Event Photographs",  coord2.id)
+        add_other_doc(db, event_b.id, "Workshop Proposal", coord2.id)
+        db.commit()
+
+        # Event Report for Event B
+        existing_report = db.query(EventReport).filter_by(event_id=event_b.id).first()
+        if not existing_report:
+            report = EventReport(
+                event_id=event_b.id,
+                submitted_by=coord2.id,
+                event_summary=(
+                    "The Cloud Computing Workshop was conducted successfully on 10th July. "
+                    "Students got hands-on exposure to AWS EC2, S3 and Lambda. "
+                    "Expert from TCS delivered an industry session."
+                ),
+                actual_budget=7850.00,
+                outcomes=(
+                    "Students understood core cloud concepts and deployed their first cloud app. "
+                    "Positive feedback received from 95% of participants."
+                ),
+                issues="Minor AV delay of 15 minutes at the start.",
+                feedback="Participants requested a follow-up advanced workshop.",
+                student_count=65,
+                faculty_count=5,
+                external_count=3,
+                program_type="Workshop",
+                objective="Provide practical cloud computing skills to engineering students",
+                learning_benefit="Hands-on AWS experience and cloud architecture fundamentals",
+                guest_speakers=[
+                    {
+                        "name": "Mr. Vikram Iyer",
+                        "designation": "Cloud Architect",
+                        "organization": "TCS",
+                        "expertise": "AWS, Azure, DevOps",
+                    }
+                ],
+                faculty_coordinators=["Dr. Priya Sharma", "Prof. Anand Kumar"],
+                student_coordinators=["Sneha Kulkarni", "Rohit Malhotra"],
+                key_outcomes=[
+                    "Students deployed live applications on AWS EC2",
+                    "Understanding of S3 object storage and bucket policies",
+                    "Introduction to serverless computing with Lambda",
+                    "Industry insights from TCS cloud architect",
+                ],
+                conclusion=(
+                    "The workshop was a great success and achieved its learning objectives. "
+                    "We recommend making this an annual event."
+                ),
+                mode_of_delivery="offline",
+                attendance_doc_path="storage/demo/attendance_sheet.pdf",
+                flier_path="storage/demo/cloud_workshop_flier.jpg",
+            )
+            db.add(report); db.flush()
+            print("  + Event Report submitted for Event B")
+        else:
+            print("  · Event Report already exists for Event B")
+        db.commit()
+
+        # ── 7. EVENT C — PENDING DIRECTOR (venue clash with Event A) ─────────
+        # ⚠️  VENUE CLASH:
+        #     Event A  →  Main Auditorium  Aug 20  09:00–17:00 IST
+        #     Event C  →  Main Auditorium  Aug 20  10:00–16:00 IST  ← OVERLAPS
+        print("\n📅 Event C – Leadership Summit 2026 (PENDING DIRECTOR)")
+
+        ev_c_start = datetime(year, 8, 20, 10, 0, 0, tzinfo=timezone(ist_offset))
+        ev_c_end   = datetime(year, 8, 20, 16, 0, 0, tzinfo=timezone(ist_offset))
+
+        event_c = db.query(Event).filter_by(title="Leadership Summit 2026").first()
+        if not event_c:
+            event_c = Event(
+                title="Leadership Summit 2026",
+                event_type="Seminar",
+                school_department="School of Engineering",
+                event_incharge_name="Amit Verma",
+                event_incharge_contact="9876543210",
+                target_audience="UG & PG Students",
+                is_club_event=True,
+                club_id=club_gdsc.id,
+                is_collaborative=False,
+                is_sponsored=False,
+                # ⚠️  SAME venue as Event A, overlapping time – venue clash!
+                start_datetime=ev_c_start,
+                end_datetime=ev_c_end,
+                venue_id=venue_audi.id,
+                venue_type="on_campus",
+                seating_arrangement="Theatre",
+                it_projector=True,
+                it_audio=True,
+                it_audio_details="Panel mic setup for 5 speakers",
+                budget=15000.00,
+                comments=(
+                    "PRESENTATION NOTE – VENUE CLASH:\n"
+                    "This event is booked at Main Auditorium Aug 20, 10:00–16:00 IST.\n"
+                    "Event A (TechFest 2026) is already approved at the same venue\n"
+                    "on Aug 20, 09:00–17:00 IST.\n"
+                    "The Director's approval screen will show the venue clash warning."
+                ),
+                outside_campus_registration=False,
+                registration_accepted=False,
+                # Pending director – dean already approved
+                status="pending_director",
+                created_by=coord1.id,
+                responsible_coordinator_id=coord1.id,
+                current_approval_step=3,
+            )
+            db.add(event_c); db.flush()
+            print(f"  + Event C id={event_c.id}")
+        else:
+            print(f"  · Event C exists id={event_c.id}")
+
+        add_event_venue(db, event_c.id, venue_audi.id)
+
+        # Approval chain: coordinator done, dean done, director PENDING
+        add_approval(db, event_c.id, coord1.id, "club_coordinator", 1, "approved",
+                     NOW - timedelta(days=3), "Leadership summit proposal submitted.")
+        add_approval(db, event_c.id, dean.id,   "associate_dean",   2, "approved",
+                     NOW - timedelta(days=2), "Good topic, approved from dean side.")
+        add_approval(db, event_c.id, director.id, "director",       3, "pending")
         db.commit()
 
         # ── Summary ──────────────────────────────────────────────────────────
@@ -501,7 +637,11 @@ def seed():
         print()
         print(f"  B) Cloud Computing Workshop [COMPLETED] id={event_b.id}")
         print(f"     Seminar Hall A  | Jul {year}-07-10 10:00–16:00 IST")
-        print(f"     Report submitted")
+        print(f"     Documents uploaded + Report submitted")
+        print()
+        print(f"  C) Leadership Summit 2026  [PENDING DIRECTOR] id={event_c.id}")
+        print(f"     Main Auditorium | Aug {year}-08-20 10:00–16:00 IST")
+        print(f"     ⚠️  VENUE CLASH with Event A detected!")
         print("═" * 60)
         print()
 
