@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
-
 import logging
 
+from pydantic import BaseModel
 from app.database import get_db
 from app.dependencies import get_current_user, require_roles
 from app.models.user import User
@@ -24,6 +24,32 @@ from app.utils.additional_perms import has_perm
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+class EventRegisterBody(BaseModel):
+    event_id: int
+
+
+@router.post("/")
+async def register_event_root(
+    body: EventRegisterBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Register for an event by JSON body { event_id }, secured via JWT."""
+    return await register_for_event(event_id=body.event_id, current_user=current_user, db=db)
+
+
+@router.get("/")
+async def get_registrations_root(
+    event_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get registrations root, secured via JWT."""
+    if event_id is not None:
+        return await list_registrations(event_id=event_id, current_user=current_user, db=db)
+    return await my_registrations(current_user=current_user, db=db)
 
 
 def _is_event_registration_user(user: User, event: Event) -> bool:

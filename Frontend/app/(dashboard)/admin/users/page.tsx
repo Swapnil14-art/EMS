@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 const ROLES: { value: string; label: string }[] = [
   { value: '', label: 'All Roles' },
+  { value: 'super_admin', label: 'Super Admin' },
   { value: 'director', label: 'Director' },
   { value: 'associate_dean', label: 'Associate Dean' },
   { value: 'club_coordinator', label: 'Club Coordinator' },
@@ -35,7 +36,11 @@ const createSchema = z.object({
   email: z.string().min(1, 'Email is required').email('Invalid email address').endsWith('@nmims.in', 'Must be @nmims.in email'),
   role: z.string().min(1, 'Role selection is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  department_id: z.coerce.number({ invalid_type_error: 'School selection is required' }).min(1, 'School selection is required'),
+  department_id: z.union([z.string(), z.number()]).optional().nullable().transform(v => {
+    if (!v || v === '' || v === 0 || v === '0') return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
@@ -44,7 +49,11 @@ const editSchema = z.object({
   email: z.string().email().endsWith('@nmims.in', 'Must be @nmims.in').optional(),
   role: z.string().optional(),
   new_password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
-  department_id: z.coerce.number().optional().nullable().transform(v => v === 0 ? null : v),
+  department_id: z.union([z.string(), z.number()]).optional().nullable().transform(v => {
+    if (!v || v === '' || v === 0 || v === '0') return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }),
 });
 type EditForm = z.infer<typeof editSchema>;
 
@@ -108,7 +117,9 @@ export default function AdminUsersPage() {
   const handleCreate = async (data: CreateForm) => {
     setSubmitting(true);
     try {
-      await userService.createDirect(data);
+      const payload: any = { ...data };
+      payload.department_id = payload.department_id ? Number(payload.department_id) : null;
+      await userService.createDirect(payload);
       toast.success('User created successfully');
       setCreateOpen(false);
       reset();
@@ -124,7 +135,7 @@ export default function AdminUsersPage() {
       name: u.name || '',
       email: u.email,
       role: u.role,
-      department_id: u.department_id || undefined,
+      department_id: u.department_id ? (String(u.department_id) as any) : '',
       new_password: ''
     });
     setEditOpen(true);
@@ -134,8 +145,9 @@ export default function AdminUsersPage() {
     if (!editingUser) return;
     setSubmitting(true);
     try {
-      const payload = { ...data };
+      const payload: any = { ...data };
       if (!payload.new_password) delete payload.new_password;
+      payload.department_id = payload.department_id ? Number(payload.department_id) : null;
       await userService.adminUpdate(editingUser.id, payload);
       toast.success('User updated successfully');
       setEditOpen(false);
@@ -368,7 +380,7 @@ export default function AdminUsersPage() {
           <Input label="Password *" type="text" placeholder="Type password here..." error={errors.password?.message} {...register('password')} />
           <Select label="Role *" options={ROLES.filter(r => r.value)} placeholder="Select role..."
             error={errors.role?.message} {...register('role')} />
-          <Select label="School *" options={deptOptions} placeholder="Select school..."
+          <Select label="School (Optional for Super Admin / Director)" options={deptOptions} placeholder="None / University-wide (No School)"
             error={errors.department_id?.message} {...register('department_id')} />
         </div>
       </Modal>
@@ -389,7 +401,7 @@ export default function AdminUsersPage() {
           </div>
 
           <Select label="Role" options={ROLES.filter(r => r.value)} error={editErrors.role?.message} {...registerEdit('role')} />
-          <Select label="School" options={deptOptions} placeholder="Select school..." error={editErrors.department_id?.message} {...registerEdit('department_id')} />
+          <Select label="School" options={deptOptions} placeholder="None / University-wide (No School)" error={editErrors.department_id?.message} {...registerEdit('department_id')} />
         </div>
       </Modal>
 

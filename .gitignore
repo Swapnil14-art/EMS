@@ -30,6 +30,12 @@ coverage.xml
 .pytest_cache/
 ems-backend/storage/
 celerybeat-schedule
+*.md
+!README.md
+!PLAYWRIGHT_TEST_STRATEGY.md
+!PROJECT_CONTEXT.md
+!SYSTEM_SPECIFICATION.md
+!PLAYWRIGHT_FAILED_TESTS_ANALYSIS.md
 
 # Playwright
 /test-results/

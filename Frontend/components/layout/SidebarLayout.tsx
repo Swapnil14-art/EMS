@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { authService } from '@/lib/services';
-import { getInitials, cn } from '@/lib/utils';
+import { getInitials, cn, ROLE_DASHBOARD } from '@/lib/utils';
 import { RoleBadge } from '@/components/shared/StatusBadge';
 import toast from 'react-hot-toast';
 import { BrandMark } from './BrandMark';
@@ -104,12 +104,44 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
     setMobileOpen(false);
   }, [pathname]);
 
+  const ROLE_ROUTES: Record<string, string> = {
+    '/admin': 'super_admin',
+    '/director': 'director',
+    '/associate_dean': 'associate_dean',
+    '/club_coordinator': 'club_coordinator',
+    '/student': 'student',
+    '/additional': 'additional',
+  };
+
   useEffect(() => {
-    if (!user) { router.replace('/login'); }
-    else if (user.force_password_change) { router.replace('/change-password'); }
-  }, [user, router]);
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    if (user.force_password_change) {
+      router.replace('/change-password');
+      return;
+    }
+    for (const [prefix, requiredRole] of Object.entries(ROLE_ROUTES)) {
+      if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+        if (user.role !== requiredRole) {
+          const dest = ROLE_DASHBOARD[user.role] || '/';
+          router.replace(dest);
+          return;
+        }
+      }
+    }
+  }, [user, pathname, router]);
 
   if (!user) return null;
+
+  for (const [prefix, requiredRole] of Object.entries(ROLE_ROUTES)) {
+    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+      if (user.role !== requiredRole) {
+        return null;
+      }
+    }
+  }
 
   const userNavItems = user.role === 'additional'
     ? buildAdditionalNav(user.extra_permissions ?? [])

@@ -67,7 +67,7 @@ export default function PublicEventDetailPage() {
         toast.success('Registered successfully!');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Action failed');
+      toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Action failed');
     } finally { setRegistering(false); }
   };
 
@@ -127,6 +127,9 @@ export default function PublicEventDetailPage() {
                             !registrationDisabled &&
                             !isBeforeRegStart &&
                             !isAfterRegEnd;
+
+  // Determine whether to show the registration panel for this user
+  const showRegistrationPanel = (user?.role === 'student' || isCoordinatorRegistration) && ['approved', 'ongoing'].includes(event.status);
 
   return (
     <div className="min-h-screen bg-[var(--card-bg)]">
@@ -252,11 +255,20 @@ export default function PublicEventDetailPage() {
             {/* Sidebar: Registration */}
             <div className="space-y-4">
               <div className="card p-6 sticky top-24">
-                {user?.role === 'student' && ['approved', 'ongoing'].includes(event.status) ? (
+                {showRegistrationPanel ? (
                   !isRegistrationAccepted ? (
                     <div className="text-center">
                       <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">Registration Not Available</h3>
                       <p className="text-sm text-[var(--text-muted)]">Registration is not accepted for this event.</p>
+                    </div>
+                  ) : (user?.role === 'student' && !event.student_registration_enabled) ? (
+                    <div className="text-center">
+                      <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">Registration Not Available</h3>
+                      <p className="text-sm text-[var(--text-muted)]">Student registration is not enabled for this event.</p>
+                    </div>
+                  ) : (user?.role === 'additional' && !isCoordinatorRegistration) ? (
+                    <div className="text-center">
+                      <p className="text-sm text-[var(--text-muted)]">Registration is not enabled for your coordinator type on this event.</p>
                     </div>
                   ) : (
                     <>
@@ -308,9 +320,18 @@ export default function PublicEventDetailPage() {
                         >
                           Registration Closed
                         </Button>
+                      ) : registrationDisabled ? (
+                        <Button
+                          disabled
+                          variant="secondary"
+                          className="w-full justify-center opacity-70 cursor-not-allowed"
+                        >
+                          Registration Temporarily Disabled
+                        </Button>
                       ) : (
                         <Button
-                          onClick={isCoordinatorRegistration ? handleRegister : () => router.push(`/student/events/${id}/register`)}
+                          onClick={handleRegister}
+                          loading={registering}
                           variant="primary"
                           className="w-full justify-center"
                         >
@@ -349,12 +370,15 @@ export default function PublicEventDetailPage() {
                   </div>
                 )}
 
-                {/* Registration disabled message */}
-                {registrationDisabled && user?.role === 'student' && ['approved', 'ongoing'].includes(event.status) && (
-                  <div className="text-center">
-                    <p className="text-sm text-[var(--status-warning-text)] font-medium">
-                      Event registration is currently disabled.
-                    </p>
+                {/* Outside campus registration link */}
+                {canRegisterVisitor && isAuthenticated && (
+                  <div className="pt-3 border-t border-[var(--border-subtle)] mt-3">
+                    <Link
+                      href={`/events/${id}/register-visitor`}
+                      className="w-full justify-center block text-center text-sm font-semibold py-2.5 px-4 rounded-xl border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white transition-all shadow-sm"
+                    >
+                      Register as Non-Campus Participant
+                    </Link>
                   </div>
                 )}
               </div>

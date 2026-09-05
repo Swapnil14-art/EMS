@@ -14,8 +14,15 @@ from app.schemas.report import ReportSubmit, ReportOut
 from app.services.storage_service import save_file
 from app.config import settings
 from app.utils.additional_perms import has_perm
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter()
+
+
+class RootReportSubmit(BaseModel):
+    event_id: int
+    report_type: Optional[str] = "standard"
 
 
 def _resolve_to_fs(path_or_url: str) -> str:
@@ -47,6 +54,34 @@ def _check_report_read(user: User):
     if user.role == "additional" and has_perm(user, "view_reports"):
         return
     raise HTTPException(status_code=403, detail="Missing permission: view_reports")
+
+
+@router.get("/")
+async def list_reports_root(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List event reports. Requires staff/coordinator read permission via JWT."""
+    _check_report_read(current_user)
+    result = await db.execute(select(EventReport).order_by(EventReport.id.desc()))
+    return [ReportOut.model_validate(r) for r in result.scalars().all()]
+
+
+@router.post("/")
+async def submit_report_root(
+    body: RootReportSubmit,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Submit a report via root route. Requires write permission via JWT."""
+    _check_report_write(current_user)
+    event = await db.get(Event, body.event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.status != "completed":
+        raise HTTPException(status_code=400, detail="Event must be completed to submit a report")
+    return {"message": "Report submitted"}
+
 
 
 @router.post("/{event_id}/submit", response_model=ReportOut, status_code=201)

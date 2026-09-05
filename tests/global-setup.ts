@@ -61,8 +61,8 @@ async function loginAndSave(key: string, user: { email: string; password: string
     const userData = meRes.ok ? await meRes.json() : null;
 
     const userPayload = userData
-      ? { ...userData, is_active: true, is_first_login: false, force_password_change: false }
-      : { email: user.email, role: user.role, is_active: true, force_password_change: false, is_first_login: false };
+      ? { ...userData, is_active: true, is_first_login: false, force_password_change: false, profile_completed: true }
+      : { email: user.email, role: user.role, is_active: true, force_password_change: false, is_first_login: false, profile_completed: true };
 
     const storageState = {
       cookies: [],

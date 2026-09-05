@@ -24,6 +24,9 @@ type FormData = z.infer<typeof schema>;
 export default function RegisterPage() {
   const [apiError, setApiError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [signupEmail, setSignupEmail] = useState('');
+  const [sendCount, setSendCount] = useState(0);
+  const [isResending, setIsResending] = useState(false);
   const [signupDisabled, setSignupDisabled] = useState(false);
   const [checkingConfig, setCheckingConfig] = useState(true);
 
@@ -48,10 +51,27 @@ export default function RegisterPage() {
     setApiError('');
     try {
       await authService.signup({ email: data.email });
+      setSignupEmail(data.email);
+      setSendCount(1);
       setSuccess(true);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Signup failed. Please try again or contact support.';
       setApiError(msg);
+    }
+  };
+
+  const resendTemporaryPassword = async () => {
+    if (!signupEmail || isResending || sendCount >= 4) return;
+    setApiError('');
+    setIsResending(true);
+    try {
+      await authService.signup({ email: signupEmail });
+      setSendCount(count => count + 1);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Unable to resend the temporary password. Please try again later.';
+      setApiError(msg);
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -145,6 +165,15 @@ export default function RegisterPage() {
                     <CheckCircle2 className="w-10 h-10 mb-4 text-[var(--status-success-text)]" />
                     <h3 className="font-bold text-lg mb-2 text-[var(--status-success-text)]">Check your inbox</h3>
                     <p className="text-sm font-medium">A temporary password has been sent to your email. Please use it to log in, after which you will be prompted to create your own secure password.</p>
+                  </div>
+                  {apiError && <Alert type="error"><span>{apiError}</span></Alert>}
+                  <div className="space-y-2">
+                    <Button type="button" variant="secondary" loading={isResending} disabled={sendCount >= 4} onClick={resendTemporaryPassword} className="w-full justify-center">
+                      Resend Temporary Password
+                    </Button>
+                    <p className="text-center text-xs text-[var(--text-secondary)]">
+                      {sendCount >= 4 ? 'The four-request limit has been reached. Please try again after 24 hours.' : `${4 - sendCount} resend request${4 - sendCount === 1 ? '' : 's'} remaining.`}
+                    </p>
                   </div>
                   <Link href="/login">
                     <Button className="w-full justify-center">Return to Login</Button>

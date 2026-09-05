@@ -23,7 +23,7 @@ const UNAUTH          = { cookies: [] as [], origins: [] as [] };
 // ─── Helper: follow redirects and return final URL ────────────────────────────
 async function finalUrl(page: any, route: string): Promise<string> {
   await page.goto(route, { waitUntil: 'domcontentloaded', timeout: 15_000 });
-  await page.waitForURL(/.+/, { timeout: 8_000 }).catch(() => {});
+  await page.waitForURL((url: URL) => url.pathname !== route, { timeout: 8_000 }).catch(() => {});
   return page.url();
 }
 

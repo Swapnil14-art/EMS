@@ -650,7 +650,11 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
         end_datetime: toUTCISOString(data.end_datetime),
         registration_start_datetime: regAccepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
         registration_deadline: regAccepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
-        school_department: data.school_department || user?.department?.name || "Multiple",
+        school_department: (data.school_department && data.school_department.trim() !== '')
+          ? data.school_department.trim()
+          : (data.departments_involved && data.departments_involved.length > 0 && !data.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
+              ? data.departments_involved.join(', ')
+              : (user?.department?.name || "Multiple")),
         club_id: data.is_club_event ? (existingEvent?.club_id || user?.club_id) : undefined,
         venue_type: venueTypes.join(', '),
         venue_ids: allVenueIds,
@@ -731,7 +735,11 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
           end_datetime: toUTCISOString(data.end_datetime),
           registration_start_datetime: regAccepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
           registration_deadline: regAccepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
-          school_department: data.school_department || user?.department?.name || "Multiple",
+          school_department: (data.school_department && data.school_department.trim() !== '')
+            ? data.school_department.trim()
+            : (data.departments_involved && data.departments_involved.length > 0 && !data.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
+                ? data.departments_involved.join(', ')
+                : (user?.department?.name || "Multiple")),
           club_id: data.is_club_event ? (existingEvent?.club_id || user?.club_id) : undefined,
           venue_type: venueTypes.join(', '),
           venue_ids: allVenueIds,
@@ -820,7 +828,11 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
         end_datetime: toUTCISOString(bufferedData.end_datetime),
         registration_start_datetime: regAccepted && bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
         registration_deadline: regAccepted && bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
-        school_department: bufferedData.school_department || user?.department?.name || "Multiple",
+        school_department: (bufferedData.school_department && bufferedData.school_department.trim() !== '')
+          ? bufferedData.school_department.trim()
+          : (bufferedData.departments_involved && bufferedData.departments_involved.length > 0 && !bufferedData.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
+              ? bufferedData.departments_involved.join(', ')
+              : (user?.department?.name || "Multiple")),
         club_id: bufferedData.is_club_event ? (existingEvent?.club_id || user?.club_id) : undefined,
         venue_type: venueTypes.join(', '),
         venue_ids: allVenueIds,

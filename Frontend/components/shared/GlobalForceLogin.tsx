@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/authStore';
 import { setAccessToken, setRefreshToken } from '@/lib/api';
 import { systemService } from '@/lib/services';
 
+import { ROLE_DASHBOARD } from '@/lib/utils';
+
 /**
  * Module 1: HydrationGate — blocks rendering until Zustand has rehydrated
  * from localStorage. Uses a simple client-side useEffect to guarantee it
@@ -68,7 +70,6 @@ export function GlobalForceLogin() {
   }, []);
 
   useEffect(() => {
-
     const isAuthRoute = 
       pathname.startsWith('/login') || 
       pathname.startsWith('/signup') || 
@@ -81,13 +82,56 @@ export function GlobalForceLogin() {
       // Security Interceptors: force onboarding steps
       if (user.force_password_change && pathname !== '/change-password') {
         router.replace('/change-password');
-      } else if (!user.force_password_change && !user.profile_completed && pathname !== '/complete-profile') {
+        return;
+      }
+
+      // Profile completion is only required for students and club coordinators
+      const requiresProfile = ['student', 'club_coordinator'].includes(user.role);
+      // Profile is complete if explicitly flagged, or if user has a valid name populated
+      const isProfileCompleted = user.profile_completed ?? !!(user.name?.trim());
+
+      if (!user.force_password_change && requiresProfile && !isProfileCompleted && pathname !== '/complete-profile') {
         router.replace('/complete-profile');
+        return;
+      }
+
+      // Role-based route enforcement across dashboard areas
+      const roleRoutes: Record<string, string> = {
+        '/admin': 'super_admin',
+        '/director': 'director',
+        '/associate_dean': 'associate_dean',
+        '/club_coordinator': 'club_coordinator',
+        '/student': 'student',
+        '/additional': 'additional',
+      };
+
+      for (const [prefix, requiredRole] of Object.entries(roleRoutes)) {
+        if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+          if (user.role !== requiredRole) {
+            router.replace(ROLE_DASHBOARD[user.role] || '/');
+            return;
+          }
+        }
       }
       return;
     }
 
     if (isAuthRoute) return;
+
+    // Immediately protect dashboards from unauthenticated access
+    const isProtectedDashboard =
+      pathname.startsWith('/admin') ||
+      pathname.startsWith('/director') ||
+      pathname.startsWith('/associate_dean') ||
+      pathname.startsWith('/club_coordinator') ||
+      pathname.startsWith('/student') ||
+      pathname.startsWith('/additional') ||
+      pathname.startsWith('/profile');
+
+    if (isProtectedDashboard) {
+      router.replace('/login');
+      return;
+    }
 
     // Public routes accessible without authentication
     const isPublicRoute =

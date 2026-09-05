@@ -95,6 +95,7 @@ def upsert_club(db, *, name: str, description: str,
 
 
 def upsert_user(db, *, email: str, name: str, role: str,
+                password: str = DEFAULT_PASSWORD,
                 department_id: int = None, club_id: int = None,
                 extra_permissions: list[str] | None = None,
                 coordinator_type: str | None = None,
@@ -108,7 +109,7 @@ def upsert_user(db, *, email: str, name: str, role: str,
             name=name,
             role=role,
             status="active",
-            hashed_password=get_password_hash(DEFAULT_PASSWORD),
+            hashed_password=get_password_hash(password),
             is_first_login=False,
             department_id=department_id,
             club_id=club_id,
@@ -125,7 +126,7 @@ def upsert_user(db, *, email: str, name: str, role: str,
         print(f"  + User: {name} <{email}>  role={role}")
     else:
         # Always reset password & activate so the account is usable
-        user.hashed_password = get_password_hash(DEFAULT_PASSWORD)
+        user.hashed_password = get_password_hash(password)
         user.is_first_login = False
         user.status = "active"
         user.role = role
@@ -228,7 +229,8 @@ def seed(include_events: bool = True):
 
         # ── Director ────────────────────────────────────────────────────────
         upsert_user(db, email="admin@nmims.in",
-                    name="System Administrator", role="super_admin")
+                    name="System Administrator", role="super_admin",
+                    password="Admin@123")
         upsert_user(db, email="director@nmims.in",
                     name="Dr. Rajesh Mehta", role="director")
 
@@ -300,7 +302,18 @@ def seed(include_events: bool = True):
                     name="Riya Student Coordinator", role="additional", department_id=dept_engg.id,
                     coordinator_type="student",
                     extra_permissions=["registration", "view_events", "view_event_details"])
+        upsert_user(db, email="student.coord@nmims.in",
+                    name="Riya Student Coordinator", role="additional", department_id=dept_engg.id,
+                    coordinator_type="student",
+                    extra_permissions=["registration", "view_events", "view_event_details"])
         upsert_user(db, email="faculty.coordinator@nmims.in",
+                    name="Dr. Meera Faculty Coordinator", role="additional", department_id=dept_engg.id,
+                    coordinator_type="Faculty",
+                    extra_permissions=[
+                        "registration", "view_events", "view_event_details", "view_event_status",
+                        "view_rnd_reports", "submit_reports", "submit_rnd_reports",
+                    ])
+        upsert_user(db, email="faculty.coord@nmims.in",
                     name="Dr. Meera Faculty Coordinator", role="additional", department_id=dept_engg.id,
                     coordinator_type="Faculty",
                     extra_permissions=[

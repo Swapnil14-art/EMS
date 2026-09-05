@@ -208,6 +208,12 @@ export const userService = {
     const res = await api.patch(`/users/${id}`, data);
     return res.data;
   },
+
+  // GET /users/faculty-coordinators — list faculty coordinator emails (any authenticated user)
+  getFacultyCoordinators: async (): Promise<{ id: number; name: string; email: string }[]> => {
+    const res = await api.get('/users/faculty-coordinators');
+    return res.data;
+  },
 };
 
 // ─── Clubs ────────────────────────────────────────────────────────────────────

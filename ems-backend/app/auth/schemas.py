@@ -57,11 +57,12 @@ class TokenResponse(BaseModel):
 class UserInfo(BaseModel):
     id: int
     email: str
-    name: Optional[str]
+    name: Optional[str] = None
     role: str
     department_id: Optional[int] = None
     club_id: Optional[int] = None
     status: str
+    is_active: bool = True
     is_first_login: bool
     sap_id: Optional[str] = None
     extra_permissions: Optional[list[str]] = []

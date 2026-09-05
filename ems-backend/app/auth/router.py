@@ -141,6 +141,15 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
         
     return {"message": "If the email is registered, a password reset link has been sent."}
 
+
+@router.post("/forgot-password", status_code=200)
+async def forgot_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == body.email.lower()))
+    user = result.scalar_one_or_none()
+    # If user exists, email reset link would be sent in production without modifying current password
+    return {"message": "If the email is registered, a password reset link has been sent."}
+
+
 @router.post("/complete-profile")
 async def complete_profile(body: ProfileCompletionRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     if current_user.is_first_login:

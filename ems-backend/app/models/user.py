@@ -34,6 +34,10 @@ class User(Base):
     department = relationship("Department", back_populates="users")
     club = relationship("Club", foreign_keys=[club_id])
 
+    @property
+    def is_active(self) -> bool:
+        return self.status == "active"
+
 
 
 class PreApprovedUser(Base):
