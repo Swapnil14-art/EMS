@@ -55,8 +55,8 @@ async def admin_get_email_log(
     db: AsyncSession = Depends(get_db),
 ):
     """Admin-only notification audit log endpoint secured with JWT super_admin role."""
-    from app.routers.notifications import get_email_logs
-    return await get_email_logs(page=page, size=size, current_user=current_user, db=db)
+    from app.routers.notifications import get_email_log
+    return await get_email_log(page=page, size=size, current_user=current_user, db=db)
 
 
 

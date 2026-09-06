@@ -93,7 +93,7 @@ function buildAdditionalNav(perms: string[]): NavItem[] {
 interface SidebarLayoutProps { children: React.ReactNode; }
 
 export default function SidebarLayout({ children }: SidebarLayoutProps) {
-  const { user, clearAuth } = useAuthStore();
+  const { user, isHydrated, clearAuth } = useAuthStore();
   const router = useRouter();
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -114,6 +114,7 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
   };
 
   useEffect(() => {
+    if (!isHydrated) return;
     if (!user) {
       router.replace('/login');
       return;
@@ -131,9 +132,9 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         }
       }
     }
-  }, [user, pathname, router]);
+  }, [user, isHydrated, pathname, router]);
 
-  if (!user) return null;
+  if (!isHydrated || !user) return null;
 
   for (const [prefix, requiredRole] of Object.entries(ROLE_ROUTES)) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {

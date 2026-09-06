@@ -13,7 +13,9 @@ import { ROLE_DASHBOARD } from '@/lib/utils';
  * fires even when zustand's onRehydrateStorage is unreliable in SSR.
  */
 export function HydrationGate({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
     // Manually inject tokens into the API client just to be absolutely sure
     // they are available before any components render and make requests.
@@ -23,12 +25,11 @@ export function HydrationGate({ children }: { children: React.ReactNode }) {
     if (state.user && (state.accessToken || state.refreshToken)) {
       useAuthStore.setState({ isAuthenticated: true });
     }
-    
-    // Hydration is complete after first client-side render
-    setReady(true);
+    useAuthStore.setState({ isHydrated: true });
+    setMounted(true);
   }, []);
 
-  if (!ready) {
+  if (!mounted || !isHydrated) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-[var(--page-bg)]">
         <div className="flex flex-col items-center gap-3 animate-pulse">
@@ -50,7 +51,7 @@ export function HydrationGate({ children }: { children: React.ReactNode }) {
 export function GlobalForceLogin() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuthStore();
+  const { user, isHydrated } = useAuthStore();
   const [forceLogin, setForceLogin] = useState<boolean | null>(null);
   const configFetched = useRef(false);
 
@@ -70,6 +71,8 @@ export function GlobalForceLogin() {
   }, []);
 
   useEffect(() => {
+    if (!isHydrated) return;
+
     const isAuthRoute = 
       pathname.startsWith('/login') || 
       pathname.startsWith('/signup') || 
@@ -151,7 +154,7 @@ export function GlobalForceLogin() {
 
     // For unauthenticated users on protected routes (dashboard, admin, etc.), redirect to login
     router.replace('/login');
-  }, [pathname, user, router, forceLogin]);
+  }, [pathname, user, isHydrated, router, forceLogin]);
 
   return null;
 }
