@@ -943,7 +943,7 @@ async def create_event(
             comments=body.comments,
             poster_path=random_poster_path,
             created_by=current_user.id,
-            status="draft",
+            status=body.status if (current_user.role == "super_admin" and body.status) else "draft",
             is_rnd_event=body.is_rnd_event,
             rnd_activity_theme=body.rnd_activity_theme if body.is_rnd_event else None,
             rnd_prescribed_activity=body.rnd_prescribed_activity if body.is_rnd_event else None,
@@ -980,7 +980,7 @@ async def create_event(
         except Exception as e:
             logger.error(f"Error sending creation notifications for event {event.id}: {e}")
 
-        return {"id": event.id, "status": event.status, "message": "Event created as draft"}
+        return {"id": event.id, "status": event.status, "message": "Event created as draft" if event.status == "draft" else f"Event created as {event.status}"}
     except HTTPException:
         raise
     except Exception as e:

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from typing import Optional, List
 from datetime import datetime, date, time
 from decimal import Decimal
@@ -81,6 +81,53 @@ class EventCreate(BaseModel):
     registration_accepted: bool = False
     student_registration_enabled: bool = False
     faculty_registration_enabled: bool = False
+    # Additional aliases and fields from API / test payloads
+    status: Optional[str] = None
+    description: Optional[str] = None
+    registration_start: Optional[datetime] = None
+    registration_end: Optional[datetime] = None
+    expected_attendance: Optional[int] = None
+    audience: Optional[str] = None
+    is_college_wide: Optional[bool] = None
+    budget_total: Optional[Decimal] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_aliases(cls, data):
+        if isinstance(data, dict):
+            # Map registration start and end
+            if "registration_start" in data and not data.get("registration_start_datetime"):
+                data["registration_start_datetime"] = data["registration_start"]
+            if "registration_end" in data and not data.get("registration_deadline"):
+                data["registration_deadline"] = data["registration_end"]
+            # Only enable registration if registration dates were provided or registration is already explicitly accepted
+            has_reg_dates = bool(
+                data.get("registration_start")
+                or data.get("registration_start_datetime")
+                or data.get("registration_end")
+                or data.get("registration_deadline")
+            )
+            # Map audience
+            aud = str(data.get("audience") or "").strip().lower()
+            if aud in ("student", "students", "all"):
+                if has_reg_dates:
+                    if not data.get("student_registration_enabled"):
+                        data["student_registration_enabled"] = True
+                    if not data.get("registration_accepted"):
+                        data["registration_accepted"] = True
+            # Map college wide
+            if data.get("is_college_wide") and not data.get("target_audience"):
+                data["target_audience"] = "college_wide"
+            # Map budget total
+            if "budget_total" in data and not data.get("budget"):
+                data["budget"] = data["budget_total"]
+            # Map description
+            if "description" in data and not data.get("comments"):
+                data["comments"] = data["description"]
+            # Map expected attendance
+            if "expected_attendance" in data and not data.get("pax_count"):
+                data["pax_count"] = data["expected_attendance"]
+        return data
 
     @field_validator("faculty_involved_emails")
     @classmethod
