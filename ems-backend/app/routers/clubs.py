@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 
@@ -49,12 +49,19 @@ async def create_club(
     current_user: User = Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
+    clean_name = body.name.strip()
+    existing = await db.execute(
+        select(Club.id).where(func.lower(Club.name) == func.lower(clean_name)).limit(1)
+    )
+    if existing.scalars().first() is not None:
+        raise HTTPException(status_code=409, detail=f"Club '{clean_name}' already exists")
+
     coord_id = body.coordinator_id
     if not coord_id and body.coordinator_ids:
         coord_id = body.coordinator_ids[0]
 
     club = Club(
-        name=body.name,
+        name=clean_name,
         description=body.description,
         department_id=body.department_id,
         coordinator_id=coord_id,
@@ -85,6 +92,15 @@ async def update_club(
         raise HTTPException(status_code=404, detail="Club not found")
         
     update_data = body.model_dump(exclude_unset=True)
+    if "name" in update_data and update_data["name"] is not None:
+        clean_name = update_data["name"].strip()
+        existing = await db.execute(
+            select(Club.id).where(func.lower(Club.name) == func.lower(clean_name), Club.id != club_id).limit(1)
+        )
+        if existing.scalars().first() is not None:
+            raise HTTPException(status_code=409, detail=f"Club '{clean_name}' already exists")
+        update_data["name"] = clean_name
+
     if "coordinator_ids" in update_data:
         coordinator_ids_to_set = update_data.pop("coordinator_ids")
         

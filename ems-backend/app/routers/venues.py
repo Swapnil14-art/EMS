@@ -123,7 +123,8 @@ async def create_venue(
     current_user: User = Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
-    venue = Venue(**body.model_dump())
+    venue_data = body.model_dump(exclude={"capacity"})
+    venue = Venue(**venue_data)
     db.add(venue)
     await db.commit()
     await db.refresh(venue)
@@ -140,7 +141,10 @@ async def update_venue(
     venue = await db.get(Venue, venue_id)
     if not venue:
         raise HTTPException(status_code=404, detail="Venue not found")
-    for field, value in body.model_dump(exclude_unset=True).items():
+    update_data = body.model_dump(exclude_unset=True, exclude={"capacity"})
+    if body.capacity is not None and "max_capacity" not in update_data:
+        update_data["max_capacity"] = body.capacity
+    for field, value in update_data.items():
         setattr(venue, field, value)
     await db.commit()
     await db.refresh(venue)
