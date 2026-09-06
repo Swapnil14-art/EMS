@@ -25,7 +25,7 @@ async def admin_list_users(
 ):
     """Admin-only user listing endpoint secured with JWT super_admin role."""
     from app.routers.users import list_users
-    return await list_users(
+    res = await list_users(
         page=page,
         size=size,
         role=role,
@@ -34,6 +34,7 @@ async def admin_list_users(
         current_user=current_user,
         db=db,
     )
+    return res["data"] if isinstance(res, dict) and "data" in res else res
 
 
 @router.get("/settings")

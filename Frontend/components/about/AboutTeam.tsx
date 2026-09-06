@@ -6,24 +6,18 @@ import { Code, Heart, Building, Award } from 'lucide-react';
 const DEVELOPERS = [
   {
     name: 'Swapnil Singh',
-    role: 'Full-Stack Developer',
     avatarInitials: 'SS',
     color: 'from-blue-600 to-indigo-600 shadow-blue-500/20',
-    tag: 'Core Architect & Engineering',
   },
   {
     name: 'Adarsh Singh',
-    role: 'Full-Stack Developer',
     avatarInitials: 'AS',
     color: 'from-amber-600 to-orange-600 shadow-amber-500/20',
-    tag: 'System Design & Workflow Engine',
   },
   {
     name: 'Raghav Kacker',
-    role: 'Full-Stack Developer',
     avatarInitials: 'RK',
     color: 'from-emerald-600 to-teal-600 shadow-emerald-500/20',
-    tag: 'UI/UX & Frontend Governance',
   },
 ];
 
@@ -33,7 +27,7 @@ export default function AboutTeam() {
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[rgb(var(--nmims-navy)/0.015)] blur-[120px] pointer-events-none rounded-full" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
+
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16 md:mb-24">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--surface-subtle)] text-[rgb(var(--color-primary))] rounded-full text-xs font-bold uppercase tracking-wider mb-4 border border-[var(--card-border)]">
@@ -63,14 +57,7 @@ export default function AboutTeam() {
                 <h3 className="font-display font-bold text-xl text-[var(--text-primary)] mb-1">
                   {dev.name}
                 </h3>
-                
-                <p className="text-xs font-bold text-[rgb(var(--color-primary))] mb-4 uppercase tracking-wider font-mono">
-                  {dev.role}
-                </p>
 
-                <span className="px-3.5 py-1 rounded-full bg-[var(--brand-soft)] text-[rgb(var(--color-primary))] text-xs font-semibold inline-block mb-4 border border-[rgb(var(--color-primary)/0.12)]">
-                  {dev.tag}
-                </span>
               </div>
 
               <div className="pt-5 border-t border-[var(--card-border)] w-full">
@@ -87,9 +74,6 @@ export default function AboutTeam() {
         <div className="text-center pt-8 border-t border-[var(--card-border)] max-w-md mx-auto">
           <p className="text-xs text-[var(--text-muted)] flex items-center justify-center gap-2 font-body">
             <span>SVKM's NMIMS Shirpur Campus</span>
-            <span>•</span>
-            <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500" />
-            <span>EMS Platform</span>
           </p>
         </div>
 
