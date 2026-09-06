@@ -27,6 +27,7 @@ async def list_users(
     year: Optional[str] = None,
     branch: Optional[str] = None,
     course: Optional[str] = None,
+    search: Optional[str] = None,
     current_user: User = Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -44,13 +45,21 @@ async def list_users(
         query = query.where(User.branch == branch)
     if course and course.lower() != "all":
         query = query.where(User.course == course)
+    if search:
+        from sqlalchemy import or_
+        query = query.where(
+            or_(
+                User.name.ilike(f"%{search}%"),
+                User.email.ilike(f"%{search}%"),
+            )
+        )
         
     count_query = select(func.count()).select_from(query.subquery())
     
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
-    query = query.order_by(User.id.desc()).offset((page - 1) * size).limit(size)
+    query = query.order_by(User.id.asc()).offset((page - 1) * size).limit(size)
     result = await db.execute(query)
     
     # Construct a dict compatible with UserOut model — mode='json' serializes datetimes

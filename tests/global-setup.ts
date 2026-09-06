@@ -64,8 +64,21 @@ async function loginAndSave(key: string, user: { email: string; password: string
       ? { ...userData, is_active: true, is_first_login: false, force_password_change: false, profile_completed: true }
       : { email: user.email, role: user.role, is_active: true, force_password_change: false, is_first_login: false, profile_completed: true };
 
+    // Derive the actual role from the fetched user data (may differ from TEST_USERS.role)
+    const actualRole = userPayload.role || user.role;
     const storageState = {
-      cookies: [],
+      cookies: [
+        {
+          name: 'ems-role',
+          value: actualRole,
+          domain: new URL(BASE_URL).hostname,
+          path: '/',
+          expires: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
+          httpOnly: false,
+          secure: false,
+          sameSite: 'Lax' as const,
+        },
+      ],
       origins: [
         {
           origin: BASE_URL,

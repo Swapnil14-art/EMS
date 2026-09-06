@@ -33,7 +33,7 @@ export function HydrationGate({ children }: { children: React.ReactNode }) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-[var(--page-bg)]">
         <div className="flex flex-col items-center gap-3 animate-pulse">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[var(--status-info-text)] to-[var(--status-info-text)]" />
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[var(--status-info-text)] to-[var(--status-info-text)] animate-spin" />
           <span className="text-sm font-medium text-[var(--text-muted)]">Loading…</span>
         </div>
       </div>
@@ -140,6 +140,8 @@ export function GlobalForceLogin() {
     const isPublicRoute =
       pathname === '/' ||
       pathname.startsWith('/events') ||
+      pathname === '/calendar' ||
+      pathname.startsWith('/calendar') ||
       pathname.startsWith('/venue-calendar') ||
       pathname.startsWith('/about');
 

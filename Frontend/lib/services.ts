@@ -144,6 +144,7 @@ export const userService = {
     department_id?: number;
     page?: number;
     size?: number;
+    search?: string;
   }) => {
     const res = await api.get('/users/', { params });
     const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);

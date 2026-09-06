@@ -19,15 +19,15 @@ export const ROLE_DASHBOARDS: Record<string, string> = {
 
 // ─── Navigation Helpers ──────────────────────────────────────────────────────
 
-/** Navigate and wait for network idle */
+/** Navigate and wait for DOM content to load */
 export async function navigateTo(page: Page, path: string) {
-  await page.goto(path, { waitUntil: 'commit', timeout: 15_000 });
+  await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 15_000 });
 }
 
 /** Wait for page to finish loading (no spinners) */
 export async function waitForPageLoad(page: Page) {
-  // Wait for any loading spinners to disappear
-  const spinners = page.locator('.animate-spin');
+  // Wait for any loading spinners or hydration gates to disappear
+  const spinners = page.locator('.animate-spin, .animate-pulse');
   if (await spinners.count() > 0) {
     await spinners.first().waitFor({ state: 'detached', timeout: 15_000 }).catch(() => {});
   }

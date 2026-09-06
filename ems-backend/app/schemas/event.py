@@ -15,11 +15,11 @@ class BudgetItem(BaseModel):
 
 class EventCreate(BaseModel):
     title: str
-    event_type: str
-    school_department: str
-    event_incharge_name: str
-    event_incharge_contact: str
-    target_audience: str
+    event_type: str = ''
+    school_department: str = ''
+    event_incharge_name: str = ''
+    event_incharge_contact: str = ''
+    target_audience: str = ''
     is_club_event: bool = True
     club_id: Optional[int] = None
     is_collaborative: bool = False

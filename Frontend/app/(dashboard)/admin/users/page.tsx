@@ -96,7 +96,7 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await userService.list({ role: roleFilter || undefined, page });
+      const res = await userService.list({ role: roleFilter || undefined, page, search: search || undefined });
       setUsers(res.data || []);
       setTotal(res.total || 0);
     } catch { setUsers([]); }
@@ -112,7 +112,7 @@ export default function AdminUsersPage() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => { fetchUsers(); }, [roleFilter, page]);
+  useEffect(() => { fetchUsers(); }, [roleFilter, page, search]);
 
   const handleCreate = async (data: CreateForm) => {
     setSubmitting(true);
@@ -267,10 +267,7 @@ export default function AdminUsersPage() {
   const uniqueBranches = Array.from(new Set(bulkStudents.map(s => s.branch).filter((b): b is string => !!b)));
   const uniqueCourses = Array.from(new Set(bulkStudents.map(s => s.course).filter((c): c is string => !!c)));
 
-  const filtered = users.filter(u =>
-    !search || u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -292,10 +289,24 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4 flex flex-wrap gap-3">
+      <div className="card p-4 flex flex-wrap gap-3 items-center">
         <Input placeholder="Search name or email…" leftIcon={<Search className="w-4 h-4" />}
           value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-        <Select options={ROLES} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} aria-label="Filter by user role" className="w-40" />
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by user role">
+          {ROLES.map(r => (
+            <button
+              key={r.value}
+              onClick={() => { setRoleFilter(r.value); setPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                roleFilter === r.value
+                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] border-[var(--btn-primary-bg)]'
+                  : 'bg-[var(--btn-secondary-bg)] text-[var(--btn-secondary-text)] border-[var(--btn-secondary-border)] hover:bg-[var(--btn-secondary-hover-bg)]'
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
         <Button variant="secondary" icon={<RefreshCw className="w-4 h-4" />} onClick={fetchUsers}>Refresh</Button>
       </div>
 

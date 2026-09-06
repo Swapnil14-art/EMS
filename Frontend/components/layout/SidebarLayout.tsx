@@ -14,6 +14,7 @@ import { RoleBadge } from '@/components/shared/StatusBadge';
 import toast from 'react-hot-toast';
 import { BrandMark } from './BrandMark';
 import { AppFooter } from './AppFooter';
+import PublicNavbar from './PublicNavbar';
 
 type NavItem = { label: string; href: string; icon: React.ReactNode; badge?: number };
 
@@ -113,10 +114,14 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
     '/additional': 'additional',
   };
 
+  const isCalendar = pathname === '/calendar' || pathname.startsWith('/calendar');
+
   useEffect(() => {
     if (!isHydrated) return;
     if (!user) {
-      router.replace('/login');
+      if (!isCalendar) {
+        router.replace('/login');
+      }
       return;
     }
     if (user.force_password_change) {
@@ -132,9 +137,24 @@ export default function SidebarLayout({ children }: SidebarLayoutProps) {
         }
       }
     }
-  }, [user, isHydrated, pathname, router]);
+  }, [user, isHydrated, pathname, router, isCalendar]);
 
-  if (!isHydrated || !user) return null;
+  if (!isHydrated) return null;
+
+  if (!user) {
+    if (isCalendar) {
+      return (
+        <div className="min-h-screen flex flex-col bg-[var(--page-bg)] text-[var(--page-text)] font-sans antialiased">
+          <PublicNavbar />
+          <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+            {children}
+          </main>
+          <AppFooter />
+        </div>
+      );
+    }
+    return null;
+  }
 
   for (const [prefix, requiredRole] of Object.entries(ROLE_ROUTES)) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
