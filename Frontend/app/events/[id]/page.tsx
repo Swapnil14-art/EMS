@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 // Using plain <img> for user-uploaded posters (served via Nginx static files)
 import Link from 'next/link';
 import {
-  Calendar, MapPin, Users, Download, ArrowLeft, ExternalLink,
+  Calendar, MapPin, Download, ArrowLeft, ExternalLink,
   Clock, User, Phone, Building, CheckCircle2, FileText
 } from 'lucide-react';
 import PublicNavbar from '@/components/layout/PublicNavbar';
@@ -188,7 +188,6 @@ export default function PublicEventDetailPage() {
                     { label: 'Event Incharge', value: event.event_incharge_name, icon: <User className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     { label: 'Contact', value: event.event_incharge_contact, icon: <Phone className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     ...(event.club?.name ? [{ label: 'Club', value: event.club.name, icon: <Building className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
-                    ...(event.registration_count !== undefined ? [{ label: 'Registered', value: `${event.registration_count} participants`, icon: <Users className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
                   ].map(row => (
                     <div key={row.label} className="flex gap-3">
                       <div className="flex-shrink-0 mt-0.5">{row.icon}</div>
@@ -219,10 +218,21 @@ export default function PublicEventDetailPage() {
               {/* Participant doc */}
               {event.participant_doc_url && (
                 <div className="card p-6">
-                  <h2 className="section-title mb-3">Participant Document</h2>
-                  <a href={event.participant_doc_url} target="_blank" rel="noopener noreferrer" className="btn-secondary gap-2 inline-flex">
-                    <Download className="w-4 h-4" /> Download Participant Document
-                  </a>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="section-title">Participation Document</h2>
+                    <a
+                      href={event.participant_doc_url}
+                      download
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[rgb(var(--color-primary))]"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </a>
+                  </div>
+                  <iframe
+                    src={`${event.participant_doc_url}#toolbar=0`}
+                    title="Participation Document"
+                    className="h-[28rem] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] sm:h-[36rem]"
+                  />
                 </div>
               )}
 

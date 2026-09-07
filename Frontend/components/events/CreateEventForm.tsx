@@ -10,7 +10,7 @@ import {
   IndianRupee
 } from 'lucide-react';
 import { Button, Input, Select, Textarea, Toggle, Alert, Combobox } from '@/components/ui';
-import { eventService, venueService, clubService, departmentService } from '@/lib/services';
+import { eventService, venueService, clubService, departmentService, userService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import { TermsModal } from '@/components/shared/TermsModal';
 import toast from 'react-hot-toast';
@@ -43,6 +43,7 @@ const schema = z.object({
   // Section A
   title: z.string().min(3, 'Title required'),
   event_type: z.string().min(1, 'Select event type'),
+  custom_event_type: z.string().optional(),
   school_department: z.string().optional(),
   departments_involved: z.array(z.string()).min(1, 'Select at least one department'),
   faculty_involved_emails: z.array(z.string()).optional(),
@@ -197,6 +198,10 @@ const schema = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Custom venue details are required', path: ['venue_custom'] });
   }
 
+  if (data.event_type === 'other' && (!data.custom_event_type || data.custom_event_type.trim() === '')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please specify the event type', path: ['custom_event_type'] });
+  }
+
   if (data.is_rnd_event) {
     if (!data.rnd_activity_theme || data.rnd_activity_theme.trim() === '') {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Activity Theme is required for R&D Events', path: ['rnd_activity_theme'] });
@@ -280,7 +285,7 @@ const EVENT_TYPES = [
   { value: 'technical', label: 'Technical' }, { value: 'cultural', label: 'Cultural' },
   { value: 'sports', label: 'Sports' }, { value: 'seminar', label: 'Seminar' },
   { value: 'workshop', label: 'Workshop' }, { value: 'hackathon', label: 'Hackathon' },
-  { value: 'awareness', label: 'Awareness' }, { value: 'other', label: 'Other' },
+  { value: 'awareness', label: 'Awareness' }, { value: 'other', label: 'Others' },
 ];
 const DEPARTMENTS_INVOLVED_OPTIONS = [
   { value: 'agriculture', label: 'Agriculture' },
@@ -375,10 +380,14 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
   const sponsorRef = useRef<HTMLInputElement>(null);
   const [facultyEmailInput, setFacultyEmailInput] = useState('');
   const [facultyEmailError, setFacultyEmailError] = useState('');
+  const [facultyCoordinators, setFacultyCoordinators] = useState<{ id: number; name: string; email: string }[]>([]);
+  const [showFacultySuggestions, setShowFacultySuggestions] = useState(false);
+  const facultyContainerRef = useRef<HTMLDivElement>(null);
 
   const { register, control, handleSubmit, watch, trigger, setValue, getValues, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
+      custom_event_type: '',
       school_department: user?.department?.name || '',
       event_incharge_name: user?.name || '',
       event_incharge_contact: '+91 ',
@@ -421,11 +430,13 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       clubService.list().then(res => res.data?.filter((c: any) => c.id !== user?.club_id) || []).catch(() => []),
       departmentService ? departmentService.list().catch(() => []) : Promise.resolve([]),
       eventId ? eventService.get(eventId).catch(() => null) : Promise.resolve(null),
-    ]).then(([vList, cList, dList, ev]) => {
+      userService.getFacultyCoordinators().catch(() => []),
+    ]).then(([vList, cList, dList, ev, fcList]) => {
       if (!isMounted) return;
       setVenues(vList);
       setClubs(cList);
       setDepartments(dList as any[]);
+      setFacultyCoordinators(Array.isArray(fcList) ? fcList : []);
 
       if (ev) {
         setCreatedId(ev.id);
@@ -463,9 +474,18 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
         const collabClubIds = ev.collaborating_clubs?.map((c: any) => c.club_id) || ev.collaborating_club_ids || [];
         const sponsorName = ev.sponsors?.[0]?.name || ev.sponsor_name || '';
 
+        const isStandardType = EVENT_TYPES.some(t => t.value.toLowerCase() === (ev.event_type || '').toLowerCase());
+        const loadedEventType = ev.event_type
+          ? (isStandardType ? ev.event_type.toLowerCase() : 'other')
+          : '';
+        const loadedCustomEventType = (ev.event_type && !isStandardType && ev.event_type.toLowerCase() !== 'other')
+          ? ev.event_type
+          : '';
+
         reset({
           title: ev.title || '',
-          event_type: ev.event_type || '',
+          event_type: loadedEventType,
+          custom_event_type: loadedCustomEventType,
           school_department: ev.school_department || user?.department?.name || '',
           departments_involved: deptsInvolved,
           faculty_involved_emails: Array.isArray(ev.faculty_involved_emails) ? ev.faculty_involved_emails : [],
@@ -544,6 +564,43 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
   const watchIsRnd = watch('is_rnd_event');
   const watchRndTheme = watch('rnd_activity_theme');
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (facultyContainerRef.current && !facultyContainerRef.current.contains(e.target as Node)) {
+        setShowFacultySuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedFacultyEmails = useMemo(() => {
+    return (watch('faculty_involved_emails') || []).map((e: string) => e.toLowerCase());
+  }, [watch('faculty_involved_emails')]);
+
+  const filteredFacultySuggestions = useMemo(() => {
+    const query = facultyEmailInput.trim().toLowerCase();
+    return facultyCoordinators.filter(fc => {
+      const emailLower = (fc.email || '').toLowerCase();
+      if (selectedFacultyEmails.includes(emailLower)) return false;
+      if (!query) return true;
+      return (fc.name && fc.name.toLowerCase().includes(query)) || emailLower.includes(query);
+    });
+  }, [facultyCoordinators, facultyEmailInput, selectedFacultyEmails]);
+
+  const handleSelectFacultyCoordinator = (email: string) => {
+    const normalized = normalizeFacultyEmail(email);
+    const current = getValues('faculty_involved_emails') || [];
+    if (current.map((e: string) => e.toLowerCase()).includes(normalized)) {
+      setFacultyEmailError('This faculty email has already been added.');
+      return;
+    }
+    setValue('faculty_involved_emails', [...current, normalized], { shouldDirty: true, shouldValidate: true });
+    setFacultyEmailInput('');
+    setFacultyEmailError('');
+    setShowFacultySuggestions(false);
+  };
+
   const addFacultyEmail = () => {
     const email = normalizeFacultyEmail(facultyEmailInput);
     if (!isAllowedFacultyEmail(email)) {
@@ -551,13 +608,14 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       return;
     }
     const current = getValues('faculty_involved_emails') || [];
-    if (current.includes(email)) {
+    if (current.map((e: string) => e.toLowerCase()).includes(email)) {
       setFacultyEmailError('This faculty email has already been added.');
       return;
     }
     setValue('faculty_involved_emails', [...current, email], { shouldDirty: true, shouldValidate: true });
     setFacultyEmailInput('');
     setFacultyEmailError('');
+    setShowFacultySuggestions(false);
   };
 
   const SECTIONS = [
@@ -618,7 +676,7 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
   const watchDecoration = watch('decoration');
 
   const STEP_FIELDS: Record<number, (keyof FormData)[]> = {
-    1: ['title', 'event_type', 'school_department', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
+    1: ['title', 'event_type', 'custom_event_type', 'departments_involved', 'event_incharge_name', 'event_incharge_contact', 'objectives', 'collaborating_club_ids', 'sponsor_name'],
     2: ['start_datetime', 'end_datetime', ...(isRegRequired ? ['registration_start_datetime', 'registration_deadline'] as (keyof FormData)[] : [])],
     3: ['venue_selections', 'venue_custom', 'venue_ids', 'seating_arrangement'], 4: [], 5: [], 6: [],
     7: watchIsRnd ? ['rnd_activity_theme', 'rnd_prescribed_activity'] : [],
@@ -643,18 +701,21 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       const regAccepted = data.outside_campus_registration || data.student_registration_enabled || data.faculty_registration_enabled;
       const outsideCampus = data.outside_campus_registration && regAccepted;
 
+      const resolvedEventType = (data.event_type === 'other' && data.custom_event_type && data.custom_event_type.trim() !== '')
+        ? data.custom_event_type.trim()
+        : data.event_type;
+
       const payloadData = { 
         ...data, 
+        event_type: resolvedEventType,
         target_audience: data.departments_involved.join(', '),
         start_datetime: toUTCISOString(data.start_datetime),
         end_datetime: toUTCISOString(data.end_datetime),
         registration_start_datetime: regAccepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
         registration_deadline: regAccepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
-        school_department: (data.school_department && data.school_department.trim() !== '')
-          ? data.school_department.trim()
-          : (data.departments_involved && data.departments_involved.length > 0 && !data.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
-              ? data.departments_involved.join(', ')
-              : (user?.department?.name || "Multiple")),
+        school_department: (data.departments_involved && data.departments_involved.length > 0 && !data.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
+            ? data.departments_involved.join(', ')
+            : (user?.department?.name || data.school_department || "Multiple")),
         club_id: data.is_club_event ? (existingEvent?.club_id || user?.club_id) : undefined,
         venue_type: venueTypes.join(', '),
         venue_ids: allVenueIds,
@@ -728,18 +789,21 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
         const regAccepted = data.outside_campus_registration || data.student_registration_enabled || data.faculty_registration_enabled;
         const outsideCampus = data.outside_campus_registration && regAccepted;
 
+        const resolvedEventType = (data.event_type === 'other' && data.custom_event_type && data.custom_event_type.trim() !== '')
+          ? data.custom_event_type.trim()
+          : data.event_type;
+
         const payloadData = {
           ...data,
+          event_type: resolvedEventType,
           target_audience: data.departments_involved.join(', '),
           start_datetime: toUTCISOString(data.start_datetime),
           end_datetime: toUTCISOString(data.end_datetime),
           registration_start_datetime: regAccepted && data.registration_start_datetime ? toUTCISOString(data.registration_start_datetime) : undefined,
           registration_deadline: regAccepted && data.registration_deadline ? toUTCISOString(data.registration_deadline) : undefined,
-          school_department: (data.school_department && data.school_department.trim() !== '')
-            ? data.school_department.trim()
-            : (data.departments_involved && data.departments_involved.length > 0 && !data.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
-                ? data.departments_involved.join(', ')
-                : (user?.department?.name || "Multiple")),
+          school_department: (data.departments_involved && data.departments_involved.length > 0 && !data.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
+              ? data.departments_involved.join(', ')
+              : (user?.department?.name || data.school_department || "Multiple")),
           club_id: data.is_club_event ? (existingEvent?.club_id || user?.club_id) : undefined,
           venue_type: venueTypes.join(', '),
           venue_ids: allVenueIds,
@@ -821,18 +885,21 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
       const regAccepted = bufferedData.outside_campus_registration || bufferedData.student_registration_enabled || bufferedData.faculty_registration_enabled;
       const outsideCampus = bufferedData.outside_campus_registration && regAccepted;
 
+      const resolvedEventType = (bufferedData.event_type === 'other' && bufferedData.custom_event_type && bufferedData.custom_event_type.trim() !== '')
+        ? bufferedData.custom_event_type.trim()
+        : bufferedData.event_type;
+
       const payloadData = {
         ...bufferedData,
+        event_type: resolvedEventType,
         target_audience: bufferedData.departments_involved.join(', '),
         start_datetime: toUTCISOString(bufferedData.start_datetime),
         end_datetime: toUTCISOString(bufferedData.end_datetime),
         registration_start_datetime: regAccepted && bufferedData.registration_start_datetime ? toUTCISOString(bufferedData.registration_start_datetime) : undefined,
         registration_deadline: regAccepted && bufferedData.registration_deadline ? toUTCISOString(bufferedData.registration_deadline) : undefined,
-        school_department: (bufferedData.school_department && bufferedData.school_department.trim() !== '')
-          ? bufferedData.school_department.trim()
-          : (bufferedData.departments_involved && bufferedData.departments_involved.length > 0 && !bufferedData.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
-              ? bufferedData.departments_involved.join(', ')
-              : (user?.department?.name || "Multiple")),
+        school_department: (bufferedData.departments_involved && bufferedData.departments_involved.length > 0 && !bufferedData.departments_involved.some((d: any) => String(d).toUpperCase().includes('COLLEGE'))
+            ? bufferedData.departments_involved.join(', ')
+            : (user?.department?.name || bufferedData.school_department || "Multiple")),
         club_id: bufferedData.is_club_event ? (existingEvent?.club_id || user?.club_id) : undefined,
         venue_type: venueTypes.join(', '),
         venue_ids: allVenueIds,
@@ -963,9 +1030,28 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
             <Input label="Event Title" placeholder="e.g. TechFest 2025 — Day 1" error={errors.title?.message} {...register('title')} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Controller name="event_type" control={control} render={({ field }) => (
-                <Select label="Event Type" options={EVENT_TYPES} placeholder="Select type" error={errors.event_type?.message} {...field} />
+                <Select
+                  label="Event Type *"
+                  options={EVENT_TYPES}
+                  placeholder="Select type"
+                  error={errors.event_type?.message}
+                  value={field.value}
+                  onChange={(e) => {
+                    field.onChange(e);
+                    if (e.target.value !== 'other') {
+                      setValue('custom_event_type', '');
+                    }
+                  }}
+                />
               )} />
-              <Input label="School / Department" placeholder="e.g. School of Engineering" error={errors.school_department?.message} {...register('school_department')} />
+              {watch('event_type') === 'other' && (
+                <Input
+                  label="Specify Event Type *"
+                  placeholder="Enter event type"
+                  error={errors.custom_event_type?.message}
+                  {...register('custom_event_type')}
+                />
+              )}
             </div>
             <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
               <p className="text-sm font-semibold text-[var(--text-primary)]">Departments Involved <span className="text-[var(--text-danger)]">*</span></p>
@@ -1018,18 +1104,61 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
             <div className="space-y-3 p-4 bg-[var(--page-bg)] rounded-2xl">
               <div>
                 <p className="text-sm font-semibold text-[var(--text-primary)]">Faculty Involved</p>
-                <p className="text-xs text-[var(--text-muted)] mt-1">Optional. Add faculty email addresses ending in .edu or .in.</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">Optional. Select from registered faculty coordinators or type an email ending in .edu or .in.</p>
               </div>
               <div className="flex gap-2">
-                <input
-                  type="email"
-                  value={facultyEmailInput}
-                  onChange={(e) => { setFacultyEmailInput(e.target.value); setFacultyEmailError(''); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addFacultyEmail(); } }}
-                  placeholder="faculty@example.edu"
-                  className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  aria-label="Faculty email"
-                />
+                <div className="relative flex-1" ref={facultyContainerRef}>
+                  <input
+                    type="email"
+                    value={facultyEmailInput}
+                    onChange={(e) => {
+                      setFacultyEmailInput(e.target.value);
+                      setFacultyEmailError('');
+                      setShowFacultySuggestions(true);
+                    }}
+                    onFocus={() => setShowFacultySuggestions(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addFacultyEmail();
+                      } else if (e.key === 'Escape') {
+                        setShowFacultySuggestions(false);
+                      }
+                    }}
+                    placeholder="Type or select faculty coordinator email..."
+                    className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                    aria-label="Faculty email"
+                    autoComplete="off"
+                  />
+                  {showFacultySuggestions && filteredFacultySuggestions.length > 0 && (
+                    <ul
+                      className="absolute z-50 left-0 right-0 mt-1 max-h-52 overflow-auto bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl shadow-xl animate-fade-in divide-y divide-[var(--border-subtle)]"
+                      role="listbox"
+                    >
+                      {filteredFacultySuggestions.map((fc) => (
+                        <li
+                          key={fc.id || fc.email}
+                          role="option"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectFacultyCoordinator(fc.email);
+                          }}
+                          className="px-3.5 py-2 cursor-pointer hover:bg-[var(--surface-subtle)] transition-colors flex items-center justify-between gap-2 text-left"
+                        >
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-medium text-[var(--text-primary)] truncate">
+                              {fc.name || 'Faculty Coordinator'}
+                            </span>
+                            <span className="text-xs text-[var(--text-muted)] truncate">{fc.email}</span>
+                          </div>
+                          <span className="text-xs font-semibold text-[rgb(var(--color-primary))] bg-[var(--surface-subtle)] px-2 py-0.5 rounded-full border border-[var(--border-subtle)] flex-shrink-0">
+                            Select
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 <Button type="button" variant="secondary" onClick={addFacultyEmail} icon={<Plus className="w-4 h-4" />}>Add</Button>
               </div>
               {facultyEmailError && <p className="text-xs text-[var(--text-danger)]">{facultyEmailError}</p>}

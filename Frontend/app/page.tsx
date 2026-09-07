@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  Calendar, Users, MapPin, TrendingUp, ArrowRight,
-  Zap, BookOpen, Award, ChevronRight
+  Users, MapPin, ArrowRight, Zap, ChevronRight
 } from 'lucide-react';
 import PublicNavbar from '@/components/layout/PublicNavbar';
 import HeroCarousel from '@/components/events/HeroCarousel';
@@ -14,34 +13,6 @@ import { AppFooter } from '@/components/layout/AppFooter';
 import { eventService, venueService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
 import type { Event, Venue } from '@/types';
-
-// Mock stats (replace with API call)
-const STATS = [
-  { label: 'Events This Year', value: '120+', icon: <Calendar className="w-5 h-5" /> },
-  { label: 'Student Participants', value: '4,800+', icon: <Users className="w-5 h-5" /> },
-  { label: 'Active Clubs', value: '28', icon: <BookOpen className="w-5 h-5" /> },
-  { label: 'Venues Available', value: '14', icon: <MapPin className="w-5 h-5" /> },
-];
-
-function StatsBar() {
-  return (
-    <div className="bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)]">
-      <div className="max-w-7xl mx-auto px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-6">
-        {STATS.map((s) => (
-          <div key={s.label} className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[rgb(var(--card-bg)/0.1)] rounded-xl flex items-center justify-center flex-shrink-0">
-              {s.icon}
-            </div>
-            <div>
-              <div className="font-display font-bold text-xl">{s.value}</div>
-              <div className="text-[rgb(var(--color-primary))]/20 text-xs">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function SectionHeader({ title, count, href }: { title: string; count?: number; href?: string }) {
   return (
@@ -170,14 +141,11 @@ export default function LandingPage() {
       {/* Hero carousel - full width, below nav */}
       <div className="pt-16">
         {loading ? (
-          <div className="h-[400px] w-full skeleton sm:h-[500px] lg:h-[540px]" />
+          <div className="h-[480px] w-full skeleton sm:h-[580px] lg:h-[620px]" />
         ) : (
           <HeroCarousel events={featuredEvents} />
         )}
       </div>
-
-      {/* Stats bar */}
-      <StatsBar />
 
       {/* ── Main Sections ───────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto space-y-10 px-4 py-8 sm:space-y-16 sm:px-6 sm:py-12 lg:px-8">
@@ -265,9 +233,10 @@ export default function LandingPage() {
               <h2 className="font-display font-bold text-[var(--btn-primary-text)] text-3xl md:text-4xl mb-3">
                 Discover & Participate<br />in Campus Events
               </h2>
-              <p className="text-[rgb(var(--color-primary))]/20 text-base max-w-md">
-                Register for upcoming events, track your participation, and never miss what's happening on campus.
-              </p>
+              <Link href="/about" className="inline-flex flex-col text-white transition-opacity hover:opacity-80">
+                <span className="font-bold">About EMS</span>
+                <span className="mt-1 text-sm text-white/80">Learn how EMS works <ArrowRight className="inline-block w-3.5 h-3.5" /></span>
+              </Link>
             </div>
             {isHydrated && !isAuthenticated && (
               <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">

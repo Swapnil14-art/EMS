@@ -67,7 +67,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   }, [current, go, events?.length]);
 
   if (!events?.length) return (
-    <div className="flex h-[400px] w-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 sm:h-[500px] lg:h-[540px]">
+    <div className="flex h-[480px] w-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 sm:h-[580px] lg:h-[620px]">
       <div className="text-center text-[var(--btn-primary-text)]">
         <p className="font-display text-3xl font-bold opacity-60">No Featured Events</p>
         <p className="text-[rgb(var(--color-primary))]/20 mt-2">Check back soon for upcoming events</p>
@@ -79,14 +79,14 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   const bgGradient = PLACEHOLDER_COLORS[current % PLACEHOLDER_COLORS.length];
 
   return (
-    <div className="relative h-[400px] w-full overflow-hidden sm:h-[500px] lg:h-[540px]">
+    <div className="relative h-[480px] w-full overflow-hidden sm:h-[580px] lg:h-[620px]">
       {/* Background image or gradient */}
       <div className={`absolute inset-0 bg-gradient-to-br ${bgGradient} transition-all duration-700`}>
         {event.poster_url && (
           <img
             src={event.poster_url}
             alt={event.title}
-            className="absolute inset-0 w-full h-full object-cover opacity-30 transition-opacity duration-700"
+            className="absolute inset-0 w-full h-full object-cover opacity-45 transition-opacity duration-700"
           />
         )}
         {/* Dark gradient overlay */}
@@ -156,6 +156,12 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
         </>
       )}
 
+      {event.club && (
+        <div className="absolute left-4 top-4 z-20 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-black shadow-sm sm:left-8 sm:top-6">
+          {event.club.name}
+        </div>
+      )}
+
       {/* Dot indicators */}
       {events?.length > 1 && (
         <div className="absolute bottom-4 right-4 z-20 flex items-center gap-1.5 sm:bottom-6 sm:right-8 sm:gap-2">
@@ -172,7 +178,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
       )}
 
       {/* Event counter */}
-      <div className="absolute right-4 top-4 z-20 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--btn-primary-text)] glass-card sm:right-8 sm:top-6 sm:px-3 sm:py-1.5">
+      <div className="absolute right-4 top-4 z-20 rounded-full px-2.5 py-1 text-xs font-semibold text-black glass-card sm:right-8 sm:top-6 sm:px-3 sm:py-1.5">
         {current + 1} / {events?.length}
       </div>
     </div>

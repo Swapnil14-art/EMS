@@ -104,7 +104,7 @@ async def list_faculty_coordinators(
         select(User.id, User.name, User.email)
         .where(
             User.role == "additional",
-            User.coordinator_type == "Faculty",
+            func.lower(User.coordinator_type) == "faculty",
             User.status == "active",
         )
         .order_by(User.name)

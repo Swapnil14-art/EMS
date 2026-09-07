@@ -89,7 +89,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <p className="text-[var(--btn-primary-text)] font-display font-bold">EMS</p>
-              <p className="text-[rgb(var(--color-primary))]/20 text-xs">NMIMS Shirpur</p>
+              <p className="text-white/75 text-xs">NMIMS Shirpur</p>
             </div>
           </Link>
         </div>
@@ -98,19 +98,19 @@ export default function RegisterPage() {
           <h2 className="font-display font-bold text-[var(--btn-primary-text)] text-4xl mb-4 leading-tight">
             Join the campus<br />event ecosystem
           </h2>
-          <p className="text-[rgb(var(--color-primary))]/20 text-base leading-relaxed mb-8">
+          <p className="text-white/80 text-base leading-relaxed mb-8">
             Create your student account with your @nmims.in email. You will receive a temporary password to get started.
           </p>
           <div className="space-y-3">
             {['Discover events from all schools', 'Register with one click', 'Get participant documents instantly', 'Stay updated via email notifications'].map(t => (
-              <div key={t} className="flex items-center gap-3 text-[rgb(var(--color-primary))]/10 text-sm">
-                <CheckCircle2 className="w-4 h-4 text-[rgb(var(--color-primary))]/20 flex-shrink-0" />
+              <div key={t} className="flex items-center gap-3 text-white/80 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-white/80 flex-shrink-0" />
                 {t}
               </div>
             ))}
           </div>
         </div>
-        <div className="relative z-10 text-[rgb(var(--color-primary))]/30 text-xs">
+        <div className="relative z-10 text-white/80 text-xs">
           Already have an account?{' '}
           <Link href="/login" className="text-[var(--btn-primary-text)] font-semibold hover:underline">Sign in</Link>
         </div>
