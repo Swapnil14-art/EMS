@@ -29,7 +29,7 @@ export function HydrationGate({ children }: { children: React.ReactNode }) {
     setMounted(true);
   }, []);
 
-  if (!mounted || !isHydrated) {
+  if (!mounted) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-[var(--page-bg)]">
         <div className="flex flex-col items-center gap-3 animate-pulse">
@@ -143,7 +143,10 @@ export function GlobalForceLogin() {
       pathname === '/calendar' ||
       pathname.startsWith('/calendar') ||
       pathname.startsWith('/venue-calendar') ||
-      pathname.startsWith('/about');
+      pathname.startsWith('/about') ||
+      pathname.startsWith('/privacy') ||
+      pathname.startsWith('/terms') ||
+      pathname.startsWith('/cookies');
 
     // If Force Login Mode is ON, redirect all public routes to login
     if (forceLogin === true) {

@@ -40,7 +40,17 @@ class Settings(BaseSettings):
 
     STORAGE_ROOT: str = "storage"
     FRONTEND_URL: str = "http://localhost:3000"
+    CORS_ORIGINS: str = ""
     COLLEGE_NAME: str = "SVKM's NMIMS, Shirpur Campus"
+    LEGAL_ENTITY_NAME: str = "[Operating Institution: SVKM's NMIMS, Shirpur Campus]"
+    PRIVACY_OFFICER_NAME: str = "[Designated Privacy Officer / Coordinator]"
+    PRIVACY_OFFICER_EMAIL: str = "privacy@shirpur.nmims.edu"
+    GRIEVANCE_OFFICER_NAME: str = "[Designated Grievance Redressal Officer]"
+    GRIEVANCE_OFFICER_EMAIL: str = "grievance-ems@shirpur.nmims.edu"
+    GRIEVANCE_OFFICER_ADDRESS: str = "[Campus Address: SVKM's NMIMS, Mukesh Patel Technology Park, Babulde, Bank of Tapi River, Mumbai-Agra National Highway 3, Shirpur, Dhule, Maharashtra 425405, India]"
+    CURRENT_TERMS_VERSION: str = "1.0"
+    CURRENT_PRIVACY_VERSION: str = "1.0"
+    CURRENT_COOKIE_VERSION: str = "1.0"
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
     DB_POOL_TIMEOUT: int = 30
@@ -48,6 +58,12 @@ class Settings(BaseSettings):
     @property
     def allowed_domain_list(self) -> List[str]:
         return [d.strip() for d in self.ALLOWED_DOMAINS.split(",")]
+
+    @property
+    def cors_origin_list(self) -> List[str]:
+        """Return the explicit browser origins allowed to call the API."""
+        configured_origins = [origin.strip().rstrip("/") for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return list(dict.fromkeys([self.FRONTEND_URL.rstrip("/"), *configured_origins]))
 
     @model_validator(mode="after")
     def validate_production_secrets(self):

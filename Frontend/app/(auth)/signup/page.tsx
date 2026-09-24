@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Mail, CheckCircle2, ChevronRight, GraduationCap, ShieldOff } from 'lucide-react';
+import { Mail, CheckCircle2, ChevronRight, GraduationCap, ShieldOff, ExternalLink } from 'lucide-react';
 import { authService, systemService } from '@/lib/services';
 import { Button, Input, Alert } from '@/components/ui';
 
@@ -18,6 +18,16 @@ const schema = z.object({
       (val) => val.toLowerCase().endsWith('@nmims.in') || val.toLowerCase().endsWith('@nmims.edu'),
       { message: 'Email must contain @nmims.in or @nmims.edu.' }
     ),
+  terms_accepted: z
+    .boolean()
+    .refine((val) => val === true, {
+      message: 'You must affirmatively agree to the Terms & Conditions.',
+    }),
+  privacy_acknowledged: z
+    .boolean()
+    .refine((val) => val === true, {
+      message: 'You must affirmatively acknowledge the Privacy Policy.',
+    }),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -30,10 +40,19 @@ export default function RegisterPage() {
   const [signupDisabled, setSignupDisabled] = useState(false);
   const [checkingConfig, setCheckingConfig] = useState(true);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    mode: 'onSubmit',
+    mode: 'onChange',
+    defaultValues: {
+      email: '',
+      terms_accepted: false,
+      privacy_acknowledged: false,
+    },
   });
+
+  const termsAccepted = watch('terms_accepted');
+  const privacyAcknowledged = watch('privacy_acknowledged');
+  const isSubmitDisabled = isSubmitting || !termsAccepted || !privacyAcknowledged;
 
   // Check if signup is disabled via public config (no auth needed)
   useEffect(() => {
@@ -50,7 +69,11 @@ export default function RegisterPage() {
   const onSubmit = async (data: FormData) => {
     setApiError('');
     try {
-      await authService.signup({ email: data.email });
+      await authService.signup({
+        email: data.email,
+        terms_accepted: data.terms_accepted,
+        privacy_acknowledged: data.privacy_acknowledged,
+      });
       setSignupEmail(data.email);
       setSendCount(1);
       setSuccess(true);
@@ -65,7 +88,11 @@ export default function RegisterPage() {
     setApiError('');
     setIsResending(true);
     try {
-      await authService.signup({ email: signupEmail });
+      await authService.signup({
+        email: signupEmail,
+        terms_accepted: true,
+        privacy_acknowledged: true,
+      });
       setSendCount(count => count + 1);
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Unable to resend the temporary password. Please try again later.';
@@ -99,7 +126,7 @@ export default function RegisterPage() {
             Join the campus<br />event ecosystem
           </h2>
           <p className="text-white/80 text-base leading-relaxed mb-8">
-            Create your student account with your @nmims.in email. You will receive a temporary password to get started.
+            Create your student account with your @nmims.in or @nmims.edu email. You will receive a temporary password to get started.
           </p>
           <div className="space-y-3">
             {['Discover events from all schools', 'Register with one click', 'Get participant documents instantly', 'Stay updated via email notifications'].map(t => (
@@ -155,6 +182,9 @@ export default function RegisterPage() {
             <>
               <div className="mb-6">
                 <h2 className="font-display font-bold text-[var(--text-primary)] text-3xl">Create Account</h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">
+                  Enter your official NMIMS email to register for EMS.
+                </p>
               </div>
 
               {apiError && <Alert type="error" className="mb-5"><span>{apiError}</span></Alert>}
@@ -182,19 +212,92 @@ export default function RegisterPage() {
               ) : (
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 animate-fade-in">
                   <Input
-                    label="Email Address"
+                    label="Institutional Email Address"
                     type="email"
                     placeholder="yourname@nmims.in"
                     leftIcon={<Mail className="w-4 h-4" />}
                     error={errors.email?.message}
-                    hint="We will email you a temporary login password."
+                    hint="Must be an @nmims.in or @nmims.edu email address."
                     {...register('email')}
                     autoComplete="email"
                     disabled={isSubmitting}
                   />
-                  <Button type="submit" loading={isSubmitting} className="w-full justify-center py-3">
+
+                  {/* Legal Acceptance Checkboxes */}
+                  <div className="space-y-3 pt-1 border-t border-[var(--border-subtle)]">
+                    {/* Checkbox 1: Terms */}
+                    <div>
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          id="terms_accepted"
+                          {...register('terms_accepted')}
+                          disabled={isSubmitting}
+                          className="mt-0.5 h-4 w-4 rounded border-[var(--card-border)] text-[rgb(var(--color-primary))] focus:ring-[rgb(var(--color-primary))] cursor-pointer"
+                        />
+                        <label htmlFor="terms_accepted" className="text-xs text-[var(--text-secondary)] leading-relaxed cursor-pointer select-none">
+                          I agree to the{' '}
+                          <Link
+                            href="/terms"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-[rgb(var(--color-primary))] hover:underline inline-flex items-center gap-0.5"
+                          >
+                            EMS Terms &amp; Conditions (v1.0) <ExternalLink className="w-3 h-3" />
+                          </Link>
+                          .
+                        </label>
+                      </div>
+                      {errors.terms_accepted && (
+                        <p className="text-xs text-[var(--status-danger-text)] pl-6 mt-1">
+                          {errors.terms_accepted.message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Checkbox 2: Privacy */}
+                    <div>
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          id="privacy_acknowledged"
+                          {...register('privacy_acknowledged')}
+                          disabled={isSubmitting}
+                          className="mt-0.5 h-4 w-4 rounded border-[var(--card-border)] text-[rgb(var(--color-primary))] focus:ring-[rgb(var(--color-primary))] cursor-pointer"
+                        />
+                        <label htmlFor="privacy_acknowledged" className="text-xs text-[var(--text-secondary)] leading-relaxed cursor-pointer select-none">
+                          I have read and acknowledge the{' '}
+                          <Link
+                            href="/privacy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-[rgb(var(--color-primary))] hover:underline inline-flex items-center gap-0.5"
+                          >
+                            EMS Privacy Policy (v1.0) <ExternalLink className="w-3 h-3" />
+                          </Link>
+                          .
+                        </label>
+                      </div>
+                      {errors.privacy_acknowledged && (
+                        <p className="text-xs text-[var(--status-danger-text)] pl-6 mt-1">
+                          {errors.privacy_acknowledged.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    loading={isSubmitting}
+                    disabled={isSubmitDisabled}
+                    className="w-full justify-center py-3"
+                  >
                     Send Temporary Password <ChevronRight className="w-4 h-4" />
                   </Button>
+
+                  <p className="text-center text-[11px] text-[var(--text-muted)]">
+                    By submitting, a one-time activation password will be dispatched to your institutional inbox.
+                  </p>
                 </form>
               )}
             </>

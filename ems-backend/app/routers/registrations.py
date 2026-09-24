@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +20,7 @@ from app.services.email_service import (
 from app.routers.events import is_student_eligible_for_event
 from app.schemas.event import VisitorRegistrationCreate
 from app.utils.additional_perms import has_perm
+from app.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +32,15 @@ class EventRegisterBody(BaseModel):
 
 
 @router.post("/")
+@limiter.limit("10/minute")
 async def register_event_root(
+    request: Request,
     body: EventRegisterBody,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Register for an event by JSON body { event_id }, secured via JWT."""
-    return await register_for_event(event_id=body.event_id, current_user=current_user, db=db)
+    return await register_for_event(request=request, event_id=body.event_id, current_user=current_user, db=db)
 
 
 @router.get("/")
@@ -76,7 +79,9 @@ def _registration_access_message(user: User) -> str:
 
 
 @router.post("/{event_id}/register")
+@limiter.limit("10/minute")
 async def register_for_event(
+    request: Request,
     event_id: int,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -313,7 +318,9 @@ async def send_bulk_update(
 
 
 @router.post("/{event_id}/register-visitor")
+@limiter.limit("5/hour")
 async def register_visitor(
+    request: Request,
     event_id: int,
     body: VisitorRegistrationCreate,
     db: AsyncSession = Depends(get_db),

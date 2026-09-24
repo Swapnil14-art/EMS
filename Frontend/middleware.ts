@@ -28,12 +28,17 @@ function isPublicPath(pathname: string): boolean {
   return (
     pathname === '/' ||
     pathname === '/login' ||
+    pathname === '/signup' ||
     pathname === '/register' ||
+    pathname === '/forgot-password' ||
     pathname === '/calendar' ||
     pathname.startsWith('/calendar/') ||
     pathname.startsWith('/events') ||
     pathname.startsWith('/venue-calendar') ||
     pathname.startsWith('/about') ||
+    pathname.startsWith('/privacy') ||
+    pathname.startsWith('/terms') ||
+    pathname.startsWith('/cookies') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/favicon') ||

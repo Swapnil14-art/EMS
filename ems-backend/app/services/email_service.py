@@ -123,6 +123,15 @@ def _build_email_html(content_html: str) -> str:
                 background-color: #fff5f5;
                 border-left-color: #e53e3e;
             }}
+            .test-notice {{
+                background-color: #fffaf0;
+                border: 1px solid #f6d48a;
+                border-left: 4px solid #d69e2e;
+                padding: 16px 20px;
+                margin: 0 0 24px;
+                border-radius: 0 6px 6px 0;
+                color: #744210;
+            }}
             .highlight {{
                 font-size: 20px;
                 color: #2b6cb0;
@@ -142,13 +151,17 @@ def _build_email_html(content_html: str) -> str:
         <div class="email-wrapper">
             <div class="container">
                 <div class="header">
-                    <h1>NMIMS EMS</h1>
+                    <h1>Test Email — NMIMS EMS</h1>
                 </div>
                 <div class="content">
+                    <div class="test-notice">
+                        <strong>This is a test email from EMS.</strong><br>
+                        The Event Management System (EMS) is a college website currently under development for SVKM's NMIMS, Shirpur Campus. Please ignore this email and do not report it.
+                    </div>
                     {content_html}
                 </div>
                 <div class="footer">
-                    <p>This is an automated message from the NMIMS Event Management System.</p>
+                    <p>This is a test message from the NMIMS Event Management System, a college website currently in progress.</p>
                     <p>&copy; 2026 SVKM's NMIMS. All rights reserved.</p>
                 </div>
             </div>

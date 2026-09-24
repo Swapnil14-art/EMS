@@ -47,6 +47,7 @@ export interface ParsedLoginResponse {
   refreshToken: string;
   requirePasswordChange: boolean;
   requireProfileCompletion: boolean;
+  requireLegalAcceptance: boolean;
 }
 
 /**
@@ -58,6 +59,7 @@ export function mapLoginResponse(res: any): ParsedLoginResponse {
     refreshToken: res.refresh_token,
     requirePasswordChange: res.require_password_change ?? false,
     requireProfileCompletion: res.require_profile_completion ?? false,
+    requireLegalAcceptance: res.require_legal_acceptance ?? false,
   };
 }
 

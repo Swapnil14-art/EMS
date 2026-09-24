@@ -1,12 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, FileText, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, AlertCircle, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
 import { eventService, registrationService, systemService } from '@/lib/services';
 import type { Event } from '@/types';
 import toast from 'react-hot-toast';
+import ParticipationDocViewer from '@/components/ui/ParticipationDocViewer';
 
 export default function StudentEventRegisterPage() {
   const { id } = useParams<{ id: string }>();
@@ -121,13 +122,25 @@ export default function StudentEventRegisterPage() {
         </div>
       </div>
 
+      {/* Contextual Privacy Notice */}
+      <div className="px-6 py-2 bg-[var(--surface-bg)] border-b border-[var(--border-subtle)] text-xs text-[var(--text-muted)] flex items-center gap-2 flex-shrink-0">
+        <Shield className="w-3.5 h-3.5 text-[rgb(var(--color-primary))] flex-shrink-0" />
+        <span>
+          <strong>Privacy Notice:</strong> Your student details (Name, SAP ID, Department, Email) will be processed by the event coordinator for attendance verification and certificate issuance. See our{' '}
+          <Link href="/privacy" target="_blank" className="text-[rgb(var(--color-primary))] hover:underline font-medium">
+            Privacy Policy
+          </Link>
+          .
+        </span>
+      </div>
+
       {/* PDF Viewer Area / Confirmation Area */}
       <div className="flex-1 w-full bg-[var(--surface-subtle)] relative overflow-hidden">
         {hasDoc && !pdfError ? (
-          <iframe 
-            src={`${event.participant_doc_url}#toolbar=0`} 
-            className="w-full h-full border-0"
+          <ParticipationDocViewer
+            url={event.participant_doc_url!}
             title="Participation Document"
+            fillContainer
             onError={() => setPdfError(true)}
           />
         ) : (

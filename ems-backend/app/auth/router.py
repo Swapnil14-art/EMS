@@ -4,7 +4,9 @@ from sqlalchemy import select
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
+from app.config import settings
 from app.models.user import User, PreApprovedUser, PendingSignup
+from app.models.legal import LegalAcceptance
 from app.models.system_config import SystemSettings
 from app.auth.jwt_handler import (
     create_access_token,
@@ -27,6 +29,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 PENDING_SIGNUP_MAX_SENDS = 4
 PENDING_SIGNUP_TTL = timedelta(hours=24)
+
+
+def _get_client_ip(request: Request) -> str | None:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return None
+
+
+async def _check_user_legal_requirement(user_id: int, db: AsyncSession) -> bool:
+    """Returns True if the user still needs to accept active terms/privacy policy."""
+    legal_query = select(LegalAcceptance.document_type).where(
+        LegalAcceptance.user_id == user_id,
+        LegalAcceptance.document_type.in_(["terms_and_conditions", "privacy_policy"]),
+        LegalAcceptance.document_version.in_([settings.CURRENT_TERMS_VERSION, settings.CURRENT_PRIVACY_VERSION]),
+        LegalAcceptance.status.in_(["accepted", "acknowledged"])
+    )
+    legal_res = await db.execute(legal_query)
+    accepted_docs = set(legal_res.scalars().all())
+    return not {"terms_and_conditions", "privacy_policy"}.issubset(accepted_docs)
+
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
 @limiter.limit("10/hour")
@@ -67,10 +92,13 @@ async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depen
     notify_temporary_password(email, temp_password, is_reset=False)
     return {"message": "Temporary password sent. Use it to log in and activate your account."}
 
+
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
+    newly_activated = False
+
     if not user:
         pending_result = await db.execute(select(PendingSignup).where(PendingSignup.email == body.email.lower()))
         pending = pending_result.scalar_one_or_none()
@@ -82,7 +110,31 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
             user = User(email=pending.email, hashed_password=pending.hashed_password, is_first_login=True, role="student", status="active")
             db.add(user)
             await db.flush()
+
+            # Record initial legal acceptances affirmatively given during signup flow
+            client_ip = _get_client_ip(request)
+            raw_ua = request.headers.get("user-agent", "")
+            ua = raw_ua[:255] if raw_ua else None
+
+            db.add(LegalAcceptance(
+                user_id=user.id,
+                document_type="terms_and_conditions",
+                document_version=settings.CURRENT_TERMS_VERSION,
+                status="accepted",
+                ip_address=client_ip,
+                user_agent=ua,
+            ))
+            db.add(LegalAcceptance(
+                user_id=user.id,
+                document_type="privacy_policy",
+                document_version=settings.CURRENT_PRIVACY_VERSION,
+                status="acknowledged",
+                ip_address=client_ip,
+                user_agent=ua,
+            ))
+
             await db.delete(pending)
+            newly_activated = True
 
     if not user or not user.hashed_password or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
@@ -92,6 +144,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
+
+    require_legal = False if newly_activated else await _check_user_legal_requirement(user.id, db)
     
     token_data = {
         "user_id": user.id,
@@ -109,8 +163,10 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(user.id),
         require_password_change=user.is_first_login,
-        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False
+        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False,
+        require_legal_acceptance=require_legal,
     )
+
 
 @router.post("/change-password")
 async def change_password(body: ChangePasswordRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -125,6 +181,7 @@ async def change_password(body: ChangePasswordRequest, current_user: User = Depe
     await db.commit()
     
     return {"message": "Password changed successfully."}
+
 
 @router.post("/reset-password")
 async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
@@ -195,6 +252,7 @@ async def complete_profile(body: ProfileCompletionRequest, current_user: User = 
     await db.commit()
     return {"message": "Profile completed successfully. Please login again to refresh access tokens."}
 
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     try:
@@ -208,6 +266,8 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
 
     if not user or user.status == "inactive":
         raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    require_legal = await _check_user_legal_requirement(user.id, db)
 
     token_data = {
         "user_id": user.id,
@@ -225,12 +285,15 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(user.id),
         require_password_change=user.is_first_login,
-        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False
+        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False,
+        require_legal_acceptance=require_legal,
     )
+
 
 @router.post("/logout")
 async def logout(current_user: User = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
+
 
 @router.get("/me", response_model=UserInfo)
 async def me(current_user: User = Depends(get_current_user)):

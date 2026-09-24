@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, MapPin, Building, User, Mail, Phone, GraduationCap, School, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Building, User, Mail, Phone, GraduationCap, School, CheckCircle2, AlertCircle, Shield } from 'lucide-react';
 import PublicNavbar from '@/components/layout/PublicNavbar';
 import { AppFooter } from '@/components/layout/AppFooter';
 import { Button, Input } from '@/components/ui';
@@ -272,7 +272,19 @@ export default function VisitorRegistrationPage() {
                   />
                 </div>
 
-                <div className="pt-4">
+                {/* Contextual Visitor Privacy Notice */}
+                <div className="p-3.5 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)] leading-relaxed flex items-start gap-2.5">
+                  <Shield className="w-4 h-4 text-[rgb(var(--color-primary))] flex-shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Privacy Notice:</strong> Your information (Name, Email, Phone, Institution) is collected solely to issue your visitor entry pass and facilitate campus security clearance for this event. For details on how we safeguard your personal data, please review our{' '}
+                    <Link href="/privacy" target="_blank" className="text-[rgb(var(--color-primary))] hover:underline font-medium">
+                      Privacy Policy
+                    </Link>
+                    .
+                  </span>
+                </div>
+
+                <div className="pt-2">
                   <Button
                     type="submit"
                     variant="primary"

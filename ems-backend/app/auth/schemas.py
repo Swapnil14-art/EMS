@@ -4,6 +4,8 @@ from typing import Optional
 
 class SignupRequest(BaseModel):
     email: EmailStr
+    terms_accepted: bool
+    privacy_acknowledged: bool
 
     @field_validator("email")
     def validate_nmims_domain(cls, v: str):
@@ -11,6 +13,18 @@ class SignupRequest(BaseModel):
         if domain not in ["nmims.in", "nmims.edu"]:
             raise ValueError("Email must contain @nmims.in or @nmims.edu.")
         return v.lower()
+
+    @field_validator("terms_accepted")
+    def validate_terms_accepted(cls, v: bool):
+        if not v:
+            raise ValueError("You must affirmatively agree to the Terms & Conditions before creating an account.")
+        return v
+
+    @field_validator("privacy_acknowledged")
+    def validate_privacy_acknowledged(cls, v: bool):
+        if not v:
+            raise ValueError("You must affirmatively acknowledge the Privacy Policy before creating an account.")
+        return v
 
 
 class LoginRequest(BaseModel):
@@ -52,6 +66,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     require_password_change: bool = False
     require_profile_completion: bool = False
+    require_legal_acceptance: bool = False
 
 
 class UserInfo(BaseModel):

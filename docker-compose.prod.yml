@@ -5,6 +5,7 @@ services:
       target: runner
       args:
         NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
     restart: unless-stopped
     environment:
       NODE_ENV: production

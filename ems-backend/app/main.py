@@ -16,7 +16,7 @@ from app.routers import (
     users, departments, clubs, venues,
     events, approvals, registrations,
     reports, rnd_reports, dashboard, admin,
-    system, notifications, permissions,
+    system, notifications, permissions, legal,
 )
 
 logger = logging.getLogger("ems.request")
@@ -50,18 +50,11 @@ def create_app() -> FastAPI:
             logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.1f", request_id, request.method, path, response.status_code, (time.perf_counter() - start) * 1000)
         return response
 
-    # CORS — allow Next.js frontend + Swagger/dev origins
-    cors_origins = [
-        settings.FRONTEND_URL,
-        "http://localhost:8000",
-        "http://localhost",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1",
-        "http://127.0.0.1:3000",
-    ]
+    # CORS must remain an explicit allow-list, including in development.
+    # Credentials cannot safely be combined with a wildcard origin policy.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.DEBUG else cors_origins,
+        allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -90,6 +83,7 @@ def create_app() -> FastAPI:
     app.include_router(system.router, prefix="/system", tags=["System Settings"])
     app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
     app.include_router(permissions.router, prefix="/permissions", tags=["Permissions"])
+    app.include_router(legal.router, prefix="/legal", tags=["Legal & Privacy"])
 
     @app.get("/health", tags=["Health"])
     async def health_check():

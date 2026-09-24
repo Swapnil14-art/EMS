@@ -27,7 +27,7 @@ export const authService = {
   },
 
   // POST /auth/signup — email-only registration
-  signup: async (data: { email: string }) => {
+  signup: async (data: { email: string; terms_accepted: boolean; privacy_acknowledged: boolean }) => {
     const res = await api.post('/auth/signup', data);
     return res.data;
   },
@@ -869,3 +869,62 @@ export const permissionService = {
   },
 };
 
+
+
+// ─── Legal & Privacy Service ─────────────────────────────────────────────────
+
+export interface LegalVersions {
+  current_versions: {
+    terms_and_conditions: string;
+    privacy_policy: string;
+    cookie_policy: string;
+  };
+  effective_dates: {
+    terms_and_conditions: string;
+    privacy_policy: string;
+    cookie_policy: string;
+  };
+  operator_name: string;
+  privacy_officer_name: string;
+  privacy_officer_email: string;
+  grievance_officer_name: string;
+  grievance_officer_email: string;
+  grievance_officer_address: string;
+}
+
+export interface LegalStatus {
+  requires_acceptance: boolean;
+  missing_documents: string[];
+  current_versions: Record<string, string>;
+  accepted_versions: Record<string, string | null>;
+}
+
+export interface LegalAcceptanceRecord {
+  id: number;
+  user_id: number;
+  document_type: string;
+  document_version: string;
+  accepted_at: string;
+  status: string;
+}
+
+export const legalService = {
+  getVersions: async (): Promise<LegalVersions> => {
+    const res = await api.get('/legal/versions');
+    return res.data;
+  },
+  getStatus: async (): Promise<LegalStatus> => {
+    const res = await api.get('/legal/status');
+    return res.data;
+  },
+  accept: async (
+    acceptances: { document_type: string; document_version: string; status?: string }[]
+  ): Promise<LegalAcceptanceRecord[]> => {
+    const res = await api.post('/legal/accept', { acceptances });
+    return res.data;
+  },
+  getMyAcceptances: async (): Promise<LegalAcceptanceRecord[]> => {
+    const res = await api.get('/legal/my-acceptances');
+    return res.data;
+  },
+};

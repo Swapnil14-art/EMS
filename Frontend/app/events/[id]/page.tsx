@@ -17,6 +17,7 @@ import type { Event, EventLink } from '@/types';
 import toast from 'react-hot-toast';
 import FullEventDetailsView from '@/components/events/FullEventDetailsView';
 import { AppFooter } from '@/components/layout/AppFooter';
+import ParticipationDocViewer from '@/components/ui/ParticipationDocViewer';
 
 export default function PublicEventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -228,10 +229,9 @@ export default function PublicEventDetailPage() {
                       <Download className="w-3.5 h-3.5" /> Download
                     </a>
                   </div>
-                  <iframe
-                    src={`${event.participant_doc_url}#toolbar=0`}
+                  <ParticipationDocViewer
+                    url={event.participant_doc_url}
                     title="Participation Document"
-                    className="h-[28rem] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-subtle)] sm:h-[36rem]"
                   />
                 </div>
               )}
