@@ -27,6 +27,7 @@ async def list_users(
     year: Optional[str] = None,
     branch: Optional[str] = None,
     course: Optional[str] = None,
+    search: Optional[str] = None,
     current_user: User = Depends(require_roles("super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -44,25 +45,21 @@ async def list_users(
         query = query.where(User.branch == branch)
     if course and course.lower() != "all":
         query = query.where(User.course == course)
+    if search:
+        from sqlalchemy import or_
+        query = query.where(
+            or_(
+                User.name.ilike(f"%{search}%"),
+                User.email.ilike(f"%{search}%"),
+            )
+        )
         
-    count_query = select(func.count(User.id))
-    if role:
-        count_query = count_query.where(User.role == role)
-    if status:
-        count_query = count_query.where(User.status == status)
-    if department_id:
-        count_query = count_query.where(User.department_id == department_id)
-    if year and year.lower() != "all":
-        count_query = count_query.where(User.year_of_study == year)
-    if branch and branch.lower() != "all":
-        count_query = count_query.where(User.branch == branch)
-    if course and course.lower() != "all":
-        count_query = count_query.where(User.course == course)
+    count_query = select(func.count()).select_from(query.subquery())
     
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
-    query = query.order_by(User.id.desc()).offset((page - 1) * size).limit(size)
+    query = query.order_by(User.id.asc()).offset((page - 1) * size).limit(size)
     result = await db.execute(query)
     
     # Construct a dict compatible with UserOut model — mode='json' serializes datetimes
@@ -90,6 +87,30 @@ async def search_users(
         .limit(10)
     )
     return result.unique().scalars().all()
+
+
+@router.get("/faculty-coordinators")
+async def list_faculty_coordinators(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return a list of faculty coordinator names and emails.
+
+    Any authenticated user may call this endpoint so that coordinators
+    and club-coordinators can get auto-complete suggestions when filling
+    in the 'Faculty Involved' field during event creation.
+    """
+    result = await db.execute(
+        select(User.id, User.name, User.email)
+        .where(
+            User.role == "additional",
+            func.lower(User.coordinator_type) == "faculty",
+            User.status == "active",
+        )
+        .order_by(User.name)
+    )
+    rows = result.all()
+    return [{"id": r.id, "name": r.name, "email": r.email} for r in rows]
 
 
 @router.get("/me", response_model=UserOut)
@@ -216,8 +237,8 @@ async def create_user_direct(
         hashed_password=hashed_password,
         name=body.name,
         role=body.role,
-        department_id=body.department_id,
-        club_id=body.club_id,
+        department_id=body.department_id if (body.department_id and body.department_id > 0) else None,
+        club_id=body.club_id if (body.club_id and body.club_id > 0) else None,
         is_first_login=False, # We assume admins setting password sets it for immediate usage
         status="active"
     )
@@ -260,19 +281,21 @@ async def update_user_admin(
         user.email = body.email.lower()
     if body.role is not None:
         user.role = body.role
-    if body.department_id is not None:
-        user.department_id = body.department_id
-    if body.club_id is not None:
-        user.club_id = body.club_id
-    if body.year_of_study is not None:
+    if "department_id" in body.model_fields_set:
+        user.department_id = body.department_id if (body.department_id and body.department_id > 0) else None
+        user.department = None
+    if "club_id" in body.model_fields_set:
+        user.club_id = body.club_id if (body.club_id and body.club_id > 0) else None
+        user.club = None
+    if "year_of_study" in body.model_fields_set:
         user.year_of_study = body.year_of_study
-    if body.branch is not None:
+    if "branch" in body.model_fields_set:
         user.branch = body.branch
-    if body.course is not None:
+    if "course" in body.model_fields_set:
         user.course = body.course
-    if body.sap_id is not None:
+    if "sap_id" in body.model_fields_set:
         user.sap_id = body.sap_id
-    if body.phone_number is not None:
+    if "phone_number" in body.model_fields_set:
         user.phone_number = body.phone_number
     if body.status is not None:
         user.status = body.status
@@ -282,8 +305,12 @@ async def update_user_admin(
         # user.is_first_login = True 
 
     await db.commit()
-    await db.refresh(user)
-    return user
+    refreshed = await db.execute(
+        select(User)
+        .options(joinedload(User.department), joinedload(User.club))
+        .where(User.id == user_id)
+    )
+    return refreshed.scalar_one()
 
 
 @router.patch("/{user_id}/activate")

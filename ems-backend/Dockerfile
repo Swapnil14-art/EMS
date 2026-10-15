@@ -17,4 +17,5 @@ RUN mkdir -p /app/storage/events
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Development can override this command in docker-compose.yml. Never use reload in the image default.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

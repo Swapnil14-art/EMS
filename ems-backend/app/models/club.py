@@ -10,8 +10,9 @@ class Club(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(150), nullable=False)
     description = Column(String(500), nullable=True)
-    department_id = Column(Integer, ForeignKey("departments.id"), nullable=False)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     coordinator_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    level = Column(String(50), nullable=False, default="department")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(TIMESTAMP(timezone=True), server_default=func.now())
 

@@ -1,12 +1,13 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, FileText, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, AlertCircle, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
 import { eventService, registrationService, systemService } from '@/lib/services';
 import type { Event } from '@/types';
 import toast from 'react-hot-toast';
+import ParticipationDocViewer from '@/components/ui/ParticipationDocViewer';
 
 export default function StudentEventRegisterPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,6 +81,12 @@ export default function StudentEventRegisterPage() {
   // If there's no PDF, maybe they shouldn't be here, but let's handle it gracefully.
   const hasDoc = !!event.participant_doc_url;
 
+  const now = new Date();
+  const regStart = event?.registration_start_datetime ? new Date(event.registration_start_datetime) : null;
+  const regEnd = event?.registration_deadline ? new Date(event.registration_deadline) : null;
+  const isBeforeRegStart = regStart ? now < regStart : false;
+  const isAfterRegEnd = regEnd ? now > regEnd : false;
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-[var(--card-bg)] overflow-hidden">
       {/* Header bar */}
@@ -105,23 +112,35 @@ export default function StudentEventRegisterPage() {
           <Button 
             onClick={handleRegister} 
             loading={registering}
-            disabled={!hasDoc || registrationDisabled}
+            disabled={registrationDisabled || isBeforeRegStart || isAfterRegEnd}
             className="flex items-center gap-2"
-            title={registrationDisabled ? 'Event registration is currently disabled' : ''}
+            title={registrationDisabled ? 'Event registration is currently disabled' : isBeforeRegStart ? 'Registration is not open yet' : isAfterRegEnd ? 'Registration deadline has passed' : ''}
           >
             <CheckCircle2 className="w-4 h-4" />
-            Agree & Register
+            {hasDoc ? 'Agree & Register' : 'Register Now'}
           </Button>
         </div>
       </div>
 
-      {/* PDF Viewer Area */}
-      <div className="flex-1 w-full bg-slate-50 relative overflow-hidden">
+      {/* Contextual Privacy Notice */}
+      <div className="px-6 py-2 bg-[var(--surface-bg)] border-b border-[var(--border-subtle)] text-xs text-[var(--text-muted)] flex items-center gap-2 flex-shrink-0">
+        <Shield className="w-3.5 h-3.5 text-[rgb(var(--color-primary))] flex-shrink-0" />
+        <span>
+          <strong>Privacy Notice:</strong> Your student details (Name, SAP ID, Department, Email) will be processed by the event coordinator for attendance verification and certificate issuance. See our{' '}
+          <Link href="/privacy" target="_blank" className="text-[rgb(var(--color-primary))] hover:underline font-medium">
+            Privacy Policy
+          </Link>
+          .
+        </span>
+      </div>
+
+      {/* PDF Viewer Area / Confirmation Area */}
+      <div className="flex-1 w-full bg-[var(--surface-subtle)] relative overflow-hidden">
         {hasDoc && !pdfError ? (
-          <iframe 
-            src={`${event.participant_doc_url}#toolbar=0`} 
-            className="w-full h-full border-0"
+          <ParticipationDocViewer
+            url={event.participant_doc_url!}
             title="Participation Document"
+            fillContainer
             onError={() => setPdfError(true)}
           />
         ) : (
@@ -130,12 +149,12 @@ export default function StudentEventRegisterPage() {
               {pdfError ? <AlertCircle className="w-8 h-8 text-[var(--text-danger)]" /> : <FileText className="w-8 h-8 text-[rgb(var(--color-primary))]" />}
             </div>
             <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
-              {pdfError ? 'Failed to load document' : 'No Participation Document'}
+              {pdfError ? 'Failed to load document' : 'Event Registration'}
             </h3>
             <p className="text-[var(--text-muted)] max-w-md">
               {pdfError 
                 ? 'There was an error loading the PDF viewer. You can try downloading the file directly.' 
-                : 'This event does not have a participation document uploaded.'}
+                : 'Click "Register Now" above to confirm your spot for this event.'}
             </p>
             {hasDoc && pdfError && (
               <a 

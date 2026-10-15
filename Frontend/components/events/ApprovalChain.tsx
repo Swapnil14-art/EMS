@@ -11,6 +11,7 @@ interface ApprovalChainProps {
 
 const ROLE_LABELS: Record<string, string> = {
   dean: 'Dean',
+  associate_dean: 'Dean',
   director: 'Director',
 };
 
@@ -23,29 +24,32 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
     <div className="space-y-3">
       {approvals?.map((approval, index) => {
         const isLast = index === approvals?.length - 1;
+        const isChangeSuggestion = approval.status === 'suggested_changes'
+          && ['dean', 'associate_dean', 'director'].includes(approval.role_at_approval);
 
         return (
           <div key={approval.id} className="relative">
             {/* Connector line */}
             {!isLast && (
-              <div className="absolute left-5 top-full w-0.5 h-3 bg-muted z-10" />
+              <div className="absolute left-5 top-full z-10 h-3 w-0.5 bg-[var(--border-strong)]" />
             )}
 
             <div className={cn(
               'rounded-2xl border-2 p-4 transition-colors',
-              approval.status === 'approved' ? 'border-emerald-200 bg-emerald-50' :
-              approval.status === 'rejected' ? 'border-red-200 bg-red-50' :
-              'border-[var(--card-border)] bg-white'
+              approval.status === 'approved' ? 'border-[var(--status-success-text)] bg-[var(--status-success-bg)]' :
+              approval.status === 'rejected' ? 'border-[var(--status-danger-text)] bg-[var(--status-danger-bg)]' :
+              isChangeSuggestion ? 'border-[var(--status-warning-text)] bg-[var(--status-warning-bg)]' :
+              'border-[var(--card-border)] bg-[var(--surface-bg)]'
             )}>
               <div className="flex items-start gap-3">
                 {/* Status icon */}
                 <div className="flex-shrink-0 mt-0.5">
                   {approval.status === 'approved' ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <CheckCircle2 className="w-5 h-5 text-[var(--status-success-text)]" />
                   ) : approval.status === 'rejected' ? (
                     <XCircle className="w-5 h-5 text-[var(--text-danger)]" />
                   ) : (
-                    <Clock className="w-5 h-5 text-slate-300" />
+                    <Clock className="w-5 h-5 text-[var(--text-muted)]" />
                   )}
                 </div>
 
@@ -60,12 +64,14 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
                     )}
                     <span className={cn(
                       'badge text-xs',
-                      approval.status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
-                      approval.status === 'rejected' ? 'bg-red-100 text-[var(--text-danger)]' :
-                      'bg-muted text-[var(--text-muted)]'
+                      approval.status === 'approved' ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' :
+                      approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' :
+                      isChangeSuggestion ? 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]' :
+                      'border border-[var(--border-strong)] bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
                     )}>
                       {approval.status === 'approved' ? 'Approved' :
-                       approval.status === 'rejected' ? 'Rejected' : 'Pending'}
+                       approval.status === 'rejected' ? 'Rejected' :
+                       isChangeSuggestion ? 'Change Suggested' : 'Pending'}
                     </span>
                   </div>
 
@@ -78,14 +84,16 @@ export default function ApprovalChain({ approvals, currentStep }: ApprovalChainP
                   {approval.remarks && (
                     <div className={cn(
                       'mt-2 p-3 rounded-xl text-xs',
-                      approval.status === 'rejected' ? 'bg-red-100 text-[var(--text-danger)]' : 'bg-muted text-[var(--text-secondary)]'
+                      approval.status === 'rejected' ? 'bg-[var(--status-danger-bg)] text-[var(--text-danger)]' :
+                      isChangeSuggestion ? 'border border-[var(--status-warning-text)] bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] font-medium' :
+                      'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
                     )}>
-                      <span className="font-semibold">Remarks: </span>{approval.remarks}
+                      <span className="font-semibold">{isChangeSuggestion ? 'Change Suggested: ' : 'Remarks: '}</span>{approval.remarks}
                     </div>
                   )}
 
                   {approval.venue_clash_override && (
-                    <div className="mt-2 p-3 rounded-xl text-xs bg-amber-100 text-amber-800">
+                    <div className="mt-2 p-3 rounded-xl text-xs bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">
                       <span className="font-semibold">⚠️ Venue clash overridden: </span>
                       {approval.venue_clash_override_reason}
                     </div>

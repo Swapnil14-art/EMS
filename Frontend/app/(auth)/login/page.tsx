@@ -5,12 +5,15 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { Button, Input, Alert } from '@/components/ui';
 import { ROLE_DASHBOARD } from '@/lib/utils';
 import { extractApiError } from '@/lib/transformers';
+import { authService, systemService } from '@/lib/services';
+import { setAccessToken, setRefreshToken } from '@/lib/api';
 import toast from 'react-hot-toast';
+import { BrandMark } from '@/components/layout/BrandMark';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -31,24 +34,20 @@ export default function LoginPage() {
 
   // Check if user signup is disabled via public config (no auth needed)
   useEffect(() => {
-    import('@/lib/services').then(({ systemService }) => {
-      systemService.getPublicConfig().then(config => {
-        if (config?.disable_role_signup) {
-          setRegistrationDisabled(true);
-        }
-      }).catch(() => {});
-    });
+    systemService.getPublicConfig().then(config => {
+      if (config?.disable_role_signup) {
+        setRegistrationDisabled(true);
+      }
+    }).catch(() => {});
   }, []);
 
   // API mapped from POST /auth/login
   const onSubmit = async (data: FormData) => {
     setApiError('');
     try {
-      const { authService } = await import('@/lib/services');
       const loginRes = await authService.login(data);
 
       // Store tokens immediately so /auth/me call is authenticated
-      const { setAccessToken, setRefreshToken } = await import('@/lib/api');
       setAccessToken(loginRes.accessToken);
       setRefreshToken(loginRes.refreshToken);
 
@@ -79,43 +78,48 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 blue-section relative overflow-hidden flex-col items-center justify-center p-12">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-48 h-48 bg-yellow-300 rounded-full blur-3xl" />
-        </div>
-        <div className="relative z-10 text-center">
-          <div className="w-20 h-20 bg-white/15 backdrop-blur-sm rounded-3xl flex items-center justify-center mx-auto mb-6 border border-white/20">
-            <span className="text-[var(--btn-primary-text)] font-display font-bold text-3xl">E</span>
+      {/* Left panel with balanced image brightness */}
+      <div 
+        className="hidden lg:flex lg:w-1/2 relative overflow-hidden flex-col items-center justify-center p-12 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/login-bg.jpg')" }}
+      >
+        {/* Subtle, balanced dark overlay to tone down brightness gently */}
+        <div className="absolute inset-0 bg-black/30" />
+
+        {/* Branding text in pure white with crisp drop shadows */}
+        <div className="relative z-10 text-center max-w-md">
+          <div className="mx-auto mb-6 w-fit rounded-3xl bg-black/30 p-3.5 backdrop-blur-md ring-1 ring-white/25 shadow-2xl">
+            <BrandMark compact link={false} />
           </div>
-          <h1 className="font-display font-bold text-[var(--btn-primary-text)] text-4xl mb-3">EMS</h1>
-          <p className="text-[rgb(var(--color-primary))]/20 text-lg mb-2">Event Management System</p>
-          <p className="text-[rgb(var(--color-primary))]/20 text-sm">SVKM's NMIMS MPTP, Shirpur</p>
-          <div className="mt-12 grid grid-cols-2 gap-4 text-left">
-            {[['📋','Plan Events','Proposal to execution'],['✅','Approvals','Multi-level workflow'],['📢','Reach Students','Broadcast to campus'],['📊','Track Everything','Analytics & reports']].map(([icon,title,desc])=>(
-              <div key={title} className="bg-[rgb(var(--card-bg)/0.1)] backdrop-blur-sm rounded-2xl p-4 border border-[rgb(var(--card-border)/0.1)]">
-                <div className="text-2xl mb-2">{icon}</div>
-                <p className="text-[var(--btn-primary-text)] font-semibold text-sm">{title}</p>
-                <p className="text-[rgb(var(--color-primary))]/20 text-xs mt-0.5">{desc}</p>
-              </div>
-            ))}
-          </div>
+          <h1 className="font-display font-bold text-white text-5xl tracking-tight mb-3 drop-shadow-[0_4px_8px_rgba(0,0,0,0.85)]">
+            EMS
+          </h1>
+          <p className="text-white text-xl font-semibold mb-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">
+            Event Management System
+          </p>
+          <p className="text-white/95 text-sm tracking-wide font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
+            SVKM&apos;s NMIMS MPTP, Shirpur
+          </p>
         </div>
       </div>
 
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-6 bg-[var(--card-bg)] overflow-y-auto">
-        <div className="w-full max-w-md py-8">
+      {/* Right panel (form area) with soft fade bleeding in from the middle seam into the right side */}
+      <div className="flex-1 flex items-center justify-center p-6 bg-slate-100 dark:bg-slate-900 overflow-y-auto relative">
+        {/* Soft shadow/fade starting at middle seam and feathering into the right side */}
+        <div className="hidden lg:block absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-black/25 via-black/8 to-transparent pointer-events-none z-10" />
+
+        <div className="w-full max-w-md py-8 relative z-20">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-[var(--btn-primary-bg)] rounded-xl flex items-center justify-center">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display">E</span>
-            </div>
-            <div><p className="font-display font-bold text-[var(--text-primary)]">EMS</p><p className="text-xs text-[var(--text-muted)]">NMIMS Shirpur</p></div>
-          </div>
+          <div className="lg:hidden mb-8"><BrandMark link={false} /></div>
 
           <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
             <h2 className="font-display font-bold text-[var(--text-primary)] text-3xl">Welcome back</h2>
             <p className="text-[var(--text-secondary)] mt-1">Sign in to your EMS account</p>
           </div>
@@ -145,7 +149,7 @@ export default function LoginPage() {
                 leftIcon={<Lock className="w-4 h-4" />}
                 error={errors.password?.message}
                 rightElement={
-                  <button type="button" onClick={() => setShowPass(!showPass)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
+                  <button type="button" onClick={() => setShowPass(!showPass)} aria-label={showPass ? 'Hide password' : 'Show password'} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-1">
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 }
@@ -162,14 +166,15 @@ export default function LoginPage() {
             {!registrationDisabled ? (
               <p className="text-sm text-[var(--text-secondary)]">
                 New student?{' '}
-                <Link href="/signup" className="text-[rgb(var(--color-primary))] font-semibold hover:text-[rgb(var(--color-primary))] transition-colors">Sign Up</Link>
+                <Link href="/signup" className="text-[rgb(var(--color-primary))] font-semibold hover:underline">
+                  Create an account
+                </Link>
               </p>
             ) : (
-              <p className="text-sm text-[var(--text-secondary)]">
-                User registration is currently disabled by administrator.
+              <p className="text-sm text-[var(--text-muted)]">
+                Student self-registration is currently closed by administration.
               </p>
             )}
-            <p className="text-xs text-[var(--text-muted)] mt-3">Staff accounts are created by the Super Admin.</p>
           </div>
         </div>
       </div>

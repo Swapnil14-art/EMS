@@ -18,5 +18,5 @@ slowapi==0.1.9
 emails==0.6.0
 python-dotenv==1.0.1
 passlib[bcrypt]==1.7.4
-psycopg2-binary==2.9.9
+psycopg2-binary>=2.9.9
 openpyxl==3.1.2

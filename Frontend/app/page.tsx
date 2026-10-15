@@ -1,46 +1,18 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
-  Calendar, Users, MapPin, TrendingUp, ArrowRight,
-  Zap, BookOpen, Award, ChevronRight
+  Users, MapPin, ArrowRight, Zap, ChevronRight
 } from 'lucide-react';
 import PublicNavbar from '@/components/layout/PublicNavbar';
 import HeroCarousel from '@/components/events/HeroCarousel';
 import { EventCard, EventCardSkeleton } from '@/components/events/EventCard';
 import { Tabs } from '@/components/ui';
 import EventCalendar from '@/components/calendar/EventCalendar';
+import { AppFooter } from '@/components/layout/AppFooter';
 import { eventService, venueService } from '@/lib/services';
+import { useAuthStore } from '@/store/authStore';
 import type { Event, Venue } from '@/types';
-
-// Mock stats (replace with API call)
-const STATS = [
-  { label: 'Events This Year', value: '120+', icon: <Calendar className="w-5 h-5" /> },
-  { label: 'Student Participants', value: '4,800+', icon: <Users className="w-5 h-5" /> },
-  { label: 'Active Clubs', value: '28', icon: <BookOpen className="w-5 h-5" /> },
-  { label: 'Venues Available', value: '14', icon: <MapPin className="w-5 h-5" /> },
-];
-
-function StatsBar() {
-  return (
-    <div className="bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)]">
-      <div className="max-w-7xl mx-auto px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-6">
-        {STATS.map((s) => (
-          <div key={s.label} className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[rgb(var(--card-bg)/0.1)] rounded-xl flex items-center justify-center flex-shrink-0">
-              {s.icon}
-            </div>
-            <div>
-              <div className="font-display font-bold text-xl">{s.value}</div>
-              <div className="text-[rgb(var(--color-primary))]/20 text-xs">{s.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function SectionHeader({ title, count, href }: { title: string; count?: number; href?: string }) {
   return (
@@ -105,6 +77,7 @@ function VenueCardSkeleton() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  const { isAuthenticated, isHydrated } = useAuthStore();
   const [ongoingEvents, setOngoingEvents] = useState<Event[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([]);
   const [pastEvents, setPastEvents] = useState<Event[]>([]);
@@ -162,23 +135,20 @@ export default function LandingPage() {
   }[activeTab] || [];
 
   return (
-    <div className="min-h-screen bg-[var(--card-bg)]">
+    <div className="landing-page min-h-screen bg-[var(--card-bg)]">
       <PublicNavbar />
 
       {/* Hero carousel - full width, below nav */}
       <div className="pt-16">
         {loading ? (
-          <div className="w-full h-[540px] skeleton" />
+          <div className="h-[480px] w-full skeleton sm:h-[580px] lg:h-[620px]" />
         ) : (
           <HeroCarousel events={featuredEvents} />
         )}
       </div>
 
-      {/* Stats bar */}
-      <StatsBar />
-
       {/* ── Main Sections ───────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+      <div className="max-w-7xl mx-auto space-y-10 px-4 py-8 sm:space-y-16 sm:px-6 sm:py-12 lg:px-8">
 
         {/* Ongoing Events (always visible at top if any) */}
         {(ongoingEvents?.length > 0 || loading) && (
@@ -249,7 +219,7 @@ export default function LandingPage() {
         </section>
 
         {/* CTA Section - For Students */}
-        <section className="blue-section rounded-3xl overflow-hidden p-8 md:p-12 relative">
+        <section className="blue-section relative overflow-hidden rounded-3xl p-6 sm:p-8 md:p-12">
           {/* Decorative blobs */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
@@ -257,51 +227,33 @@ export default function LandingPage() {
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <Zap className="w-5 h-5 text-yellow-400" />
+                <Zap className="w-5 h-5 text-[var(--status-warning-text)]" />
                 <span className="text-[rgb(var(--color-primary))]/20 text-sm font-semibold uppercase tracking-wider">For Students</span>
               </div>
               <h2 className="font-display font-bold text-[var(--btn-primary-text)] text-3xl md:text-4xl mb-3">
                 Discover & Participate<br />in Campus Events
               </h2>
-              <p className="text-[rgb(var(--color-primary))]/20 text-base max-w-md">
-                Register for upcoming events, track your participation, and never miss what's happening on campus.
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
-              <Link href="/signup"
-                className="px-6 py-3 bg-white text-[rgb(var(--color-primary))] rounded-xl font-bold text-sm hover:bg-[var(--card-bg)] transition-colors shadow-lg text-center">
-                Create Account
-              </Link>
-              <Link href="/login"
-                className="px-6 py-3 bg-[rgb(var(--card-bg)/0.1)] text-[var(--btn-primary-text)] border border-white/20 rounded-xl font-semibold text-sm hover:bg-white/20 transition-colors backdrop-blur-sm text-center">
-                Log In
+              <Link href="/about" className="inline-flex flex-col text-white transition-opacity hover:opacity-80">
+                <span className="font-bold">About EMS</span>
+                <span className="mt-1 text-sm text-white/80">Learn how EMS works <ArrowRight className="inline-block w-3.5 h-3.5" /></span>
               </Link>
             </div>
+            {isHydrated && !isAuthenticated && (
+              <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+                <Link href="/signup"
+                  className="px-6 py-3 bg-white text-[rgb(var(--color-primary))] rounded-xl font-bold text-sm hover:bg-[var(--card-bg)] transition-colors shadow-lg text-center">
+                  Create Account
+                </Link>
+                <Link href="/login"
+                  className="px-6 py-3 bg-[rgb(var(--card-bg)/0.1)] text-[var(--btn-primary-text)] border border-white/20 rounded-xl font-semibold text-sm hover:bg-white/20 transition-colors backdrop-blur-sm text-center">
+                  Log In
+                </Link>
+              </div>
+            )}
           </div>
         </section>
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-[var(--card-border)] bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-16 h-16 flex items-center justify-center">
-                <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={64} height={64} className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <p className="font-display font-bold text-[var(--text-primary)] text-sm">EMS — Event Management System</p>
-                <p className="text-xs text-[var(--text-muted)]">SVKM&apos;s NMIMS, Shirpur Campus</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-6 text-xs text-[var(--text-muted)]">
-              <Link href="/login" className="hover:text-[rgb(var(--color-primary))] transition-colors">Log In</Link>
-              <Link href="/signup" className="hover:text-[rgb(var(--color-primary))] transition-colors">Sign Up</Link>
-              <span>© {new Date().getFullYear()} NMIMS Shirpur</span>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 }

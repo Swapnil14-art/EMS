@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app.models.user import User, PreApprovedUser
+from app.config import settings
+from app.models.user import User, PreApprovedUser, PendingSignup
+from app.models.legal import LegalAcceptance
 from app.models.system_config import SystemSettings
 from app.auth.jwt_handler import (
     create_access_token,
@@ -19,14 +21,41 @@ from app.auth.schemas import (
 from app.utils.security import verify_password, get_password_hash, generate_temporary_password
 from app.services.email_service import notify_temporary_password
 from app.dependencies import get_current_user
+from app.rate_limit import limiter
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+PENDING_SIGNUP_MAX_SENDS = 4
+PENDING_SIGNUP_TTL = timedelta(hours=24)
+
+
+def _get_client_ip(request: Request) -> str | None:
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return None
+
+
+async def _check_user_legal_requirement(user_id: int, db: AsyncSession) -> bool:
+    """Returns True if the user still needs to accept active terms/privacy policy."""
+    legal_query = select(LegalAcceptance.document_type).where(
+        LegalAcceptance.user_id == user_id,
+        LegalAcceptance.document_type.in_(["terms_and_conditions", "privacy_policy"]),
+        LegalAcceptance.document_version.in_([settings.CURRENT_TERMS_VERSION, settings.CURRENT_PRIVACY_VERSION]),
+        LegalAcceptance.status.in_(["accepted", "acknowledged"])
+    )
+    legal_res = await db.execute(legal_query)
+    accepted_docs = set(legal_res.scalars().all())
+    return not {"terms_and_conditions", "privacy_policy"}.issubset(accepted_docs)
+
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
-async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/hour")
+async def signup(request: Request, body: SignupRequest, db: AsyncSession = Depends(get_db)):
     # Check if user signup is disabled
     config_result = await db.execute(select(SystemSettings).limit(1))
     config = config_result.scalar_one_or_none()
@@ -37,32 +66,76 @@ async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
             detail="User registration is currently disabled by administrator",
         )
 
-    result = await db.execute(select(User).where(User.email == body.email.lower()))
+    email = body.email.lower()
+    result = await db.execute(select(User).where(User.email == email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="User with this email already exists.")
-        
+
+    now = datetime.now(timezone.utc)
     temp_password = generate_temporary_password()
     hashed_password = get_password_hash(temp_password)
-    
-    user = User(
-        email=body.email.lower(),
-        hashed_password=hashed_password,
-        is_first_login=True,
-        role="student",
-        status="active"
-    )
-    db.add(user)
+    pending_result = await db.execute(select(PendingSignup).where(PendingSignup.email == email))
+    pending = pending_result.scalar_one_or_none()
+    if pending and pending.expires_at > now and pending.sent_count >= PENDING_SIGNUP_MAX_SENDS:
+        raise HTTPException(status_code=429, detail="Temporary password request limit reached. Please try again after 24 hours.")
+
+    if pending:
+        pending.hashed_password = hashed_password
+        pending.sent_count = 1 if pending.expires_at <= now else pending.sent_count + 1
+        pending.expires_at = now + PENDING_SIGNUP_TTL
+        pending.last_sent_at = now
+    else:
+        pending = PendingSignup(email=email, hashed_password=hashed_password, sent_count=1, expires_at=now + PENDING_SIGNUP_TTL, last_sent_at=now)
+        db.add(pending)
     await db.commit()
-    
-    notify_temporary_password(body.email.lower(), temp_password, is_reset=False)
-    
-    return {"message": "Signup successful. Check your email for the temporary password."}
+
+    notify_temporary_password(email, temp_password, is_reset=False)
+    return {"message": "Temporary password sent. Use it to log in and activate your account."}
+
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email.lower()))
     user = result.scalar_one_or_none()
-    
+    newly_activated = False
+
+    if not user:
+        pending_result = await db.execute(select(PendingSignup).where(PendingSignup.email == body.email.lower()))
+        pending = pending_result.scalar_one_or_none()
+        if pending and pending.expires_at <= datetime.now(timezone.utc):
+            await db.delete(pending)
+            await db.commit()
+            pending = None
+        if pending and verify_password(body.password, pending.hashed_password):
+            user = User(email=pending.email, hashed_password=pending.hashed_password, is_first_login=True, role="student", status="active")
+            db.add(user)
+            await db.flush()
+
+            # Record initial legal acceptances affirmatively given during signup flow
+            client_ip = _get_client_ip(request)
+            raw_ua = request.headers.get("user-agent", "")
+            ua = raw_ua[:255] if raw_ua else None
+
+            db.add(LegalAcceptance(
+                user_id=user.id,
+                document_type="terms_and_conditions",
+                document_version=settings.CURRENT_TERMS_VERSION,
+                status="accepted",
+                ip_address=client_ip,
+                user_agent=ua,
+            ))
+            db.add(LegalAcceptance(
+                user_id=user.id,
+                document_type="privacy_policy",
+                document_version=settings.CURRENT_PRIVACY_VERSION,
+                status="acknowledged",
+                ip_address=client_ip,
+                user_agent=ua,
+            ))
+
+            await db.delete(pending)
+            newly_activated = True
+
     if not user or not user.hashed_password or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password.")
         
@@ -71,6 +144,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         
     user.last_login_at = datetime.now(timezone.utc)
     await db.commit()
+
+    require_legal = False if newly_activated else await _check_user_legal_requirement(user.id, db)
     
     token_data = {
         "user_id": user.id,
@@ -79,15 +154,19 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
         "department_id": user.department_id,
         "club_id": user.club_id,
         "is_first_login": user.is_first_login,
-        "is_profile_complete": bool(user.name) if user.role in ["student", "club_coordinator"] else True
+        "is_profile_complete": bool(user.name) if user.role in ["student", "club_coordinator"] else True,
+        "extra_permissions": user.extra_permissions or [],
+        "coordinator_type": user.coordinator_type,
     }
     
     return TokenResponse(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(user.id),
         require_password_change=user.is_first_login,
-        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False
+        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False,
+        require_legal_acceptance=require_legal,
     )
+
 
 @router.post("/change-password")
 async def change_password(body: ChangePasswordRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -103,6 +182,7 @@ async def change_password(body: ChangePasswordRequest, current_user: User = Depe
     
     return {"message": "Password changed successfully."}
 
+
 @router.post("/reset-password")
 async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == body.email.lower()))
@@ -117,6 +197,15 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
         notify_temporary_password(user.email, temp_password, is_reset=True)
         
     return {"message": "If the email is registered, a password reset link has been sent."}
+
+
+@router.post("/forgot-password", status_code=200)
+async def forgot_password(body: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == body.email.lower()))
+    user = result.scalar_one_or_none()
+    # If user exists, email reset link would be sent in production without modifying current password
+    return {"message": "If the email is registered, a password reset link has been sent."}
+
 
 @router.post("/complete-profile")
 async def complete_profile(body: ProfileCompletionRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -163,6 +252,7 @@ async def complete_profile(body: ProfileCompletionRequest, current_user: User = 
     await db.commit()
     return {"message": "Profile completed successfully. Please login again to refresh access tokens."}
 
+
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     try:
@@ -177,6 +267,8 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
     if not user or user.status == "inactive":
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
+    require_legal = await _check_user_legal_requirement(user.id, db)
+
     token_data = {
         "user_id": user.id,
         "email": user.email,
@@ -184,19 +276,24 @@ async def refresh_token(body: RefreshRequest, db: AsyncSession = Depends(get_db)
         "department_id": user.department_id,
         "club_id": user.club_id,
         "is_first_login": user.is_first_login,
-        "is_profile_complete": bool(user.name) if user.role in ["student", "club_coordinator"] else True
+        "is_profile_complete": bool(user.name) if user.role in ["student", "club_coordinator"] else True,
+        "extra_permissions": user.extra_permissions or [],
+        "coordinator_type": user.coordinator_type,
     }
     
     return TokenResponse(
         access_token=create_access_token(token_data),
         refresh_token=create_refresh_token(user.id),
         require_password_change=user.is_first_login,
-        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False
+        require_profile_completion=not bool(user.name) if user.role in ["student", "club_coordinator"] else False,
+        require_legal_acceptance=require_legal,
     )
+
 
 @router.post("/logout")
 async def logout(current_user: User = Depends(get_current_user)):
     return {"message": "Logged out successfully"}
+
 
 @router.get("/me", response_model=UserInfo)
 async def me(current_user: User = Depends(get_current_user)):

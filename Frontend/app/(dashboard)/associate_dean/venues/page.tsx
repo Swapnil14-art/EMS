@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { MapPin, Calendar, Users, Clock, Search } from 'lucide-react';
 import { venueService } from '@/lib/services';
 import { Input, EmptyState } from '@/components/ui';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import type { Venue } from '@/types';
 
 export default function VenuesPage() {
@@ -46,7 +47,7 @@ export default function VenuesPage() {
               <div className="w-10 h-10 bg-[var(--card-bg)] rounded-2xl flex items-center justify-center flex-shrink-0">
                 <MapPin className="w-5 h-5 text-[rgb(var(--color-primary))]" />
               </div>
-              <span className={`badge ${venue.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+              <span className={`badge ${venue.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                 {venue.is_active ? 'Available' : 'Inactive'}
               </span>
             </div>
@@ -55,7 +56,7 @@ export default function VenuesPage() {
             <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
               <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />Max {venue.max_capacity} concurrent</span>
               {venue.department?.name && (
-                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />{venue.department.name}</span>
+                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /><SchoolDisplay value={venue.department.name} /></span>
               )}
             </div>
           </div>

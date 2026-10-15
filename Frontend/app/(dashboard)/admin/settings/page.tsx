@@ -15,7 +15,7 @@ export default function AdminSettingsPage() {
       {[
         { icon: <Database className="w-5 h-5 text-[rgb(var(--color-primary))]" />, title: 'Database', items: ['Neon PostgreSQL (serverless)', 'Connection via DATABASE_URL env var', 'No local PostgreSQL container — Neon only'] },
         { icon: <Server className="w-5 h-5 text-[rgb(var(--color-primary))]" />, title: 'File Storage', items: ['OCI Object Storage bucket: ems-uploads', 'No local uploads folder', 'Files served via OCI public/pre-signed URLs', 'Bucket prefix: dev/ or prod/ (OCI_STORAGE_PREFIX)'] },
-        { icon: <Mail className="w-5 h-5 text-[rgb(var(--color-primary))]" />, title: 'Email (SMTP)', items: ['Server: smtp.nmims.in:587', 'From: noreply@nmims.in', 'Async via Celery worker', 'All emails logged in email_notifications table'] },
+        { icon: <Mail className="w-5 h-5 text-[rgb(var(--color-primary))]" />, title: 'Email (SMTP)', items: ['Configured through server environment variables', 'Async via Celery worker', 'Delivery status available in Email Log'] },
         { icon: <Shield className="w-5 h-5 text-[rgb(var(--color-primary))]" />, title: 'Security', items: ['Email domain restricted to @nmims.in', 'JWT access token: 15 min lifetime', 'Refresh token: 7 days (HttpOnly cookie)', 'Rate limit: 5 login attempts/min per IP'] },
       ].map(section => (
         <div key={section.title} className="card p-6">

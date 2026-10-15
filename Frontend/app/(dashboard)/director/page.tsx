@@ -41,7 +41,7 @@ export default function DirectorDashboard() {
         </>}
       </div>
       <div>
-        <h2 className="section-title mb-4">Pending Approvals {pending?.length > 0 && <span className="ml-2 px-2 py-0.5 bg-red-100 text-[var(--text-danger)] rounded-full text-xs font-bold">{pending?.length}</span>}</h2>
+        <h2 className="section-title mb-4">Pending Approvals {pending?.length > 0 && <span className="ml-2 px-2 py-0.5 bg-[var(--status-danger-bg)] text-[var(--text-danger)] rounded-full text-xs font-bold">{pending?.length}</span>}</h2>
         <PendingApprovalsPage hideHeader />
       </div>
     </div>

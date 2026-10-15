@@ -1,9 +1,22 @@
 {
-  "name": "adarsh-before-connection-backend-4-4",
+  "name": "ems-workspace",
   "version": "1.0.0",
-  "description": "",
+  "description": "Event Management System",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "test": "npx playwright test --project=chromium",
+    "test:all": "npx playwright test",
+    "test:auth": "npx playwright test tests/e2e/auth --project=chromium",
+    "test:admin": "npx playwright test tests/e2e/admin --project=chromium",
+    "test:health": "npx playwright test tests/health --project=chromium",
+    "test:a11y": "npx playwright test tests/accessibility --project=chromium",
+    "test:visual": "npx playwright test tests/visual --project=chromium",
+    "test:rbac": "npx playwright test tests/e2e/shared/rbac.spec.ts --project=chromium",
+    "test:report": "npx playwright show-report",
+    "test:ui": "npx playwright test --ui",
+    "test:debug": "npx playwright test --debug --project=chromium",
+    "test:update-snapshots": "npx playwright test tests/visual --update-snapshots --project=chromium"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Swapnil14-art/EMS.git"
@@ -16,10 +29,8 @@
     "url": "https://github.com/Swapnil14-art/EMS/issues"
   },
   "homepage": "https://github.com/Swapnil14-art/EMS#readme",
-  "dependencies": {
-    "sqlalchemy": "^10.1.1"
-  },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.0"
   }

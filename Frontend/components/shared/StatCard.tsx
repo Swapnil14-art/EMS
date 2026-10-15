@@ -11,12 +11,12 @@ interface StatCardProps {
 }
 
 const colorMap = {
-  blue:   { bg: 'bg-[var(--card-bg)]',   icon: 'bg-[rgb(var(--btn-primary-bg)/0.1)] text-[rgb(var(--color-primary))]',   val: 'text-[rgb(var(--color-primary))]' },
-  green:  { bg: 'bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', val: 'text-emerald-700' },
-  amber:  { bg: 'bg-amber-50',  icon: 'bg-amber-100 text-amber-600',  val: 'text-amber-700' },
-  red:    { bg: 'bg-red-50',    icon: 'bg-red-100 text-[var(--text-danger)]',      val: 'text-[var(--text-danger)]' },
-  purple: { bg: 'bg-[var(--card-bg)]', icon: 'bg-[rgb(var(--color-secondary)/0.1)] text-[var(--text-secondary)]',val: 'text-[var(--text-secondary)]' },
-  indigo: { bg: 'bg-indigo-50', icon: 'bg-indigo-100 text-indigo-600',val: 'text-indigo-700' },
+  blue:   { bg: 'bg-[var(--status-info-bg)]', icon: 'bg-[var(--status-info-bg)] text-[var(--status-info-text)]', val: 'text-[var(--status-info-text)]' },
+  green:  { bg: 'bg-[var(--status-success-bg)]', icon: 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]', val: 'text-[var(--status-success-text)]' },
+  amber:  { bg: 'bg-[var(--status-warning-bg)]', icon: 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]', val: 'text-[var(--status-warning-text)]' },
+  red:    { bg: 'bg-[var(--status-danger-bg)]', icon: 'bg-[var(--status-danger-bg)] text-[var(--status-danger-text)]', val: 'text-[var(--status-danger-text)]' },
+  purple: { bg: 'bg-[var(--surface-subtle)]', icon: 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]', val: 'text-[var(--text-secondary)]' },
+  indigo: { bg: 'bg-[var(--status-info-bg)]', icon: 'bg-[var(--status-info-bg)] text-[var(--status-info-text)]', val: 'text-[var(--status-info-text)]' },
 };
 
 export function StatCard({ title, value, icon, color = 'blue', subtitle, trend }: StatCardProps) {
@@ -29,7 +29,7 @@ export function StatCard({ title, value, icon, color = 'blue', subtitle, trend }
           <p className={cn('font-display font-bold text-2xl sm:text-3xl', c.val)}>{value}</p>
           {subtitle && <p className="text-xs text-[var(--text-muted)] mt-1 truncate" title={subtitle}>{subtitle}</p>}
           {trend && (
-            <p className={cn('text-xs font-semibold mt-1', trend.up ? 'text-emerald-600' : 'text-[var(--text-danger)]')}>
+            <p className={cn('text-xs font-semibold mt-1', trend.up ? 'text-[var(--status-success-text)]' : 'text-[var(--text-danger)]')}>
               {trend.up ? '↑' : '↓'} {trend.value}
             </p>
           )}

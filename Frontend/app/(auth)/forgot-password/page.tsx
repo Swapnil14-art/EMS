@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -49,8 +50,8 @@ export default function ForgotPasswordPage() {
         </div>
         <div className="relative z-10">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/15 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display">E</span>
+            <div className="w-10 h-10 relative flex items-center justify-center">
+              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={40} height={40} className="w-full h-full object-contain" priority />
             </div>
             <div>
               <p className="text-[var(--btn-primary-text)] font-display font-bold">EMS</p>
@@ -78,8 +79,8 @@ export default function ForgotPasswordPage() {
         <div className="w-full max-w-md py-8">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-3 mb-6">
-            <div className="w-9 h-9 bg-[var(--btn-primary-bg)] rounded-xl flex items-center justify-center">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display text-sm">E</span>
+            <div className="w-9 h-9 relative flex items-center justify-center">
+              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={36} height={36} className="w-full h-full object-contain" priority />
             </div>
             <span className="font-display font-bold text-[var(--text-primary)]">EMS — NMIMS Shirpur</span>
           </div>
@@ -94,8 +95,8 @@ export default function ForgotPasswordPage() {
           {success ? (
             <div className="space-y-6 animate-slide-up">
               <div className="bg-[rgb(var(--alert-success-bg)/0.1)] border border-[rgb(var(--alert-success-border)/0.2)] text-[var(--alert-success-text)] p-6 rounded-2xl">
-                <CheckCircle2 className="w-10 h-10 mb-4 text-green-500" />
-                <h3 className="font-bold text-lg mb-2 text-green-700">Check your inbox</h3>
+                <CheckCircle2 className="w-10 h-10 mb-4 text-[var(--status-success-text)]" />
+                <h3 className="font-bold text-lg mb-2 text-[var(--status-success-text)]">Check your inbox</h3>
                 <p className="text-sm font-medium">If an account with that email exists, we have sent a temporary password to it. Please check your inbox and spam folders.</p>
               </div>
               <Link href="/login">

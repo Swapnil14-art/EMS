@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, or_, func, cast, String
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 import logging
 import traceback
 
@@ -15,7 +16,7 @@ from fastapi.responses import StreamingResponse
 logger = logging.getLogger(__name__)
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_roles
+from app.dependencies import get_current_user, get_optional_user, require_roles
 from app.models.user import User
 from app.models.event_registration import EventRegistration
 from app.models.event import (
@@ -23,6 +24,139 @@ from app.models.event import (
     EventLink, EventDocument, EventOtherDoc,
     EventCoordinator, EventEditHistory, EventVenue,
 )
+from app.models.event_report import EventReport
+from app.models.event_rnd_report import EventRndReport
+from app.schemas.event import (
+    EventCreate, EventUpdate, EventOut,
+    EventLinkCreate, EventLinkUpdate, EventLinkOut,
+    EventDocumentOut, EventOtherDocOut,
+    EventCoordinatorOut, CancelEventRequest,
+    AddCoordinatorRequest, EventDocumentCreate,
+)
+from app.services.storage_service import save_file, delete_file
+from app.services.venue_clash_service import check_venue_clash
+from app.services.email_service import (
+    notify_event_cancelled, notify_event_details_updated,
+    notify_faculty_and_coordinators_involved
+)
+from app.utils.permissions import can_edit_event, can_cancel_event, can_view_internal_docs
+from app.utils.diff import take_event_snapshot, compute_diff
+
+router = APIRouter()
+
+
+# ─── Helpers ────────────────────────────────────────────────────────────────
+
+def synchronize_registration_audience(event: Event) -> None:
+    """Keep registration switches consistent for UI and direct API updates."""
+    event.registration_accepted = bool(
+        event.outside_campus_registration
+        or event.student_registration_enabled
+        or event.faculty_registration_enabled
+    )
+    if not event.registration_accepted:
+        event.outside_campus_registration = False
+        event.registration_start_datetime = None
+        event.registration_deadline = None
+
+
+async def _get_involved_faculty_and_coordinators_emails(db: AsyncSession, event: Event) -> List[str]:
+    """Build unique list of email addresses for Faculty Involved and Coordinators for an event."""
+    emails = []
+
+    # 1. Faculty involved emails provided in event form submission
+    if event.faculty_involved_emails:
+        for em in event.faculty_involved_emails:
+            if em:
+                emails.append(str(em).strip().lower())
+
+    # 2. Event creator email
+    if event.created_by:
+        from app.models.user import User
+        creator = await db.get(User, event.created_by)
+        if creator and creator.email:
+            emails.append(creator.email.strip().lower())
+
+    # 3. Primary club coordinator email
+    if event.club_id:
+        from app.models.club import Club
+        from app.models.user import User
+        club = await db.get(Club, event.club_id)
+        if club and club.coordinator_id:
+            coord = await db.get(User, club.coordinator_id)
+            if coord and coord.email:
+                emails.append(coord.email.strip().lower())
+
+    # 4. Collaborating club coordinators emails
+    if event.collaborating_clubs:
+        from app.models.club import Club
+        from app.models.user import User
+        for collab in event.collaborating_clubs:
+            collab_club = await db.get(Club, collab.club_id)
+            if collab_club and collab_club.coordinator_id:
+                coord = await db.get(User, collab_club.coordinator_id)
+                if coord and coord.email:
+                    emails.append(coord.email.strip().lower())
+
+    return list(set(emails))
+
+def is_student_eligible_for_event(user: User, event: Event) -> bool:
+    """
+    Check if a student user is eligible to view/register for an event.
+    """
+    ta = (event.target_audience or "").strip().lower()
+    sd = (event.school_department or "").strip().lower()
+
+    # 1. College-wide / All / Empty target audience or school_department
+    if ta in ("college_wide", "college", "all", "") or "college" in ta or "all" in ta:
+        return True
+    if "college" in sd or "all" in sd:
+        return True
+
+    # 2. Extract user department code and name safely without triggering async lazy-loading
+    dept_codes = []
+    dept_names = []
+    try:
+        from sqlalchemy import inspect
+        insp = inspect(user)
+        if insp and "department" not in insp.unloaded and getattr(user, "department", None):
+            if getattr(user.department, "code", None):
+                dept_codes.append(user.department.code.strip().lower())
+            if getattr(user.department, "name", None):
+                dept_names.append(user.department.name.strip().lower())
+    except Exception:
+        pass
+
+    # If user has no department assigned, allow visibility for general public/college-wide events
+    if not dept_codes and not dept_names:
+        return True
+
+    def matches(str1: str, str2: str) -> bool:
+        if not str1 or not str2:
+            return False
+        return str1 in str2 or str2 in str1
+
+    # Check target_audience & school_department
+    for code in dept_codes:
+        if matches(code, ta) or matches(code, sd):
+            return True
+    for name in dept_names:
+        if matches(name, ta) or matches(name, sd):
+            return True
+
+    # Check departments_involved (list of strings or JSON or string)
+    depts_inv = event.departments_involved or []
+    if isinstance(depts_inv, list):
+        for item in depts_inv:
+            item_str = str(item).strip().lower()
+            if item_str in ("college_wide", "college", "all") or "college" in item_str or "all" in item_str:
+                return True
+            for code in dept_codes:
+                if matches(code, item_str):
+                    return True
+            for name in dept_names:
+                if matches(name, item_str):
+                    return True
 from app.schemas.event import (
     EventCreate, EventUpdate, EventOut,
     EventLinkCreate, EventLinkUpdate, EventLinkOut,
@@ -41,44 +175,128 @@ router = APIRouter()
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 
+def is_student_eligible_for_event(user: User, event: Event) -> bool:
+    """
+    Check if a student user is eligible to view/register for an event.
+    """
+    ta = (event.target_audience or "").strip().lower()
+    sd = (event.school_department or "").strip().lower()
 
+    # 1. College-wide / All / Empty target audience or school_department
+    if ta in ("college_wide", "college", "all", "") or "college" in ta or "all" in ta:
+        return True
+    if "college" in sd or "all" in sd:
+        return True
+
+    # 2. Extract user department code and name safely without triggering async lazy-loading
+    dept_codes = []
+    dept_names = []
+    try:
+        from sqlalchemy import inspect
+        insp = inspect(user)
+        if insp and "department" not in insp.unloaded and getattr(user, "department", None):
+            if getattr(user.department, "code", None):
+                dept_codes.append(user.department.code.strip().lower())
+            if getattr(user.department, "name", None):
+                dept_names.append(user.department.name.strip().lower())
+    except Exception:
+        pass
+
+    # If user has no department assigned, allow visibility for general public/college-wide events
+    if not dept_codes and not dept_names:
+        return True
+
+    def matches(str1: str, str2: str) -> bool:
+        if not str1 or not str2:
+            return False
+        return str1 in str2 or str2 in str1
+
+    # Check target_audience & school_department
+    for code in dept_codes:
+        if matches(code, ta) or matches(code, sd):
+            return True
+    for name in dept_names:
+        if matches(name, ta) or matches(name, sd):
+            return True
+
+    # Check departments_involved (list of strings or JSON or string)
+    depts_inv = event.departments_involved or []
+    if isinstance(depts_inv, list):
+        for item in depts_inv:
+            item_str = str(item).strip().lower()
+            if item_str in ("college_wide", "college", "all") or "college" in item_str or "all" in item_str:
+                return True
+            for code in dept_codes:
+                if matches(code, item_str):
+                    return True
+            for name in dept_names:
+                if matches(name, item_str):
+                    return True
+    elif isinstance(depts_inv, str):
+        item_str = depts_inv.strip().lower()
+        if item_str in ("college_wide", "college", "all") or "college" in item_str or "all" in item_str:
+            return True
+        for code in dept_codes:
+            if matches(code, item_str):
+                return True
+        for name in dept_names:
+            if matches(name, item_str):
+                return True
+
+    return False
 
 
 def _apply_student_filter(query, user: User):
-    """Apply student-specific visibility rules."""
-    from app.models.event import Event
+    """
+    Filter for student role:
+    1. Visible statuses (approved, ongoing, completed, archived).
+    2. Eligible based on event's department/school eligibility or College-Wide.
+    """
     visible_statuses = ["approved", "ongoing", "completed", "archived"]
     query = query.where(Event.status.in_(visible_statuses))
     
-    dept_code = user.department.code.strip().lower() if user.department and user.department.code else ""
-    dept_name = user.department.name.strip().lower() if user.department and user.department.name else ""
-    logger.info(f"Student event filter — dept_code='{dept_code}', dept_name='{dept_name}' (User ID: {user.id})")
+    tokens = set()
+    try:
+        from sqlalchemy import inspect
+        insp = inspect(user)
+        if insp and "department" not in insp.unloaded and getattr(user, "department", None):
+            dept_code = user.department.code.strip().lower() if user.department.code else ""
+            dept_name = user.department.name.strip().lower() if user.department.name else ""
+            if dept_code:
+                tokens.add(dept_code)
+            if dept_name:
+                tokens.add(dept_name)
+                for word in dept_name.split():
+                    w = word.strip().lower()
+                    if len(w) > 3 and w not in ("school", "department", "studies", "sciences", "technology"):
+                        tokens.add(w)
+    except Exception as e:
+        logger.warning(f"Error inspecting student department: {e}")
+
+    dept_inv_str = cast(Event.departments_involved, String)
+    logger.info(f"Student event filter — tokens={tokens} (User ID: {user.id})")
     
-    # Always-visible conditions: college-wide / all / empty target
     conditions = [
-        Event.target_audience.ilike("college%"),
-        Event.target_audience.ilike("all%"),
+        Event.target_audience.ilike("%college%"),
+        Event.target_audience.ilike("%all%"),
         Event.target_audience == "",
         Event.target_audience.is_(None),
-        Event.school_department.ilike("college%"),
-        Event.school_department.ilike("all%"),
+        Event.school_department.ilike("%college%"),
+        Event.school_department.ilike("%all%"),
+        dept_inv_str.ilike("%college%"),
+        dept_inv_str.ilike("%all%"),
     ]
     
-    # Department-specific conditions — check BOTH code and name against BOTH fields
-    if dept_code:
-        conditions.append(Event.target_audience.ilike(f"%{dept_code}%"))
-        conditions.append(Event.school_department.ilike(f"%{dept_code}%"))
-    if dept_name:
-        conditions.append(Event.target_audience.ilike(f"%{dept_name}%"))
-        conditions.append(Event.school_department.ilike(f"%{dept_name}%"))
+    for t in tokens:
+        conditions.append(Event.target_audience.ilike(f"%{t}%"))
+        conditions.append(Event.school_department.ilike(f"%{t}%"))
+        conditions.append(dept_inv_str.ilike(f"%{t}%"))
         
     query = query.where(or_(*conditions))
     return query
 
 
 # ─── List / Detail ──────────────────────────────────────────────────────────
-
-from app.dependencies import get_current_user, get_optional_user, require_roles
 
 @router.get("/")
 async def list_events(
@@ -88,45 +306,61 @@ async def list_events(
     from_date: Optional[datetime] = Query(None),
     to_date: Optional[datetime] = Query(None),
     search: Optional[str] = Query(None),
+    is_rnd: Optional[bool] = Query(None),
+    document_type: Optional[str] = Query(None),
     my_events: bool = Query(False),
     manage_only: bool = Query(False),
     page: int = Query(1, ge=1),
-    size: int = Query(20, ge=1, le=2000),
+    size: int = Query(20, ge=1, le=200),
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Sanitize FastAPI Query defaults when invoked directly or when parameters are default objects
+    if hasattr(status, "default"): status = None
+    if hasattr(club_id, "default"): club_id = None
+    if hasattr(department_id, "default"): department_id = None
+    if hasattr(from_date, "default"): from_date = None
+    if hasattr(to_date, "default"): to_date = None
+    if hasattr(search, "default"): search = None
+    if hasattr(my_events, "default"): my_events = False
+    if hasattr(manage_only, "default"): manage_only = False
+    if hasattr(is_rnd, "default"): is_rnd = None
+    if hasattr(document_type, "default"): document_type = None
+
     query = select(Event)
 
     if not current_user:
-        # Public users can only see approved events
-        query = query.where(Event.status == "approved")
+        # Public unauthenticated users see all public events regardless of School/Department
+        query = query.where(Event.status.in_(["approved", "ongoing", "completed", "archived"]))
     elif current_user.role == "student":
         # Role-based base filter
         query = _apply_student_filter(query, current_user)
     elif current_user.role == "club_coordinator":
-        # Base: events they created, coordinate, or their club is involved in (any status)
-        coord_events = select(EventCoordinator.event_id).where(
-            EventCoordinator.user_id == current_user.id
-        ).scalar_subquery()
-        
-        # Include events where their club is the primary club or a collaborator
-        collab_events = select(EventCollaboratingClub.event_id).where(
-            EventCollaboratingClub.club_id == current_user.club_id
-        ).scalar_subquery() if current_user.club_id else select(EventCollaboratingClub.event_id).where(False).scalar_subquery()
-        
-        conditions = [
-            Event.created_by == current_user.id,
-            Event.id.in_(coord_events)
-        ]
-        
-        if current_user.club_id:
-            conditions.append(Event.club_id == current_user.club_id)
-            conditions.append(Event.id.in_(collab_events))
+        if my_events or manage_only:
+            # My Events or report management: events they created, coordinate, or their club is involved in
+            coord_events = select(EventCoordinator.event_id).where(
+                EventCoordinator.user_id == current_user.id
+            ).scalar_subquery()
             
-        if not manage_only:
-            conditions.append(Event.status.in_(["approved", "ongoing", "completed", "archived"])) # Browse public
+            # Include events where their club is the primary club or a collaborator
+            collab_events = select(EventCollaboratingClub.event_id).where(
+                EventCollaboratingClub.club_id == current_user.club_id
+            ).scalar_subquery() if current_user.club_id else select(EventCollaboratingClub.event_id).where(False).scalar_subquery()
             
-        query = query.where(or_(*conditions))
+            conditions = [
+                Event.created_by == current_user.id,
+                Event.id.in_(coord_events)
+            ]
+            
+            if current_user.club_id:
+                conditions.append(Event.club_id == current_user.club_id)
+                conditions.append(Event.id.in_(collab_events))
+                
+            query = query.where(or_(*conditions))
+        else:
+            # Browse Events tab for Club Coordinator:
+            # Show ALL events from the entire database, regardless of status or club
+            pass
 
     elif current_user.role == "associate_dean":
         conditions = [
@@ -135,9 +369,11 @@ async def list_events(
         if current_user.department_id:
             # Also see all events in their department (any status)
             from app.models.club import Club
+            from app.models.department import Department
+            dept = await db.get(Department, current_user.department_id)
             dept_clubs = select(Club.id).where(Club.department_id == current_user.department_id)
-            dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-            dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
+            dept_code = dept.code.strip().lower() if dept and dept.code else ""
+            dept_name = dept.name.strip().lower() if dept and dept.name else ""
             
             # Include events where dept clubs are primary OR collaborating
             collab_match = select(EventCollaboratingClub.event_id).where(
@@ -150,9 +386,17 @@ async def list_events(
             ]
             if dept_code:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_code}%"))
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_code}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_code}%"))
             if dept_name:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_name}%"))
-                
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_name}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_name}%"))
+            
+            # Also match events created by coordinators/users belonging to this department
+            creator_dept_users = select(User.id).where(User.department_id == current_user.department_id)
+            dept_matchers.append(Event.created_by.in_(creator_dept_users.scalar_subquery()))
+
             conditions.append(or_(*dept_matchers))
             
         if manage_only and current_user.department_id:
@@ -160,7 +404,14 @@ async def list_events(
             query = query.where(or_(*dept_matchers))
         else:
             query = query.where(or_(*conditions))
+    elif current_user.role == "additional":
+        from app.utils.additional_perms import has_perm
+        if not has_perm(current_user, "view_events"):
+            raise HTTPException(status_code=403, detail="Missing permission: view_events")
+        # Additional users see the same public events as students (no internal/draft access)
+        query = query.where(Event.status.in_(["approved", "ongoing", "completed", "archived"]))
     # director / super_admin see all — no additional filter
+
 
     # Optional filters
     now = datetime.now(timezone.utc)
@@ -177,11 +428,15 @@ async def list_events(
                 Event.start_datetime <= now,
                 Event.end_datetime >= now,
             )
-        elif status in ("past", "archived"):
+        elif status == "past":
             query = query.where(
-                Event.status.in_(["approved", "ongoing", "completed", "archived"]),
-                Event.end_datetime < now,
+                or_(
+                    Event.status.in_(["completed", "archived"]),
+                    and_(Event.status.in_(["approved", "ongoing"]), Event.end_datetime < now)
+                )
             )
+        elif status == "archived":
+            query = query.where(Event.status == "archived")
         else:
             if "," in status:
                 status_list = [s.strip() for s in status.split(",") if s.strip()]
@@ -201,6 +456,20 @@ async def list_events(
         query = query.where(Event.end_datetime <= to_date)
     if search:
         query = query.where(Event.title.ilike(f"%{search}%"))
+    if is_rnd is not None:
+        query = query.where(Event.is_rnd_event == is_rnd)
+    if document_type == "DOCUMENT":
+        query = query.where(Event.participant_doc_path.isnot(None))
+    elif document_type == "ATTENDANCE":
+        query = query.where(or_(
+            Event.id.in_(select(EventReport.event_id).where(EventReport.attendance_doc_path.isnot(None))),
+            Event.id.in_(select(EventRndReport.event_id).where(EventRndReport.attendance_doc_path.isnot(None))),
+        ))
+    elif document_type == "REPORT":
+        query = query.where(or_(
+            Event.id.in_(select(EventReport.event_id).where(EventReport.generated_report_path.isnot(None))),
+            Event.id.in_(select(EventRndReport.event_id).where(EventRndReport.generated_report_path.isnot(None))),
+        ))
     if my_events and current_user:
         if current_user.role == "club_coordinator" and current_user.club_id:
             coord_events = select(EventCoordinator.event_id).where(
@@ -252,16 +521,31 @@ async def get_calendar_events(
         )
     )
 
-    # Status filter logic
-    allowed_statuses = ["approved", "ongoing", "completed"]
-    if current_user and current_user.role != "student":
-        # Let staff users see pending/archived if they want, but still exclude draft/rejected/cancelled unless explicitly matched (optional)
-        # But instructions say: "Include ONLY: approved, ongoing, completed. EXCLUDE: draft, rejected, cancelled."
-        query = query.where(Event.status.in_(allowed_statuses))
-    else:
-        query = query.where(Event.status.in_(allowed_statuses))
-        
-    if status and status in allowed_statuses:
+    # Public visitors and students may only see approved events that have not
+    # finished. Other roles retain the full shared-calendar visibility.
+    restricted_calendar = current_user is None or current_user.role == "student"
+    now = datetime.now(timezone.utc)
+    if restricted_calendar:
+        query = query.where(
+            Event.status.in_(["approved", "ongoing"]),
+            Event.end_datetime >= now,
+        )
+        if status == "upcoming":
+            query = query.where(
+                Event.status == "approved",
+                Event.start_datetime > now,
+            )
+        elif status == "ongoing":
+            query = query.where(
+                or_(
+                    Event.status == "ongoing",
+                    and_(
+                        Event.status == "approved",
+                        Event.start_datetime <= now,
+                    ),
+                ),
+            )
+    elif status:
         query = query.where(Event.status == status)
 
     if club_id:
@@ -269,24 +553,6 @@ async def get_calendar_events(
         
     if department:
         query = query.where(Event.school_department.ilike(f"%{department}%"))
-
-    # Role Visibility
-    if current_user:
-        if current_user.role == "student":
-            query = _apply_student_filter(query, current_user)
-        elif current_user.role == "club_coordinator":
-            calendar_conditions = [
-                Event.created_by == current_user.id,
-                Event.id.in_(
-                    select(EventCoordinator.event_id).where(
-                        EventCoordinator.user_id == current_user.id
-                    ).scalar_subquery()
-                ),
-                Event.status == "approved"
-            ]
-            if current_user.club_id:
-                calendar_conditions.append(Event.club_id == current_user.club_id)
-            query = query.where(or_(*calendar_conditions))
 
     result = await db.execute(query)
     events = result.scalars().all()
@@ -298,7 +564,6 @@ async def get_calendar_events(
         return '#3b82f6'
 
     calendar_data = []
-    now = datetime.now(timezone.utc)
     for e in events:
         evt_status = e.status
         if evt_status == 'approved':
@@ -317,7 +582,7 @@ async def get_calendar_events(
             "start": e.start_datetime.isoformat() if e.start_datetime else None,
             "end": e.end_datetime.isoformat() if e.end_datetime else None,
             "allDay": False,
-            "status": e.status,
+            "status": evt_status,
             "department": e.school_department,
             "color": get_event_color(evt_status),
             "venue": venue_name
@@ -362,22 +627,17 @@ async def get_event(
         if event.status not in visible_statuses:
             raise HTTPException(status_code=404, detail="Event not found")
         
-        ta = (event.target_audience or "").strip().lower()
-        sd = (event.school_department or "").strip().lower()
-        
-        # Always allow college-wide / all / empty
-        if ta not in ("college_wide", "college", "all", ""):
-            dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-            dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
-            
-            match = False
-            if dept_code and (dept_code in ta or dept_code in sd):
-                match = True
-            if dept_name and (dept_name in ta or dept_name in sd):
-                match = True
-            
-            if not match:
-                raise HTTPException(status_code=403, detail="Access denied")
+        if not is_student_eligible_for_event(current_user, event):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # Additional role visibility check
+    elif current_user.role == "additional":
+        from app.utils.additional_perms import has_perm
+        if not has_perm(current_user, "view_event_details"):
+            raise HTTPException(status_code=403, detail="Missing permission: view_event_details")
+        if event.status not in visible_statuses:
+            raise HTTPException(status_code=404, detail="Event not found")
+
 
     # ── Registration info ──
     reg_count_result = await db.execute(
@@ -419,20 +679,33 @@ async def get_event(
         "is_sponsored": event.is_sponsored,
         "start_datetime": event.start_datetime,
         "end_datetime": event.end_datetime,
+        "registration_start_datetime": event.registration_start_datetime,
         "registration_deadline": event.registration_deadline,
         "venue_id": event.venue_id,
         "venue_ids": [v.id for v in event.venues] if hasattr(event, "venues") else [],
         "venue_custom": event.venue_custom,
         "venue_type": event.venue_type,
         "departments_involved": event.departments_involved or [],
+        "faculty_involved_emails": event.faculty_involved_emails,
+        "objectives": event.objectives or [],
         "seating_arrangement": event.seating_arrangement,
         "budget": event.budget,
+        "budget_breakdown": event.budget_breakdown,
         "comments": event.comments,
         "poster_path": event.poster_path,
         "status": event.status,
         "created_by": event.created_by,
         "created_at": event.created_at,
         "updated_at": event.updated_at,
+        "is_rnd_event": event.is_rnd_event,
+        "rnd_activity_theme": event.rnd_activity_theme,
+        "rnd_prescribed_activity": event.rnd_prescribed_activity,
+        "rnd_semester_quarter": event.rnd_semester_quarter,
+        "rnd_tentative_date": event.rnd_tentative_date.isoformat() if event.rnd_tentative_date else None,
+        "registration_accepted": event.registration_accepted,
+        "outside_campus_registration": event.outside_campus_registration,
+        "student_registration_enabled": event.student_registration_enabled,
+        "faculty_registration_enabled": event.faculty_registration_enabled,
         "registration_count": registration_count,
         "is_registered": is_registered,
         "links": [{"id": l.id, "link_type": l.link_type, "url": l.url, "label": l.label}
@@ -479,6 +752,7 @@ async def get_event(
         for field in internal_fields:
             if hasattr(event, field):
                 data[field] = getattr(event, field)
+
 
     return data
 
@@ -534,10 +808,34 @@ async def create_event(
             err_msg = f"Venue clash detected! The venue is already booked for: {detail_str}. Please choose a different venue or time slot."
             raise HTTPException(status_code=409, detail=err_msg)
 
-        # Default registration deadline = start - 1 day
-        reg_deadline = body.registration_deadline or (start_dt - timedelta(days=1))
-        if reg_deadline.tzinfo is None:
-            reg_deadline = reg_deadline.replace(tzinfo=timezone.utc)
+        # Registration dates and toggle synchronization handling
+        outside_campus = body.outside_campus_registration
+        student_registration_enabled = body.student_registration_enabled
+        faculty_registration_enabled = body.faculty_registration_enabled
+        reg_accepted = bool(outside_campus or student_registration_enabled or faculty_registration_enabled)
+
+        reg_start = None
+        reg_deadline = None
+
+        if reg_accepted:
+            if not body.registration_start_datetime or not body.registration_deadline:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Registration Start Date & Time and End Date & Time are required when Registration Accepted is ON"
+                )
+            reg_start = body.registration_start_datetime
+            if reg_start.tzinfo is None:
+                reg_start = reg_start.replace(tzinfo=timezone.utc)
+
+            reg_deadline = body.registration_deadline
+            if reg_deadline.tzinfo is None:
+                reg_deadline = reg_deadline.replace(tzinfo=timezone.utc)
+
+            if reg_deadline < reg_start:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Student registration end date & time cannot be earlier than start date & time"
+                )
 
         import os
         import random
@@ -549,6 +847,41 @@ async def create_event(
             if posters:
                 chosen = random.choice(posters)
                 random_poster_path = f"/api/static/default_posters/{chosen}"
+
+        # Budget and breakdown calculation & validation
+        final_budget = Decimal('0.00')
+        stored_breakdown = None
+
+        if body.budget_breakdown is not None and len(body.budget_breakdown) > 0:
+            calc_total = Decimal('0.00')
+            stored_breakdown = []
+            for item in body.budget_breakdown:
+                amt = Decimal(str(item.amount))
+                if amt < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget item amount cannot be negative")
+                cat = item.category.strip() if item.category else ""
+                if not cat:
+                    raise HTTPException(status_code=400, detail="Each budget item must have a category or description")
+                calc_total += amt
+                stored_breakdown.append({
+                    "category": cat,
+                    "amount": float(amt),
+                    "description": item.description.strip() if item.description else None
+                })
+
+            if body.budget is not None:
+                provided_budget = Decimal(str(body.budget))
+                if abs(provided_budget - calc_total) > Decimal('0.01'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Estimated budget total does not match the sum of breakdown items"
+                    )
+            final_budget = calc_total
+        else:
+            if body.budget is not None:
+                final_budget = Decimal(str(body.budget))
+                if final_budget < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget cannot be negative")
 
         event = Event(
             title=body.title,
@@ -563,11 +896,14 @@ async def create_event(
             is_sponsored=body.is_sponsored,
             start_datetime=start_dt,
             end_datetime=end_dt,
+            registration_start_datetime=reg_start,
             registration_deadline=reg_deadline,
             venue_id=body.venue_id,
             venue_custom=body.venue_custom,
             venue_type=body.venue_type,
             departments_involved=body.departments_involved,
+            faculty_involved_emails=[str(email) for email in body.faculty_involved_emails] if body.faculty_involved_emails else None,
+            objectives=[o.strip() for o in (body.objectives or []) if o and o.strip()] if body.objectives else None,
             seating_arrangement=body.seating_arrangement,
             seating_other_detail=body.seating_other_detail,
             tables_required=body.tables_required,
@@ -597,12 +933,22 @@ async def create_event(
             printing_details=body.printing_details,
             volunteers=body.volunteers,
             volunteers_details=body.volunteers_details,
+            outside_campus_registration=outside_campus,
+            registration_accepted=reg_accepted,
+            student_registration_enabled=student_registration_enabled,
+            faculty_registration_enabled=faculty_registration_enabled,
             other_requirements=body.other_requirements,
-            budget=body.budget,
+            budget=final_budget,
+            budget_breakdown=stored_breakdown,
             comments=body.comments,
             poster_path=random_poster_path,
             created_by=current_user.id,
-            status="draft",
+            status=body.status if (current_user.role == "super_admin" and body.status) else "draft",
+            is_rnd_event=body.is_rnd_event,
+            rnd_activity_theme=body.rnd_activity_theme if body.is_rnd_event else None,
+            rnd_prescribed_activity=body.rnd_prescribed_activity if body.is_rnd_event else None,
+            rnd_semester_quarter=body.rnd_semester_quarter if body.is_rnd_event else None,
+            rnd_tentative_date=body.rnd_tentative_date if body.is_rnd_event else None,
         )
         db.add(event)
         await db.flush()
@@ -625,7 +971,16 @@ async def create_event(
 
         await db.commit()
         await db.refresh(event)
-        return {"id": event.id, "status": event.status, "message": "Event created as draft"}
+
+        # Notify all Faculty Involved & Coordinators that event was created
+        try:
+            involved_emails = await _get_involved_faculty_and_coordinators_emails(db, event)
+            if involved_emails:
+                notify_faculty_and_coordinators_involved(event, involved_emails, event_action="created")
+        except Exception as e:
+            logger.error(f"Error sending creation notifications for event {event.id}: {e}")
+
+        return {"id": event.id, "status": event.status, "message": "Event created as draft" if event.status == "draft" else f"Event created as {event.status}"}
     except HTTPException:
         raise
     except Exception as e:
@@ -655,6 +1010,65 @@ async def update_event(
             raise HTTPException(status_code=403, detail="You cannot edit this event")
 
         now = datetime.now(timezone.utc)
+        update_data = body.model_dump(exclude_unset=True)
+
+        reg_config_keys = {"registration_start_datetime", "registration_deadline", "registration_accepted", "outside_campus_registration", "student_registration_enabled", "faculty_registration_enabled"}
+        is_registration_dates_only = bool(update_data) and set(update_data.keys()).issubset(reg_config_keys)
+
+        # Special case: Editing registration schedule alone for any event (including approved/ongoing)
+        if is_registration_dates_only:
+            if "outside_campus_registration" in update_data:
+                event.outside_campus_registration = body.outside_campus_registration
+                if body.outside_campus_registration:
+                    event.registration_accepted = True
+
+            if "registration_accepted" in update_data:
+                event.registration_accepted = body.registration_accepted
+                if not body.registration_accepted:
+                    event.outside_campus_registration = False
+                    event.student_registration_enabled = False
+                    event.faculty_registration_enabled = False
+                    event.registration_start_datetime = None
+                    event.registration_deadline = None
+
+            if "student_registration_enabled" in update_data:
+                event.student_registration_enabled = body.student_registration_enabled
+            if "faculty_registration_enabled" in update_data:
+                event.faculty_registration_enabled = body.faculty_registration_enabled
+
+            if "registration_start_datetime" in update_data:
+                reg_s = body.registration_start_datetime
+                if reg_s and reg_s.tzinfo is None:
+                    reg_s = reg_s.replace(tzinfo=timezone.utc)
+                event.registration_start_datetime = reg_s
+
+            if "registration_deadline" in update_data:
+                reg_e = body.registration_deadline
+                if reg_e and reg_e.tzinfo is None:
+                    reg_e = reg_e.replace(tzinfo=timezone.utc)
+                event.registration_deadline = reg_e
+
+            synchronize_registration_audience(event)
+
+            if event.registration_accepted:
+                if not event.registration_start_datetime or not event.registration_deadline:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Registration Start Date & Time and End Date & Time are required when Registration Accepted is ON"
+                    )
+                chk_s_utc = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+                chk_e_utc = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
+                if chk_e_utc < chk_s_utc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Student registration end date & time cannot be earlier than start date & time"
+                    )
+
+            event.updated_at = now
+            await db.commit()
+            await db.refresh(event)
+            return {"id": event.id, "status": event.status, "message": "Registration schedule updated successfully"}
+
         event_start = event.start_datetime
         if event_start.tzinfo is None:
             event_start = event_start.replace(tzinfo=timezone.utc)
@@ -672,9 +1086,6 @@ async def update_event(
                 detail="After event start, only links can be edited via /links endpoints",
             )
 
-        # Apply updates
-        update_data = body.model_dump(exclude_unset=True)
-        
         # Defensive Boolean details handling inside dict
         if 'podium_setup' in update_data and not update_data['podium_setup']: update_data['podium_details'] = None
         if 'decoration' in update_data and not update_data['decoration']: update_data['decoration_details'] = None
@@ -685,30 +1096,57 @@ async def update_event(
         if 'transport' in update_data and not update_data['transport']: update_data['transport_details'] = None
         if 'security' in update_data and not update_data['security']: update_data['security_details'] = None
         if 'printing' in update_data and not update_data['printing']: update_data['printing_details'] = None
-        if 'volunteers' in update_data and not update_data['volunteers']: update_data['volunteers_details'] = None
-        
+        # Budget breakdown handling in update
+        if 'budget_breakdown' in update_data and update_data['budget_breakdown'] is not None:
+            calc_total = Decimal('0.00')
+            stored_breakdown = []
+            for item in body.budget_breakdown or []:
+                amt = Decimal(str(item.amount))
+                if amt < Decimal('0.00'):
+                    raise HTTPException(status_code=400, detail="Budget item amount cannot be negative")
+                cat = item.category.strip() if item.category else ""
+                if not cat:
+                    raise HTTPException(status_code=400, detail="Each budget item must have a category or description")
+                calc_total += amt
+                stored_breakdown.append({
+                    "category": cat,
+                    "amount": float(amt),
+                    "description": item.description.strip() if item.description else None
+                })
+            if 'budget' in update_data and update_data['budget'] is not None:
+                provided_budget = Decimal(str(body.budget))
+                if abs(provided_budget - calc_total) > Decimal('0.01'):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Estimated budget total does not match the sum of breakdown items"
+                    )
+            update_data['budget'] = calc_total
+            update_data['budget_breakdown'] = stored_breakdown
+        elif 'budget' in update_data and update_data['budget'] is not None:
+            provided_budget = Decimal(str(body.budget))
+            if provided_budget < Decimal('0.00'):
+                raise HTTPException(status_code=400, detail="Budget cannot be negative")
+
         for field, value in update_data.items():
             if hasattr(event, field):
                 setattr(event, field, value)
 
-        # Recompute datetimes if provided
-        if body.start_datetime:
-            start_dt = body.start_datetime
-            if start_dt.tzinfo is None:
-                start_dt = start_dt.replace(tzinfo=timezone.utc)
-            event.start_datetime = start_dt
-            
-        if body.end_datetime:
-            end_dt = body.end_datetime
-            if end_dt.tzinfo is None:
-                end_dt = end_dt.replace(tzinfo=timezone.utc)
-            event.end_datetime = end_dt
-            
-        if body.registration_deadline:
-            reg_dt = body.registration_deadline
-            if reg_dt.tzinfo is None:
-                reg_dt = reg_dt.replace(tzinfo=timezone.utc)
-            event.registration_deadline = reg_dt
+        # Toggle synchronization on general update
+        synchronize_registration_audience(event)
+
+        if event.registration_accepted:
+            if not event.registration_start_datetime or not event.registration_deadline:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Registration Start Date & Time and End Date & Time are required when Registration Accepted is ON"
+                )
+            chk_s_utc = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+            chk_e_utc = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
+            if chk_e_utc < chk_s_utc:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Student registration end date & time cannot be earlier than start date & time"
+                )
             
         evt_st_compare = event.start_datetime if event.start_datetime.tzinfo else event.start_datetime.replace(tzinfo=timezone.utc)
         evt_end_compare = event.end_datetime if event.end_datetime.tzinfo else event.end_datetime.replace(tzinfo=timezone.utc)
@@ -734,19 +1172,35 @@ async def update_event(
             err_msg = f"Venue clash detected! The venue is already booked for: {detail_str}. Please choose a different venue or time slot."
             raise HTTPException(status_code=409, detail=err_msg)
 
+        if 'objectives' in update_data:
+            event.objectives = [o.strip() for o in (body.objectives or []) if o and o.strip()] if body.objectives else None
+
         if body.venue_ids is not None:
             from sqlalchemy import delete
             await db.execute(delete(EventVenue).where(EventVenue.event_id == event.id))
             for vid in body.venue_ids:
                 db.add(EventVenue(event_id=event.id, venue_id=vid))
 
+        if body.collaborating_club_ids is not None:
+            from sqlalchemy import delete
+            await db.execute(delete(EventCollaboratingClub).where(EventCollaboratingClub.event_id == event.id))
+            if event.is_collaborative:
+                for cid in body.collaborating_club_ids:
+                    db.add(EventCollaboratingClub(event_id=event.id, club_id=cid))
+
+        if body.is_sponsored and body.sponsor_name:
+            if event.sponsors:
+                event.sponsors[0].name = body.sponsor_name
+            else:
+                db.add(EventSponsor(event_id=event.id, name=body.sponsor_name))
+
         # Status reset logic
         is_collab = event.is_collaborative and event.collaborating_clubs
-        if event.status == "draft":
-            pass  # stays draft
+        if event.status in ["draft", "suggested_changes"]:
+            pass  # stays draft / suggested_changes when saving changes
         elif event.status in [
             "pending_associate_dean", "pending_coordinator_parallel",
-            "pending_director", "suggested_changes",
+            "pending_director",
         ]:
             # For collaborative events, restart from coordinator parallel approval
             if is_collab:
@@ -761,7 +1215,9 @@ async def update_event(
                     editor_name = current_user.name or current_user.email
                     notify_collab_chain_restarted(event, all_coords, editor_name)
             else:
-                event.status = "pending_associate_dean"
+                from app.services.approval_service import clear_approval_records, set_non_collab_pending_status
+                await clear_approval_records(db, event.id)
+                await set_non_collab_pending_status(db, event)
         elif post_director and not after_start:
             # Save snapshot for diff
             new_snap = take_event_snapshot(event)
@@ -786,7 +1242,9 @@ async def update_event(
                     editor_name = current_user.name or current_user.email
                     notify_collab_chain_restarted(event, all_coords, editor_name)
             else:
-                event.status = "pending_associate_dean"
+                from app.services.approval_service import clear_approval_records, set_non_collab_pending_status
+                await clear_approval_records(db, event.id)
+                await set_non_collab_pending_status(db, event)
 
             # Notify registered students
             from app.models.event_registration import EventRegistration
@@ -852,7 +1310,11 @@ async def submit_event(
             if event.created_by != current_user.id and current_user.role != "super_admin":
                 raise HTTPException(status_code=403, detail="Only the event creator can submit")
 
-        allowed_statuses = ["draft", "suggested_changes"]
+        allowed_statuses = [
+            "draft", "suggested_changes",
+            "pending_associate_dean", "pending_coordinator_parallel",
+            "pending_dean", "pending_director",
+        ]
         if event.status not in allowed_statuses:
             raise HTTPException(
                 status_code=400,
@@ -861,6 +1323,13 @@ async def submit_event(
 
         if not event.poster_path:
             raise HTTPException(status_code=400, detail="Poster upload is required before submission")
+
+        if event.registration_accepted:
+            if not event.registration_start_datetime or not event.registration_deadline:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Registration start date & time and end date & time are required when Registration Accepted is ON.",
+                )
 
         event_start = event.start_datetime
         if event_start.tzinfo is None:
@@ -894,6 +1363,10 @@ async def submit_event(
                 detail=f"Venue clash detected! The venue is already booked for: {detail_str}. An approver must override to proceed."
             )
 
+        # Clear any prior approval records on fresh submit (e.g. from suggested_changes)
+        from app.services.approval_service import clear_approval_records
+        await clear_approval_records(db, event.id)
+
         # Determine target status
         if event.is_collaborative and event.collaborating_clubs:
             event.status = "pending_coordinator_parallel"
@@ -907,9 +1380,10 @@ async def submit_event(
                         from app.services.email_service import notify_collab_approval_needed
                         notify_collab_approval_needed(event, coordinator)
         else:
-            event.status = "pending_associate_dean"
+            from app.services.approval_service import set_non_collab_pending_status
+            await set_non_collab_pending_status(db, event)
             # Notify associate_dean
-            if event.club:
+            if False: # replaced by set_non_collab_pending_status
                 from app.models.club import Club
                 club = await db.get(Club, event.club_id)
                 if club and club.department_id:
@@ -926,6 +1400,15 @@ async def submit_event(
                         notify_event_submitted(event, dean)
 
         await db.commit()
+
+        # Notify all Faculty Involved & Coordinators that event was submitted
+        try:
+            involved_emails = await _get_involved_faculty_and_coordinators_emails(db, event)
+            if involved_emails:
+                notify_faculty_and_coordinators_involved(event, involved_emails, event_action="submitted")
+        except Exception as e:
+            logger.error(f"Error sending submission notifications for event {event.id}: {e}")
+
         return {"message": "Event submitted", "status": event.status}
     except HTTPException:
         raise
@@ -991,8 +1474,17 @@ async def cancel_event(
         )
     )
     students = reg_result.scalars().all()
-    if students:
-        notify_event_cancelled(event, students, body.reason)
+    visitor_result = await db.execute(
+        select(EventRegistration.visitor_email).where(
+            EventRegistration.event_id == event.id,
+            EventRegistration.status == "registered",
+            EventRegistration.participation_type == "visitor",
+        )
+    )
+    visitor_emails = [email for email in visitor_result.scalars().all() if email]
+    recipients = students + visitor_emails
+    if recipients:
+        notify_event_cancelled(event, recipients, body.reason)
 
     await db.commit()
     return {"message": "Event cancelled", "status": "cancelled"}
@@ -1013,6 +1505,7 @@ async def delete_event(
             selectinload(Event.documents),
             selectinload(Event.other_docs),
             selectinload(Event.report),
+            selectinload(Event.rnd_report),
             selectinload(Event.collaborating_clubs),
             selectinload(Event.venues_assoc),
             selectinload(Event.approvals),
@@ -1051,6 +1544,12 @@ async def delete_event(
                 delete_file(event.report.attendance_doc_path)
             if event.report.generated_report_path:
                 delete_file(event.report.generated_report_path)
+
+        if event.rnd_report:
+            if event.rnd_report.attendance_doc_path:
+                delete_file(event.rnd_report.attendance_doc_path)
+            if event.rnd_report.generated_report_path:
+                delete_file(event.rnd_report.generated_report_path)
 
         # Remove email notifications associated with this event first to prevent FK violation
         from sqlalchemy import delete
@@ -1126,7 +1625,7 @@ async def upload_sponsor_doc(
     event_id: int,
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id, options=[
@@ -1136,7 +1635,7 @@ async def upload_sponsor_doc(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     
-    # Allow creator, super_admin, or any collaborating coordinator
+    # Allow creator or any collaborating coordinator
     collab_club_ids = [c.club_id for c in (event.collaborating_clubs or [])]
     if (
         event.created_by != current_user.id
@@ -1179,7 +1678,7 @@ async def upload_other_doc(
     event_id: int,
     title: str = Query(default=""),
     file: UploadFile = File(...),
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id, options=[selectinload(Event.other_docs)])
@@ -1205,7 +1704,7 @@ async def upload_other_doc(
 async def delete_other_doc(
     event_id: int,
     doc_id: int,
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -1224,14 +1723,35 @@ async def delete_other_doc(
 
 # ─── Internal Documents ──────────────────────────────────────────────────────
 
+@router.get("/{event_id}/documents")
+async def get_internal_documents(
+    event_id: int,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await db.get(Event, event_id, options=[selectinload(Event.documents)])
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return [
+        {
+            "id": d.id,
+            "event_id": d.event_id,
+            "title": d.title,
+            "file_path": d.file_path,
+            "url": d.url,
+            "uploaded_by": d.uploaded_by,
+            "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
+        }
+        for d in (event.documents or [])
+    ]
+
+
 @router.post("/{event_id}/documents")
 async def add_internal_document(
     event_id: int,
     body: EventDocumentCreate,
     file: Optional[UploadFile] = File(None),
-    current_user: User = Depends(require_roles(
-        "club_coordinator", "super_admin", "associate_dean", "director"
-    )),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id)
@@ -1259,7 +1779,7 @@ async def add_internal_document(
 async def delete_internal_document(
     event_id: int,
     doc_id: int,
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -1279,11 +1799,34 @@ async def delete_internal_document(
 
 # ─── Links ───────────────────────────────────────────────────────────────────
 
+@router.get("/{event_id}/links")
+async def get_event_links(
+    event_id: int,
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db),
+):
+    event = await db.get(Event, event_id, options=[selectinload(Event.links)])
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return [
+        {
+            "id": l.id,
+            "event_id": l.event_id,
+            "link_type": l.link_type,
+            "url": l.url,
+            "label": l.label,
+            "created_by": l.created_by,
+            "created_at": l.created_at.isoformat() if l.created_at else None,
+        }
+        for l in (event.links or [])
+    ]
+
+
 @router.post("/{event_id}/links", response_model=EventLinkOut)
 async def add_link(
     event_id: int,
     body: EventLinkCreate,
-    current_user: User = Depends(require_roles("club_coordinator", "super_admin")),
+    current_user: User = Depends(require_roles("club_coordinator")),
     db: AsyncSession = Depends(get_db),
 ):
     event = await db.get(Event, event_id)
@@ -1463,24 +2006,54 @@ async def get_event_registrations(
         .where(
             EventRegistration.event_id == event_id,
             EventRegistration.status == "registered",
+            EventRegistration.participation_type == "in_campus",
         )
         .order_by(User.name)
     )
     rows = result.all()
-    
-    return [
-        {
+
+    # Also fetch visitor registrations (no linked user)
+    visitor_result = await db.execute(
+        select(EventRegistration)
+        .where(
+            EventRegistration.event_id == event_id,
+            EventRegistration.status == "registered",
+            EventRegistration.participation_type == "visitor",
+        )
+        .order_by(EventRegistration.visitor_name)
+    )
+    visitor_rows = visitor_result.scalars().all()
+
+    registrations = []
+    for user, reg in rows:
+        registrations.append({
             "id": user.id,
             "name": user.name,
             "email": user.email,
             "department": user.department.name if user.department else "N/A",
+            "phone_number": user.phone_number or "N/A",
             "year": user.year_of_study or "N/A",
             "branch": user.branch or "N/A",
             "course": user.course or "N/A",
             "registered_at": reg.registered_at.isoformat() if reg.registered_at else None,
-        }
-        for user, reg in rows
-    ]
+            "participation_type": "In-Campus",
+        })
+
+    for reg in visitor_rows:
+        registrations.append({
+            "id": reg.id,
+            "name": reg.visitor_name or "N/A",
+            "email": reg.visitor_email or "N/A",
+            "department": reg.visitor_school_college or "N/A",
+            "phone_number": reg.visitor_phone or "N/A",
+            "year": "N/A",
+            "branch": reg.visitor_qualification or "N/A",
+            "course": "N/A",
+            "registered_at": reg.registered_at.isoformat() if reg.registered_at else None,
+            "participation_type": "Visitor",
+        })
+
+    return registrations
 
 
 @router.get("/{event_id}/registrations/export")
@@ -1498,7 +2071,7 @@ async def export_event_registrations(
     ws.title = "Registered Students"
     
     # Header
-    headers = ["Name", "Email", "Department", "Year", "Branch", "Course", "Registration Time"]
+    headers = ["Name", "Email", "Phone Number", "Department", "Year", "Branch", "Course", "Registration Time", "Participation Type"]
     ws.append(headers)
     
     # Rows
@@ -1506,11 +2079,13 @@ async def export_event_registrations(
         ws.append([
             r["name"],
             r["email"],
+            r["phone_number"],
             r["department"],
             r["year"],
             r["branch"],
             r["course"],
-            r["registered_at"]
+            r["registered_at"],
+            r.get("participation_type", "In-Campus"),
         ])
     
     # Auto-adjust column widths

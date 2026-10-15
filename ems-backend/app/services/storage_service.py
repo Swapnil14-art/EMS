@@ -8,23 +8,6 @@ from pathlib import Path
 from fastapi import UploadFile, HTTPException
 from app.config import settings
 
-ALLOWED_TYPES = {
-    "poster": {"image/jpeg", "image/png", "image/webp"},
-    "document": {
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/vnd.ms-excel",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "image/jpeg",
-        "image/png",
-    },
-    "photo": {"image/jpeg", "image/png", "image/webp"},
-    "sponsor_logo": {"image/jpeg", "image/png", "image/webp"},
-}
-
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
-
 
 async def save_file(
     file: UploadFile,
@@ -35,17 +18,9 @@ async def save_file(
     """
     Saves uploaded file to structured storage.
     Returns the relative path (from storage root).
+    No file type or size restrictions.
     """
-    allowed = ALLOWED_TYPES.get(file_type, ALLOWED_TYPES["document"])
-    if file.content_type not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file type: {file.content_type}. Allowed: {allowed}",
-        )
-
     contents = await file.read()
-    if len(contents) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
 
     ext = Path(file.filename).suffix.lower()
     unique_name = f"{uuid.uuid4().hex}{ext}"

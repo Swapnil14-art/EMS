@@ -3,6 +3,17 @@ import { persist } from 'zustand/middleware';
 import type { User, UserRole } from '@/types';
 import { setAccessToken, clearAccessToken, setRefreshToken, clearRefreshToken } from '@/lib/api';
 
+// ─── Cookie helpers (readable by Next.js middleware for server-side RBAC) ─────
+function setRoleCookie(role: string) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `ems-role=${role}; path=/; SameSite=Lax; max-age=${60 * 60 * 24 * 7}`;
+}
+
+function clearRoleCookie() {
+  if (typeof document === 'undefined') return;
+  document.cookie = 'ems-role=; path=/; SameSite=Lax; max-age=0';
+}
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
@@ -29,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (user, accessToken, refreshToken) => {
         if (accessToken) setAccessToken(accessToken);
         if (refreshToken) setRefreshToken(refreshToken);
+        setRoleCookie(user.role);
         set({
           user,
           accessToken: accessToken || null,
@@ -42,6 +54,7 @@ export const useAuthStore = create<AuthState>()(
       clearAuth: () => {
         clearAccessToken();
         clearRefreshToken();
+        clearRoleCookie();
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },
 

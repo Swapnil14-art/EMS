@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Plus, Search, RefreshCw, UserCheck, UserX, Edit2, Trash2, Shield, Users, Filter, CheckSquare, Square } from 'lucide-react';
-import { userService } from '@/lib/services';
+import { userService, departmentService } from '@/lib/services';
 import { Button, Input, Select, Modal, Alert, Pagination, EmptyState, Spinner } from '@/components/ui';
 import { RoleBadge } from '@/components/shared/StatusBadge';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import { ROLE_LABELS } from '@/lib/utils';
 import type { User, UserRole } from '@/types';
 import toast from 'react-hot-toast';
@@ -13,10 +14,12 @@ import { z } from 'zod';
 
 const ROLES: { value: string; label: string }[] = [
   { value: '', label: 'All Roles' },
+  { value: 'super_admin', label: 'Super Admin' },
   { value: 'director', label: 'Director' },
   { value: 'associate_dean', label: 'Associate Dean' },
   { value: 'club_coordinator', label: 'Club Coordinator' },
   { value: 'student', label: 'Student' },
+  { value: 'additional', label: 'Additional' },
 ];
 
 const YEARS = [
@@ -29,11 +32,15 @@ const YEARS = [
 ];
 
 const createSchema = z.object({
-  name: z.string().min(2, 'Name required'),
-  email: z.string().email().endsWith('@nmims.in', 'Must be @nmims.in'),
-  role: z.string().min(1, 'Select role'),
+  name: z.string().min(2, 'Full name is required'),
+  email: z.string().min(1, 'Email is required').email('Invalid email address').endsWith('@nmims.in', 'Must be @nmims.in email'),
+  role: z.string().min(1, 'Role selection is required'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  department_id: z.coerce.number().optional().nullable().transform(v => v === 0 ? null : v),
+  department_id: z.union([z.string(), z.number()]).optional().nullable().transform(v => {
+    if (!v || v === '' || v === 0 || v === '0') return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }),
 });
 type CreateForm = z.infer<typeof createSchema>;
 
@@ -42,7 +49,11 @@ const editSchema = z.object({
   email: z.string().email().endsWith('@nmims.in', 'Must be @nmims.in').optional(),
   role: z.string().optional(),
   new_password: z.string().min(6, 'Password must be at least 6 characters').optional().or(z.literal('')),
-  department_id: z.coerce.number().optional().nullable().transform(v => v === 0 ? null : v),
+  department_id: z.union([z.string(), z.number()]).optional().nullable().transform(v => {
+    if (!v || v === '' || v === 0 || v === '0') return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }),
 });
 type EditForm = z.infer<typeof editSchema>;
 
@@ -85,19 +96,30 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await userService.list({ role: roleFilter || undefined, page });
+      const res = await userService.list({ role: roleFilter || undefined, page, search: search || undefined });
       setUsers(res.data || []);
       setTotal(res.total || 0);
     } catch { setUsers([]); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchUsers(); }, [roleFilter, page]);
+  const [deptOptions, setDeptOptions] = useState<{value: string; label: string}[]>([]);
+
+  useEffect(() => {
+    departmentService.list().then(depts => {
+      const arr = Array.isArray(depts) ? depts : [];
+      setDeptOptions(arr.map((d: any) => ({ value: String(d.id), label: `${d.name} (${d.code})` })));
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => { fetchUsers(); }, [roleFilter, page, search]);
 
   const handleCreate = async (data: CreateForm) => {
     setSubmitting(true);
     try {
-      await userService.createDirect(data);
+      const payload: any = { ...data };
+      payload.department_id = payload.department_id ? Number(payload.department_id) : null;
+      await userService.createDirect(payload);
       toast.success('User created successfully');
       setCreateOpen(false);
       reset();
@@ -113,7 +135,7 @@ export default function AdminUsersPage() {
       name: u.name || '',
       email: u.email,
       role: u.role,
-      department_id: u.department_id || undefined,
+      department_id: u.department_id ? (String(u.department_id) as any) : '',
       new_password: ''
     });
     setEditOpen(true);
@@ -123,8 +145,9 @@ export default function AdminUsersPage() {
     if (!editingUser) return;
     setSubmitting(true);
     try {
-      const payload = { ...data };
+      const payload: any = { ...data };
       if (!payload.new_password) delete payload.new_password;
+      payload.department_id = payload.department_id ? Number(payload.department_id) : null;
       await userService.adminUpdate(editingUser.id, payload);
       toast.success('User updated successfully');
       setEditOpen(false);
@@ -244,10 +267,7 @@ export default function AdminUsersPage() {
   const uniqueBranches = Array.from(new Set(bulkStudents.map(s => s.branch).filter((b): b is string => !!b)));
   const uniqueCourses = Array.from(new Set(bulkStudents.map(s => s.course).filter((c): c is string => !!c)));
 
-  const filtered = users.filter(u =>
-    !search || u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -269,10 +289,24 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="card p-4 flex flex-wrap gap-3">
+      <div className="card p-4 flex flex-wrap gap-3 items-center">
         <Input placeholder="Search name or email…" leftIcon={<Search className="w-4 h-4" />}
           value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-        <Select options={ROLES} value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }} className="w-40" />
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Filter by user role">
+          {ROLES.map(r => (
+            <button
+              key={r.value}
+              onClick={() => { setRoleFilter(r.value); setPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                roleFilter === r.value
+                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] border-[var(--btn-primary-bg)]'
+                  : 'bg-[var(--btn-secondary-bg)] text-[var(--btn-secondary-text)] border-[var(--btn-secondary-border)] hover:bg-[var(--btn-secondary-hover-bg)]'
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
         <Button variant="secondary" icon={<RefreshCw className="w-4 h-4" />} onClick={fetchUsers}>Refresh</Button>
       </div>
 
@@ -300,37 +334,37 @@ export default function AdminUsersPage() {
                     </div>
                     <span className="font-medium">{u.name || '—'}</span>
                     {u.force_password_change && (
-                      <span className="badge bg-amber-100 text-amber-700 text-[10px]">Temp pwd</span>
+                      <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)] text-[10px]">Temp pwd</span>
                     )}
                   </div>
                 </td>
                 <td className="text-[var(--text-secondary)] text-xs">{u.email}</td>
                 <td><RoleBadge role={u.role} /></td>
-                <td className="text-[var(--text-secondary)] text-xs">{u.department?.name || '—'}</td>
+                <td className="text-[var(--text-secondary)] text-xs"><SchoolDisplay value={u.department?.name} /></td>
                 <td>
-                  <span className={`badge ${u.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+                  <span className={`badge ${u.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                     {u.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </td>
                 <td>
                   <div className="flex gap-1">
                     <button onClick={() => openEdit(u)}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit User">
+                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--status-info-text)] hover:bg-[var(--status-info-bg)] rounded-lg transition-colors" title="Edit User">
                       <Edit2 className="w-4 h-4" />
                     </button>
                     {u.is_active ? (
                       <button onClick={() => setDeactivateUser(u)}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-red-50 rounded-lg transition-colors" title="Deactivate">
+                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors" title="Deactivate">
                         <UserX className="w-4 h-4" />
                       </button>
                     ) : (
                       <button onClick={async () => { await userService.activate(u.id); fetchUsers(); toast.success('User activated'); }}
-                        className="p-1.5 text-[var(--text-muted)] hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Activate">
+                        className="p-1.5 text-[var(--text-muted)] hover:text-[var(--status-success-text)] hover:bg-[var(--status-success-bg)] rounded-lg transition-colors" title="Activate">
                         <UserCheck className="w-4 h-4" />
                       </button>
                     )}
                     <button onClick={() => setDeleteUser(u)}
-                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-red-50 rounded-lg transition-colors" title="Delete permanently">
+                      className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-danger)] hover:bg-[var(--status-danger-bg)] rounded-lg transition-colors" title="Delete permanently">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -352,13 +386,13 @@ export default function AdminUsersPage() {
           <Alert type="info">
             <span>This will immediately create the user. They can log in using the email and password you set here.</span>
           </Alert>
-          <Input label="Full Name" placeholder="Firstname Lastname" error={errors.name?.message} {...register('name')} />
-          <Input label="Email" type="email" placeholder="user@nmims.in" error={errors.email?.message} {...register('email')} />
-          <Input label="Password" type="text" placeholder="Type password here..." error={errors.password?.message} {...register('password')} />
-          <Select label="Role" options={ROLES.filter(r => r.value)} placeholder="Select role"
+          <Input label="Full Name *" placeholder="Firstname Lastname" error={errors.name?.message} {...register('name')} />
+          <Input label="Email *" type="email" placeholder="user@nmims.in" error={errors.email?.message} {...register('email')} />
+          <Input label="Password *" type="text" placeholder="Type password here..." error={errors.password?.message} {...register('password')} />
+          <Select label="Role *" options={ROLES.filter(r => r.value)} placeholder="Select role..."
             error={errors.role?.message} {...register('role')} />
-          <Input label="School ID (leave blank for Director/Admin)" type="number"
-            placeholder="1=ENGG, 2=AGRI, 3=PHRM" {...register('department_id')} />
+          <Select label="School (Optional for Super Admin / Director)" options={deptOptions} placeholder="None / University-wide (No School)"
+            error={errors.department_id?.message} {...register('department_id')} />
         </div>
       </Modal>
 
@@ -378,7 +412,7 @@ export default function AdminUsersPage() {
           </div>
 
           <Select label="Role" options={ROLES.filter(r => r.value)} error={editErrors.role?.message} {...registerEdit('role')} />
-          <Input label="School ID" type="number" placeholder="1=ENGG, 2=AGRI, 3=PHRM" {...registerEdit('department_id')} />
+          <Select label="School" options={deptOptions} placeholder="None / University-wide (No School)" error={editErrors.department_id?.message} {...registerEdit('department_id')} />
         </div>
       </Modal>
 
@@ -476,9 +510,9 @@ export default function AdminUsersPage() {
                   <p className="text-xs text-[var(--text-muted)]">{s.email} {s.sap_id ? `· ${s.sap_id}` : ''}</p>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
-                  {s.year_of_study && <span className="badge bg-blue-100 text-blue-700 text-[10px]">{s.year_of_study}</span>}
-                  {s.branch && <span className="badge bg-purple-100 text-purple-700 text-[10px]">{s.branch}</span>}
-                  <span className={`badge text-[10px] ${s.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-[var(--text-muted)]'}`}>
+                  {s.year_of_study && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)] text-[10px]">{s.year_of_study}</span>}
+                  {s.branch && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)] text-[10px]">{s.branch}</span>}
+                  <span className={`badge text-[10px] ${s.is_active ? 'bg-[var(--status-success-bg)] text-[var(--status-success-text)]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'}`}>
                     {s.is_active ? 'Active' : 'Inactive'}
                   </span>
                 </div>

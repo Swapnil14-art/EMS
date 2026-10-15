@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 // Using plain <img> for user-uploaded posters (served via Nginx static files)
 import Link from 'next/link';
 import {
-  Calendar, MapPin, Users, Download, ArrowLeft, ExternalLink,
+  Calendar, MapPin, Download, ArrowLeft, ExternalLink,
   Clock, User, Phone, Building, CheckCircle2, FileText
 } from 'lucide-react';
 import PublicNavbar from '@/components/layout/PublicNavbar';
@@ -16,6 +16,8 @@ import { formatDateTime, formatDate } from '@/lib/utils';
 import type { Event, EventLink } from '@/types';
 import toast from 'react-hot-toast';
 import FullEventDetailsView from '@/components/events/FullEventDetailsView';
+import { AppFooter } from '@/components/layout/AppFooter';
+import ParticipationDocViewer from '@/components/ui/ParticipationDocViewer';
 
 export default function PublicEventDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,7 +68,7 @@ export default function PublicEventDetailPage() {
         toast.success('Registered successfully!');
       }
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Action failed');
+      toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Action failed');
     } finally { setRegistering(false); }
   };
 
@@ -91,7 +93,25 @@ export default function PublicEventDetailPage() {
     </div>
   );
 
-  const canRegister = ['approved', 'ongoing'].includes(event.status) && user?.role === 'student' && !registrationDisabled;
+  const now = new Date();
+  const regStart = event.registration_start_datetime ? new Date(event.registration_start_datetime) : null;
+  const regEnd = event.registration_deadline ? new Date(event.registration_deadline) : null;
+  const isBeforeRegStart = regStart ? now < regStart : false;
+  const isAfterRegEnd = regEnd ? now > regEnd : false;
+
+  const isRegistrationAccepted = !!event.registration_accepted;
+
+  const isStudentRegistration = user?.role === 'student' && !!event.student_registration_enabled;
+  const isCoordinatorRegistration = user?.role === 'additional' &&
+    user.extra_permissions?.includes('registration') &&
+    ((user.coordinator_type === 'student' && !!event.student_registration_enabled) ||
+      (user.coordinator_type === 'Faculty' && !!event.faculty_registration_enabled));
+  const canRegister = isRegistrationAccepted &&
+                      ['approved', 'ongoing'].includes(event.status) &&
+                      (isStudentRegistration || isCoordinatorRegistration) &&
+                      !registrationDisabled &&
+                      !isBeforeRegStart &&
+                      !isAfterRegEnd;
   const isOngoing = event.status === 'ongoing';
   const isUpcoming = event.status === 'approved';
 
@@ -101,6 +121,16 @@ export default function PublicEventDetailPage() {
   if (isInternalUser) {
     return <FullEventDetailsView event={event} />;
   }
+
+  const canRegisterVisitor = isRegistrationAccepted &&
+                            !!event.outside_campus_registration &&
+                            ['approved', 'ongoing'].includes(event.status) &&
+                            !registrationDisabled &&
+                            !isBeforeRegStart &&
+                            !isAfterRegEnd;
+
+  // Determine whether to show the registration panel for this user
+  const showRegistrationPanel = (user?.role === 'student' || isCoordinatorRegistration) && ['approved', 'ongoing'].includes(event.status);
 
   return (
     <div className="min-h-screen bg-[var(--card-bg)]">
@@ -118,8 +148,8 @@ export default function PublicEventDetailPage() {
             <div className="flex flex-wrap gap-2 mb-3">
               <EventTypeBadge type={event.event_type} className="bg-white/20 text-[var(--btn-primary-text)] border border-white/20 backdrop-blur-sm" />
               {isOngoing && (
-                <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-[var(--btn-primary-text)] rounded-full text-xs font-bold">
-                  <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" /> LIVE NOW
+                <span className="flex items-center gap-1.5 rounded-full border border-[var(--status-success-text)] bg-[var(--status-success-bg)] px-3 py-1 text-xs font-bold text-[var(--status-success-text)]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" /> LIVE NOW
                 </span>
               )}
             </div>
@@ -141,8 +171,9 @@ export default function PublicEventDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge status={event.status} />
                   <EventTypeBadge type={event.event_type} />
-                  {event.is_collaborative && <span className="badge bg-indigo-100 text-indigo-700">Collaborative</span>}
-                  {event.is_sponsored && <span className="badge bg-amber-100 text-amber-700">Sponsored</span>}
+                  {event.is_collaborative && <span className="badge bg-[var(--status-info-bg)] text-[var(--status-info-text)]">Collaborative</span>}
+                  {event.is_sponsored && <span className="badge bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]">Sponsored</span>}
+                  {event.outside_campus_registration && <span className="badge bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">Outside Campus Accepted</span>}
                 </div>
               </div>
 
@@ -158,7 +189,6 @@ export default function PublicEventDetailPage() {
                     { label: 'Event Incharge', value: event.event_incharge_name, icon: <User className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     { label: 'Contact', value: event.event_incharge_contact, icon: <Phone className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     ...(event.club?.name ? [{ label: 'Club', value: event.club.name, icon: <Building className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
-                    ...(event.registration_count !== undefined ? [{ label: 'Registered', value: `${event.registration_count} students`, icon: <Users className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
                   ].map(row => (
                     <div key={row.label} className="flex gap-3">
                       <div className="flex-shrink-0 mt-0.5">{row.icon}</div>
@@ -189,10 +219,20 @@ export default function PublicEventDetailPage() {
               {/* Participant doc */}
               {event.participant_doc_url && (
                 <div className="card p-6">
-                  <h2 className="section-title mb-3">Participant Document</h2>
-                  <a href={event.participant_doc_url} target="_blank" rel="noopener noreferrer" className="btn-secondary gap-2 inline-flex">
-                    <Download className="w-4 h-4" /> Download Participant Document
-                  </a>
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h2 className="section-title">Participation Document</h2>
+                    <a
+                      href={event.participant_doc_url}
+                      download
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-semibold text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-subtle)] hover:text-[rgb(var(--color-primary))]"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </a>
+                  </div>
+                  <ParticipationDocViewer
+                    url={event.participant_doc_url}
+                    title="Participation Document"
+                  />
                 </div>
               )}
 
@@ -200,8 +240,8 @@ export default function PublicEventDetailPage() {
               {event.report_path && (
                 <div className="card p-6">
                   <h2 className="section-title mb-3">Post-Event Report</h2>
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-emerald-50/80 to-green-50/50 border border-emerald-200 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-br from-[var(--status-success-text)] to-[var(--status-success-text)] border border-[var(--status-success-text)] rounded-xl">
+                    <div className="w-10 h-10 rounded-lg bg-[var(--status-success-bg)] flex items-center justify-center text-[var(--status-success-text)] shrink-0">
                       <FileText className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -212,7 +252,7 @@ export default function PublicEventDetailPage() {
                       href={event.report_url || event.report_path}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl font-semibold text-sm hover:bg-emerald-700 active:scale-[0.98] transition-all shadow-md shrink-0"
+                      className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[var(--status-success-text)] px-4 py-2 text-sm font-semibold text-white shadow-md transition-all hover:opacity-90 active:scale-[0.98]"
                     >
                       <Download className="w-4 h-4" />
                       Download
@@ -225,34 +265,91 @@ export default function PublicEventDetailPage() {
             {/* Sidebar: Registration */}
             <div className="space-y-4">
               <div className="card p-6 sticky top-24">
-                {canRegister ? (
-                  <>
-                    <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">
-                      {registered ? 'You are registered!' : 'Register for this event'}
-                    </h3>
-                    <p className="text-sm text-[var(--text-muted)] mb-4">
-                      {registered ? 'You have successfully registered. Check your email for details.' : 'Join this event — it\'s free!'}
-                    </p>
-                    {registered && <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-4" />}
-                    {registered ? (
-                      <Button
-                        disabled
-                        variant="secondary"
-                        className="w-full justify-center opacity-80 cursor-not-allowed"
-                      >
-                        <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-500" />
-                        Already Registered
-                      </Button>
-                    ) : (
-                      <Button
-                        onClick={() => router.push(`/student/events/${id}/register`)}
-                        variant="primary"
-                        className="w-full justify-center"
-                      >
-                        Register Now
-                      </Button>
-                    )}
-                  </>
+                {showRegistrationPanel ? (
+                  !isRegistrationAccepted ? (
+                    <div className="text-center">
+                      <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">Registration Not Available</h3>
+                      <p className="text-sm text-[var(--text-muted)]">Registration is not accepted for this event.</p>
+                    </div>
+                  ) : (user?.role === 'student' && !event.student_registration_enabled) ? (
+                    <div className="text-center">
+                      <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">Registration Not Available</h3>
+                      <p className="text-sm text-[var(--text-muted)]">Student registration is not enabled for this event.</p>
+                    </div>
+                  ) : (user?.role === 'additional' && !isCoordinatorRegistration) ? (
+                    <div className="text-center">
+                      <p className="text-sm text-[var(--text-muted)]">Registration is not enabled for your coordinator type on this event.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">
+                        {registered ? 'You are registered!' : 'Register for this event'}
+                      </h3>
+                      <p className="text-sm text-[var(--text-muted)] mb-4">
+                        {registered
+                          ? 'You have successfully registered. Check your email for details.'
+                          : isBeforeRegStart
+                          ? `Registration opens on ${formatDateTime(event.registration_start_datetime!)}.`
+                          : isAfterRegEnd
+                          ? 'Registration deadline has passed.'
+                          : 'Join this event — it\'s free!'}
+                      </p>
+                      {registered && <CheckCircle2 className="w-10 h-10 text-[var(--status-success-text)] mb-4" />}
+                      {registered ? (
+                        <div className="space-y-2">
+                          <Button
+                            disabled
+                            variant="secondary"
+                            className="w-full justify-center opacity-80 cursor-not-allowed"
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-2 text-[var(--status-success-text)]" />
+                            Already Registered
+                          </Button>
+                          <Button
+                            variant="danger"
+                            loading={registering}
+                            onClick={handleRegister}
+                            className="w-full justify-center"
+                          >
+                            Unregister from Event
+                          </Button>
+                        </div>
+                      ) : isBeforeRegStart ? (
+                        <Button
+                          disabled
+                          variant="secondary"
+                          className="w-full justify-center opacity-70 cursor-not-allowed"
+                        >
+                          Registration Not Open
+                        </Button>
+                      ) : isAfterRegEnd ? (
+                        <Button
+                          disabled
+                          variant="secondary"
+                          className="w-full justify-center opacity-70 cursor-not-allowed"
+                        >
+                          Registration Closed
+                        </Button>
+                      ) : registrationDisabled ? (
+                        <Button
+                          disabled
+                          variant="secondary"
+                          className="w-full justify-center opacity-70 cursor-not-allowed"
+                        >
+                          Registration Temporarily Disabled
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleRegister}
+                          loading={registering}
+                          variant="primary"
+                          className="w-full justify-center"
+                        >
+                          Register Now
+                        </Button>
+                      )}
+                    </>
+                  )
                 ) : !isAuthenticated ? (
                   <>
                     <h3 className="font-display font-bold text-[var(--text-primary)] text-lg mb-2">Interested?</h3>
@@ -260,6 +357,16 @@ export default function PublicEventDetailPage() {
                     <div className="space-y-2">
                       <Link href="/login" className="btn-primary w-full justify-center block text-center">Log In</Link>
                       <Link href="/signup" className="btn-secondary w-full justify-center block text-center">Create Account</Link>
+                      {canRegisterVisitor && (
+                        <div className="pt-3 border-t border-[var(--border-subtle)] mt-3">
+                          <Link
+                            href={`/events/${id}/register-visitor`}
+                            className="w-full justify-center block text-center text-sm font-semibold py-2.5 px-4 rounded-xl border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white transition-all shadow-sm"
+                          >
+                            Register as Non-Campus Participant
+                          </Link>
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -273,12 +380,15 @@ export default function PublicEventDetailPage() {
                   </div>
                 )}
 
-                {/* Registration disabled message */}
-                {registrationDisabled && user?.role === 'student' && ['approved', 'ongoing'].includes(event.status) && (
-                  <div className="text-center">
-                    <p className="text-sm text-orange-600 font-medium">
-                      Event registration is currently disabled.
-                    </p>
+                {/* Outside campus registration link */}
+                {canRegisterVisitor && isAuthenticated && (
+                  <div className="pt-3 border-t border-[var(--border-subtle)] mt-3">
+                    <Link
+                      href={`/events/${id}/register-visitor`}
+                      className="w-full justify-center block text-center text-sm font-semibold py-2.5 px-4 rounded-xl border border-emerald-600 text-emerald-700 hover:bg-emerald-600 hover:text-white dark:border-emerald-500 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white transition-all shadow-sm"
+                    >
+                      Register as Non-Campus Participant
+                    </Link>
                   </div>
                 )}
               </div>
@@ -301,13 +411,7 @@ export default function PublicEventDetailPage() {
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="border-t border-[var(--card-border)] bg-white mt-12">
-        <div className="max-w-7xl mx-auto px-6 py-6 text-center text-xs text-[var(--text-muted)]">
-          SVKM's NMIMS MPTP, Shirpur Campus · Event Management System
-        </div>
-      </footer>
+      <div className='mt-12'><AppFooter /></div>
     </div>
   );
 }

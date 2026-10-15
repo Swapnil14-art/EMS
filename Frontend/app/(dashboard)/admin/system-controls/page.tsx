@@ -38,8 +38,8 @@ function ToggleSwitch({
         relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent
         transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2
         ${checked
-          ? 'bg-red-500 focus:ring-red-400'
-          : 'bg-gray-300 focus:ring-[var(--input-focus-ring)]'
+          ? 'bg-[var(--status-danger-bg)] focus:ring-[var(--status-danger-text)]'
+          : 'bg-[var(--surface-subtle)] focus:ring-[var(--input-focus-ring)]'
         }
         ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
       `}
@@ -93,8 +93,8 @@ function ControlCard({
             <div className="mt-3">
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
                 checked
-                  ? 'bg-red-50 text-red-700 border border-red-200'
-                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  ? 'bg-[var(--status-danger-bg)] text-[var(--status-danger-text)] border border-[var(--status-danger-text)]'
+                  : 'bg-[var(--status-success-bg)] text-[var(--status-success-text)] border border-[var(--status-success-text)]'
               }`}>
                 {checked ? (
                   <><PowerOff className="w-3 h-3" /> {statusLabel.on}</>
@@ -189,7 +189,7 @@ export default function SystemControlsPage() {
         {/* A. Disable Student Registration (Event Registration) */}
         <ControlCard
           icon={<ShieldAlert className="w-5 h-5 text-white" />}
-          iconColor="bg-red-500"
+          iconColor="bg-[var(--status-danger-bg)]"
           title="Disable Student Registration"
           description="When enabled, students will not be able to register for any events. The 'Register' button will be hidden and the registration API will reject all requests."
           checked={config.disable_student_registration}
@@ -204,7 +204,7 @@ export default function SystemControlsPage() {
         {/* B. Disable Role-Based Signup */}
         <ControlCard
           icon={<UserX className="w-5 h-5 text-white" />}
-          iconColor="bg-orange-500"
+          iconColor="bg-[var(--status-warning-bg)]"
           title="Disable Role-Based Signup"
           description="When enabled, new user registration is completely blocked. The 'Sign Up' button is hidden on the login page and the signup API will reject all requests with: 'User registration is currently disabled by administrator'."
           checked={config.disable_role_signup}
@@ -219,7 +219,7 @@ export default function SystemControlsPage() {
         {/* C. Force Login */}
         <ControlCard
           icon={<LogIn className="w-5 h-5 text-white" />}
-          iconColor="bg-amber-500"
+          iconColor="bg-[var(--status-warning-bg)]"
           title="Force Login"
           description="When enabled, all public/landing pages redirect unauthenticated visitors to the login page. Only authenticated users can view any content."
           checked={config.force_login}
@@ -235,7 +235,7 @@ export default function SystemControlsPage() {
       {/* ─── D. User Management Section ──────────────────────────────── */}
       <div className="card p-6">
         <div className="flex items-start gap-4">
-          <div className="w-11 h-11 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0">
+          <div className="w-11 h-11 rounded-xl bg-[var(--status-info-bg)] flex items-center justify-center flex-shrink-0">
             <Users className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1">
@@ -258,12 +258,12 @@ export default function SystemControlsPage() {
       </div>
 
       {/* ─── Info Card ───────────────────────────────────────────────── */}
-      <div className="card p-5 bg-blue-50/50 border-blue-200">
+      <div className="card p-5 bg-[var(--status-info-bg)] border-[var(--status-info-text)]">
         <div className="flex gap-3">
-          <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-800">
+          <Info className="w-5 h-5 text-[var(--status-info-text)] flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-[var(--status-info-text)]">
             <p className="font-semibold mb-1">How controls work</p>
-            <ul className="space-y-1 text-blue-700">
+            <ul className="space-y-1 text-[var(--status-info-text)]">
               <li>• Each control is <strong>independent</strong> — toggling one does not affect others</li>
               <li>• All controls are <strong>backend-enforced</strong> — API calls are blocked regardless of UI</li>
               <li>• Changes take effect <strong>immediately</strong> across the entire system</li>

@@ -5,13 +5,17 @@ import { useAuthStore } from '@/store/authStore';
 import { setAccessToken, setRefreshToken } from '@/lib/api';
 import { systemService } from '@/lib/services';
 
+import { ROLE_DASHBOARD } from '@/lib/utils';
+
 /**
  * Module 1: HydrationGate — blocks rendering until Zustand has rehydrated
  * from localStorage. Uses a simple client-side useEffect to guarantee it
  * fires even when zustand's onRehydrateStorage is unreliable in SSR.
  */
 export function HydrationGate({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
+  const isHydrated = useAuthStore((s) => s.isHydrated);
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
     // Manually inject tokens into the API client just to be absolutely sure
     // they are available before any components render and make requests.
@@ -21,16 +25,15 @@ export function HydrationGate({ children }: { children: React.ReactNode }) {
     if (state.user && (state.accessToken || state.refreshToken)) {
       useAuthStore.setState({ isAuthenticated: true });
     }
-    
-    // Hydration is complete after first client-side render
-    setReady(true);
+    useAuthStore.setState({ isHydrated: true });
+    setMounted(true);
   }, []);
 
-  if (!ready) {
+  if (!mounted) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-[var(--page-bg)]">
         <div className="flex flex-col items-center gap-3 animate-pulse">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600" />
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[var(--status-info-text)] to-[var(--status-info-text)] animate-spin" />
           <span className="text-sm font-medium text-[var(--text-muted)]">Loading…</span>
         </div>
       </div>
@@ -48,7 +51,7 @@ export function HydrationGate({ children }: { children: React.ReactNode }) {
 export function GlobalForceLogin() {
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuthStore();
+  const { user, isHydrated } = useAuthStore();
   const [forceLogin, setForceLogin] = useState<boolean | null>(null);
   const configFetched = useRef(false);
 
@@ -68,6 +71,7 @@ export function GlobalForceLogin() {
   }, []);
 
   useEffect(() => {
+    if (!isHydrated) return;
 
     const isAuthRoute = 
       pathname.startsWith('/login') || 
@@ -81,20 +85,68 @@ export function GlobalForceLogin() {
       // Security Interceptors: force onboarding steps
       if (user.force_password_change && pathname !== '/change-password') {
         router.replace('/change-password');
-      } else if (!user.force_password_change && !user.profile_completed && pathname !== '/complete-profile') {
+        return;
+      }
+
+      // Profile completion is only required for students and club coordinators
+      const requiresProfile = ['student', 'club_coordinator'].includes(user.role);
+      // Profile is complete if explicitly flagged, or if user has a valid name populated
+      const isProfileCompleted = user.profile_completed ?? !!(user.name?.trim());
+
+      if (!user.force_password_change && requiresProfile && !isProfileCompleted && pathname !== '/complete-profile') {
         router.replace('/complete-profile');
+        return;
+      }
+
+      // Role-based route enforcement across dashboard areas
+      const roleRoutes: Record<string, string> = {
+        '/admin': 'super_admin',
+        '/director': 'director',
+        '/associate_dean': 'associate_dean',
+        '/club_coordinator': 'club_coordinator',
+        '/student': 'student',
+        '/additional': 'additional',
+      };
+
+      for (const [prefix, requiredRole] of Object.entries(roleRoutes)) {
+        if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
+          if (user.role !== requiredRole) {
+            router.replace(ROLE_DASHBOARD[user.role] || '/');
+            return;
+          }
+        }
       }
       return;
     }
 
     if (isAuthRoute) return;
 
+    // Immediately protect dashboards from unauthenticated access
+    const isProtectedDashboard =
+      pathname.startsWith('/admin') ||
+      pathname.startsWith('/director') ||
+      pathname.startsWith('/associate_dean') ||
+      pathname.startsWith('/club_coordinator') ||
+      pathname.startsWith('/student') ||
+      pathname.startsWith('/additional') ||
+      pathname.startsWith('/profile');
+
+    if (isProtectedDashboard) {
+      router.replace('/login');
+      return;
+    }
+
     // Public routes accessible without authentication
     const isPublicRoute =
       pathname === '/' ||
       pathname.startsWith('/events') ||
+      pathname === '/calendar' ||
+      pathname.startsWith('/calendar') ||
       pathname.startsWith('/venue-calendar') ||
-      pathname.startsWith('/about');
+      pathname.startsWith('/about') ||
+      pathname.startsWith('/privacy') ||
+      pathname.startsWith('/terms') ||
+      pathname.startsWith('/cookies');
 
     // If Force Login Mode is ON, redirect all public routes to login
     if (forceLogin === true) {
@@ -107,7 +159,7 @@ export function GlobalForceLogin() {
 
     // For unauthenticated users on protected routes (dashboard, admin, etc.), redirect to login
     router.replace('/login');
-  }, [pathname, user, router, forceLogin]);
+  }, [pathname, user, isHydrated, router, forceLogin]);
 
   return null;
 }

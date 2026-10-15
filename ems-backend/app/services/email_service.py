@@ -123,6 +123,15 @@ def _build_email_html(content_html: str) -> str:
                 background-color: #fff5f5;
                 border-left-color: #e53e3e;
             }}
+            .test-notice {{
+                background-color: #fffaf0;
+                border: 1px solid #f6d48a;
+                border-left: 4px solid #d69e2e;
+                padding: 16px 20px;
+                margin: 0 0 24px;
+                border-radius: 0 6px 6px 0;
+                color: #744210;
+            }}
             .highlight {{
                 font-size: 20px;
                 color: #2b6cb0;
@@ -142,13 +151,17 @@ def _build_email_html(content_html: str) -> str:
         <div class="email-wrapper">
             <div class="container">
                 <div class="header">
-                    <h1>NMIMS EMS</h1>
+                    <h1>Test Email — NMIMS EMS</h1>
                 </div>
                 <div class="content">
+                    <div class="test-notice">
+                        <strong>This is a test email from EMS.</strong><br>
+                        The Event Management System (EMS) is a college website currently under development for SVKM's NMIMS, Shirpur Campus. Please ignore this email and do not report it.
+                    </div>
                     {content_html}
                 </div>
                 <div class="footer">
-                    <p>This is an automated message from the NMIMS Event Management System.</p>
+                    <p>This is a test message from the NMIMS Event Management System, a college website currently in progress.</p>
                     <p>&copy; 2026 SVKM's NMIMS. All rights reserved.</p>
                 </div>
             </div>
@@ -351,6 +364,12 @@ def notify_registration_confirmation(event: Any, student: Any):
     send_email.delay(student.email, subject, body, event.id, "registration_confirmation")
 
 
+def notify_visitor_registration_confirmation(event: Any, visitor_name: str, visitor_email: str):
+    """Send the same confirmation to an outside-campus visitor."""
+    visitor = type("Visitor", (), {"name": visitor_name, "email": visitor_email})()
+    notify_registration_confirmation(event, visitor)
+
+
 def notify_event_cancelled(event: Any, registered_students: List[Any], reason: str):
     subject = f"[EMS] Important Update: Event Cancelled - {event.title}"
     content_html = f"""
@@ -366,7 +385,7 @@ def notify_event_cancelled(event: Any, registered_students: List[Any], reason: s
     <p>We sincerely apologize for any inconvenience this may cause. Any relevant reimbursements or alternative arrangements will be communicated to you by the organizing committee.</p>
     """
     body = _build_email_html(content_html)
-    emails = [s.email for s in registered_students]
+    emails = [s if isinstance(s, str) else s.email for s in registered_students]
     send_bulk_email.delay(emails, subject, body, event.id, "event_cancelled")
 
 
@@ -415,3 +434,49 @@ def notify_collab_chain_restarted(event: Any, coordinators: List[Any], edited_by
     body = _build_email_html(content_html)
     for coord in coordinators:
         send_email.delay(coord.email, subject, body, event.id, "collab_chain_restarted")
+
+
+def notify_faculty_and_coordinators_involved(event: Any, recipients: List[str], event_action: str = "created"):
+    """
+    Notify all Faculty Involved and involved Coordinators when an event is created or submitted.
+    Does NOT send to Dean or Director.
+    """
+    if not recipients:
+        return
+
+    # Deduplicate valid emails
+    unique_emails = set()
+    for em in recipients:
+        if em and isinstance(em, str) and "@" in em:
+            unique_emails.add(em.strip().lower())
+
+    if not unique_emails:
+        return
+
+    action_text = "created and listed" if event_action == "created" else "submitted for approval"
+    subject = f"[EMS] Event {event_action.title()}: {event.title}"
+    content_html = f"""
+    <h2>Event Notification — You Are Listed as Involved</h2>
+    <p>Dear Faculty / Coordinator,</p>
+    <p>The event proposal <b>{event.title}</b> has been {action_text}. You are listed as an involved Faculty In-Charge or Coordinator for this event.</p>
+    
+    <table>
+      <tr><td>Event Title</td><td>{event.title}</td></tr>
+      <tr><td>Event Type</td><td>{event.event_type}</td></tr>
+      <tr><td>School / Department</td><td>{getattr(event, 'school_department', None) or 'N/A'}</td></tr>
+      <tr><td>Event In-Charge</td><td>{event.event_incharge_name} ({event.event_incharge_contact})</td></tr>
+      <tr><td>Date &amp; Time</td><td>{event.start_datetime.strftime('%d %B %Y, %I:%M %p')}</td></tr>
+      <tr><td>Venue</td><td>{getattr(event, 'venue_custom', None) or 'Predefined Venue'}</td></tr>
+      <tr><td>Proposed Budget</td><td>&#8377;{float(event.budget):,.2f}</td></tr>
+    </table>
+    
+    <div class="alert">
+        <p style="margin: 0;">You can log in to the EMS portal to view complete event details, schedule, and assets.</p>
+    </div>
+    <div class="center-align">
+        <a href="{settings.FRONTEND_URL}/events/{event.id}" class="btn">View Event Details</a>
+    </div>
+    """
+    body = _build_email_html(content_html)
+    for email in unique_emails:
+        send_email.delay(email, subject, body, event.id, "faculty_involved_notification")

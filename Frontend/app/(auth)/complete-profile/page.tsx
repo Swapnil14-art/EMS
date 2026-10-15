@@ -1,13 +1,14 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { User, Phone, GraduationCap, ChevronRight, Hash, Users, Network } from 'lucide-react';
 import { authService, departmentService } from '@/lib/services';
 import { useAuthStore } from '@/store/authStore';
-import { COURSES, SPECIALIZATIONS, YEAR_OF_STUDY } from '@/lib/utils';
+import { COURSES, SPECIALIZATIONS, YEAR_OF_STUDY, getSchoolInfo } from '@/lib/utils';
 import { Button, Input, Select, Alert } from '@/components/ui';
 import { extractApiError } from '@/lib/transformers';
 
@@ -57,7 +58,10 @@ export default function CompleteProfilePage() {
   useEffect(() => {
     departmentService.list().then((depts) => {
       const deptArray = Array.isArray(depts) ? depts : (depts as any)?.data || [];
-      setDepartments(deptArray.map((d: any) => ({ label: d.name, value: String(d.id) })));
+      setDepartments(deptArray.map((d: any) => {
+        const info = getSchoolInfo(d.code);
+        return { label: info ? info.abbreviation : d.name, value: String(d.id) };
+      }));
     }).catch(console.error);
   }, []);
 
@@ -110,8 +114,8 @@ export default function CompleteProfilePage() {
         </div>
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-white/15 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-              <span className="text-[var(--btn-primary-text)] font-bold font-display">E</span>
+            <div className="w-10 h-10 relative flex items-center justify-center">
+              <Image src="/logo1.jpg" alt="SVKM's NMIMS Logo" width={40} height={40} className="w-full h-full object-contain" priority />
             </div>
             <p className="text-[var(--btn-primary-text)] font-display font-bold">EMS</p>
           </div>

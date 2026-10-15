@@ -1,8 +1,11 @@
 'use client';
 
 import EventCalendar from '@/components/calendar/EventCalendar';
+import { useAuthStore } from '@/store/authStore';
 
 export default function CalendarPage() {
+  const user = useAuthStore((state) => state.user);
+
   return (
     <div className="space-y-6">
       <div>
@@ -10,7 +13,7 @@ export default function CalendarPage() {
         <p className="text-sm text-[var(--text-muted)]">View scheduled events across all campus venues.</p>
       </div>
       
-      <EventCalendar isPublic={false} />
+      <EventCalendar isPublic={!user} />
     </div>
   );
 }

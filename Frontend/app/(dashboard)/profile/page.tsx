@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { userService, departmentService } from '@/lib/services';
-import { ROLE_LABELS, COURSES, YEAR_OF_STUDY } from '@/lib/utils';
+import { ROLE_LABELS, COURSES, YEAR_OF_STUDY, getSchoolInfo } from '@/lib/utils';
 import { Button, Input, Select } from '@/components/ui';
+import { SchoolDisplay } from '@/components/shared/SchoolDisplay';
 import { User, Mail, Phone, MapPin, CheckCircle2, Building2, GraduationCap, Info, Edit, FileText, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -38,7 +39,10 @@ export default function ProfilePage() {
         departmentService.list().catch(() => [])
       ]);
       setProfile(u);
-      setDepartments(depts.map((d: any) => ({ value: String(d.id), label: d.name })));
+      setDepartments(depts.map((d: any) => {
+        const info = getSchoolInfo(d.code);
+        return { value: String(d.id), label: info ? info.abbreviation : d.name };
+      }));
     } catch (err: any) {
       toast.error('Failed to load profile');
     } finally {
@@ -146,7 +150,7 @@ export default function ProfilePage() {
         {/* Left Column: Summary Card */}
         <div className="md:col-span-1">
           <div className="card text-center p-6 space-y-4">
-            <div className="w-24 h-24 mx-auto bg-slate-100 text-slate-400 rounded-full flex items-center justify-center text-4xl font-bold uppercase overflow-hidden border-4 border-white shadow-md">
+            <div className="w-24 h-24 mx-auto bg-[var(--surface-subtle)] text-[var(--text-muted)] rounded-full flex items-center justify-center text-4xl font-bold uppercase overflow-hidden border-4 border-white shadow-md">
               {profile.name ? profile.name.slice(0,2) : '?'}
             </div>
             
@@ -166,7 +170,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center gap-3 text-[var(--text-secondary)] text-sm">
                 <Building2 className="w-4 h-4 text-[var(--text-muted)]" />
-                <span className="truncate">{profile.department?.name || 'No school'}</span>
+                <span className="truncate">{profile.department?.name ? <SchoolDisplay value={profile.department.name} /> : 'No school'}</span>
               </div>
               {profile.club && (
                 <div className="flex items-center gap-3 text-[var(--text-secondary)] text-sm">
@@ -264,7 +268,7 @@ export default function ProfilePage() {
                   <ProfileField label="Email Address" value={profile.email} />
                   <ProfileField label="Phone Number" value={profile.phone_number} />
                   
-                  <ProfileField label="School" value={profile.department?.name} />
+                  <ProfileField label="School" value={<SchoolDisplay value={profile.department?.name} />} />
                   
                   {isClubCoordinator && (
                      <ProfileField label="Coordinator For" value={profile.club?.name} />
@@ -290,8 +294,8 @@ export default function ProfilePage() {
                 </div>
                 
                 {/* Information Callout */}
-                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-blue-800 mt-6">
-                  <Info className="w-5 h-5 flex-shrink-0 text-blue-600" />
+                <div className="bg-[var(--status-info-bg)] border border-[var(--status-info-text)] rounded-xl p-4 flex gap-3 text-[var(--status-info-text)] mt-6">
+                  <Info className="w-5 h-5 flex-shrink-0 text-[var(--status-info-text)]" />
                   <p className="text-sm">
                     <strong>Email and Role are managed by the system.</strong> If you need to change your registered email, role, or club assignment, please contact the Super Admin.
                   </p>
@@ -305,12 +309,12 @@ export default function ProfilePage() {
   );
 }
 
-function ProfileField({ label, value }: { label: string, value?: string }) {
+function ProfileField({ label, value }: { label: string, value?: React.ReactNode }) {
   return (
     <div>
       <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">{label}</p>
       <p className="text-sm font-medium text-[var(--text-primary)]">
-        {value || <span className="text-slate-400 italic">Not provided</span>}
+        {value || <span className="text-[var(--text-muted)] italic">Not provided</span>}
       </p>
     </div>
   );

@@ -1,29 +1,89 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
-
 import logging
 
+from pydantic import BaseModel
 from app.database import get_db
 from app.dependencies import get_current_user, require_roles
 from app.models.user import User
 from app.models.event import Event
 from app.models.event_registration import EventRegistration
 from app.models.system_config import SystemSettings
-from app.services.email_service import notify_registration_confirmation
+from app.services.email_service import (
+    notify_registration_confirmation,
+    notify_visitor_registration_confirmation,
+)
+from app.routers.events import is_student_eligible_for_event
+from app.schemas.event import VisitorRegistrationCreate
+from app.utils.additional_perms import has_perm
+from app.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
+class EventRegisterBody(BaseModel):
+    event_id: int
+
+
+@router.post("/")
+@limiter.limit("10/minute")
+async def register_event_root(
+    request: Request,
+    body: EventRegisterBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Register for an event by JSON body { event_id }, secured via JWT."""
+    return await register_for_event(request=request, event_id=body.event_id, current_user=current_user, db=db)
+
+
+@router.get("/")
+async def get_registrations_root(
+    event_id: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get registrations root, secured via JWT."""
+    if event_id is not None:
+        return await list_registrations(event_id=event_id, current_user=current_user, db=db)
+    return await my_registrations(current_user=current_user, db=db)
+
+
+def _is_event_registration_user(user: User, event: Event) -> bool:
+    """Return whether this user may use the in-campus registration flow."""
+    if user.role == "student":
+        return bool(event.student_registration_enabled)
+
+    if user.role != "additional" or not has_perm(user, "registration"):
+        return False
+
+    if user.coordinator_type == "student":
+        return bool(event.student_registration_enabled)
+    if user.coordinator_type == "Faculty":
+        return bool(event.faculty_registration_enabled)
+    return False
+
+
+def _registration_access_message(user: User) -> str:
+    if user.role == "additional" and not has_perm(user, "registration"):
+        return "Missing permission: registration"
+    if user.role == "additional" and not user.coordinator_type:
+        return "Select a coordinator type before registering for events"
+    return "Registration is not enabled for your coordinator type on this event"
+
+
 @router.post("/{event_id}/register")
+@limiter.limit("10/minute")
 async def register_for_event(
+    request: Request,
     event_id: int,
-    current_user: User = Depends(require_roles("student")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Register the current student for an event."""
@@ -48,29 +108,57 @@ async def register_for_event(
             detail="Registration is only open for approved or ongoing events",
         )
 
-    # Registration deadline check
-    now = datetime.now(timezone.utc)
-    if event.registration_deadline and now > event.registration_deadline:
-        raise HTTPException(status_code=400, detail="Registration deadline has passed")
+    # Registration accepted and audience checks. Additional users must have the
+    # Registration permission and a coordinator type matching the event audience.
+    if not event.registration_accepted or not _is_event_registration_user(current_user, event):
+        raise HTTPException(
+            status_code=403,
+            detail=_registration_access_message(current_user),
+        )
 
-    # Audience check — case-insensitive, match both dept code and name
-    ta = (event.target_audience or "").strip().lower()
-    sd = (event.school_department or "").strip().lower()
-    if ta not in ("college_wide", "college", "all", ""):
-        dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-        dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
-        match = False
-        if dept_code and (dept_code in ta or dept_code in sd):
-            match = True
-        if dept_name and (dept_name in ta or dept_name in sd):
-            match = True
-        if not match:
+    # Registration start time & deadline checks
+    now = datetime.now(timezone.utc)
+    if event.registration_start_datetime:
+        reg_start = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+        if now < reg_start:
+            formatted_date = reg_start.strftime("%d %b %Y, %I:%M %p")
             raise HTTPException(
-                status_code=403,
-                detail="This event is not open to your department",
+                status_code=400,
+                detail=f"Registration opens on {formatted_date}",
             )
 
-    # Create registration (DB UNIQUE constraint handles duplicates)
+    if event.registration_deadline:
+        reg_deadline = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
+        if now > reg_deadline:
+            raise HTTPException(status_code=400, detail="Registration deadline has passed")
+
+    # Audience check — check college-wide, school/department, and departments_involved
+    if not is_student_eligible_for_event(current_user, event):
+        raise HTTPException(
+            status_code=403,
+            detail="This event is not open to your department",
+        )
+
+    # Check for existing registration record (handles re-registration after unregistering)
+    existing_result = await db.execute(
+        select(EventRegistration).where(
+            EventRegistration.event_id == event_id,
+            EventRegistration.student_id == current_user.id,
+        )
+    )
+    existing_reg = existing_result.scalar_one_or_none()
+
+    if existing_reg:
+        if existing_reg.status == "registered":
+            raise HTTPException(status_code=409, detail="You are already registered for this event")
+        else:
+            existing_reg.status = "registered"
+            existing_reg.registered_at = now
+            await db.commit()
+            notify_registration_confirmation(event, current_user)
+            return {"message": "Successfully registered for the event", "event_id": event_id}
+
+    # Create new registration if none existed
     registration = EventRegistration(
         event_id=event_id,
         student_id=current_user.id,
@@ -84,10 +172,7 @@ async def register_for_event(
         await db.rollback()
         raise HTTPException(status_code=409, detail="You are already registered for this event")
 
-    # Send confirmation email
-    send_registration_email = False
-    if send_registration_email:
-        notify_registration_confirmation(event, current_user)
+    notify_registration_confirmation(event, current_user)
 
     return {"message": "Successfully registered for the event", "event_id": event_id}
 
@@ -95,10 +180,16 @@ async def register_for_event(
 @router.delete("/{event_id}/cancel")
 async def cancel_registration(
     event_id: int,
-    current_user: User = Depends(require_roles("student")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel the current student's registration."""
+    event = await db.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if not _is_event_registration_user(current_user, event):
+        raise HTTPException(status_code=403, detail=_registration_access_message(current_user))
+
     result = await db.execute(
         select(EventRegistration).where(
             EventRegistration.event_id == event_id,
@@ -153,10 +244,13 @@ async def list_registrations(
 
 @router.get("/my")
 async def my_registrations(
-    current_user: User = Depends(require_roles("student")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Return all events the current student is registered for."""
+    if current_user.role not in ("student", "additional"):
+        raise HTTPException(status_code=403, detail="Only student or coordinator registrations are available here")
+
     result = await db.execute(
         select(Event, EventRegistration)
         .join(EventRegistration, EventRegistration.event_id == Event.id)
@@ -221,3 +315,109 @@ async def send_bulk_update(
     send_bulk_email.delay(emails, subject, body_html, event_id, "manual_update")
 
     return {"message": f"Update email queued for {len(emails)} students"}
+
+
+@router.post("/{event_id}/register-visitor")
+@limiter.limit("5/hour")
+async def register_visitor(
+    request: Request,
+    event_id: int,
+    body: VisitorRegistrationCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Register a non-campus visitor for an event. No authentication required."""
+    # System control: block registration if disabled
+    config_result = await db.execute(select(SystemSettings).limit(1))
+    config = config_result.scalar_one_or_none()
+    if config and config.disable_student_registration:
+        raise HTTPException(
+            status_code=403,
+            detail="Event registration is currently disabled",
+        )
+
+    event = await db.get(Event, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    # Must have outside campus registration enabled
+    if not event.registration_accepted or not event.outside_campus_registration:
+        raise HTTPException(
+            status_code=403,
+            detail="This event does not accept outside campus registrations",
+        )
+
+    # Must have reached Director-level approval (status approved or ongoing)
+    if event.status not in ["approved", "ongoing"]:
+        raise HTTPException(
+            status_code=400,
+            detail="Registration is only open for approved or ongoing events",
+        )
+
+    # Registration start time & deadline checks
+    now = datetime.now(timezone.utc)
+    if event.registration_start_datetime:
+        reg_start = event.registration_start_datetime if event.registration_start_datetime.tzinfo else event.registration_start_datetime.replace(tzinfo=timezone.utc)
+        if now < reg_start:
+            formatted_date = reg_start.strftime("%d %b %Y, %I:%M %p")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Registration opens on {formatted_date}",
+            )
+
+    if event.registration_deadline:
+        reg_deadline = event.registration_deadline if event.registration_deadline.tzinfo else event.registration_deadline.replace(tzinfo=timezone.utc)
+        if now > reg_deadline:
+            raise HTTPException(status_code=400, detail="Registration deadline has passed")
+
+    # Check for duplicate visitor email
+    existing_result = await db.execute(
+        select(EventRegistration).where(
+            EventRegistration.event_id == event_id,
+            EventRegistration.visitor_email == body.email,
+            EventRegistration.participation_type == "visitor",
+        )
+    )
+    existing_reg = existing_result.scalar_one_or_none()
+
+    if existing_reg:
+        if existing_reg.status == "registered":
+            raise HTTPException(
+                status_code=409,
+                detail="This email is already registered for this event",
+            )
+        else:
+            # Re-register a previously cancelled visitor
+            existing_reg.status = "registered"
+            existing_reg.registered_at = now
+            existing_reg.visitor_name = body.full_name
+            existing_reg.visitor_phone = body.phone
+            existing_reg.visitor_qualification = body.qualification
+            existing_reg.visitor_school_college = body.school_college
+            await db.commit()
+            notify_visitor_registration_confirmation(event, body.full_name, body.email)
+            return {"message": "Successfully registered for the event", "event_id": event_id}
+
+    registration = EventRegistration(
+        event_id=event_id,
+        student_id=None,
+        participation_type="visitor",
+        status="registered",
+        visitor_name=body.full_name,
+        visitor_email=body.email,
+        visitor_phone=body.phone,
+        visitor_qualification=body.qualification,
+        visitor_school_college=body.school_college,
+    )
+    db.add(registration)
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This email is already registered for this event",
+        )
+
+    notify_visitor_registration_confirmation(event, body.full_name, body.email)
+    return {"message": "Successfully registered for the event", "event_id": event_id}

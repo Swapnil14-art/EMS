@@ -5,7 +5,7 @@ Called from the approvals router.
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete as sa_delete
+from sqlalchemy import select, delete as sa_delete, or_, func
 
 from app.models.event import Event, EventCollaboratingClub
 from app.models.event_approval import EventApproval
@@ -211,35 +211,46 @@ async def _handle_parallel_coordinator_approval(
     approved_count = len(approval_result.scalars().all())
 
     if approved_count >= expected_count:
-        event.status = "pending_associate_dean"
-        # Collect ALL unique department IDs from creator's club + collaborating clubs
-        from app.models.club import Club
-        dept_ids = set()
+        is_cw = await _is_college_wide_event(db, event)
 
-        if event.club_id:
-            creator_club = await db.get(Club, event.club_id)
-            if creator_club and creator_club.department_id:
-                dept_ids.add(creator_club.department_id)
-
-        for collab in collab_clubs:
-            if collab.club_id:
-                collab_club = await db.get(Club, collab.club_id)
-                if collab_club and collab_club.department_id:
-                    dept_ids.add(collab_club.department_id)
-
-        # Notify Associate Deans for ALL involved departments
-        if dept_ids:
-            from app.services.email_service import notify_event_submitted
-            dean_result = await db.execute(
-                select(User).where(
-                    User.role == "associate_dean",
-                    User.department_id.in_(dept_ids),
-                    User.status == "active",
-                )
+        if is_cw:
+            event.status = "pending_director"
+            director_result = await db.execute(
+                select(User).where(User.role == "director", User.status == "active")
             )
-            deans = dean_result.scalars().all()
-            for dean in deans:
-                notify_event_submitted(event, dean)
+            directors = director_result.scalars().all()
+            for director in directors:
+                notify_pending_director(event, director)
+        else:
+            event.status = "pending_associate_dean"
+            # Collect ALL unique department IDs from creator's club + collaborating clubs
+            dept_ids = set()
+            from app.models.club import Club
+
+            if event.club_id:
+                creator_club = await db.get(Club, event.club_id)
+                if creator_club and creator_club.department_id:
+                    dept_ids.add(creator_club.department_id)
+
+            for collab in collab_clubs:
+                if collab.club_id:
+                    collab_club = await db.get(Club, collab.club_id)
+                    if collab_club and collab_club.department_id:
+                        dept_ids.add(collab_club.department_id)
+
+            # Notify Associate Deans for ALL involved departments
+            if dept_ids:
+                from app.services.email_service import notify_event_submitted
+                dean_result = await db.execute(
+                    select(User).where(
+                        User.role == "associate_dean",
+                        User.department_id.in_(dept_ids),
+                        User.status == "active",
+                    )
+                )
+                deans = dean_result.scalars().all()
+                for dean in deans:
+                    notify_event_submitted(event, dean)
 
 
 async def _check_all_deans_approved(db, event) -> bool:
@@ -282,53 +293,52 @@ async def _check_all_deans_approved(db, event) -> bool:
     if not approved_dean_ids:
         return False
 
-    approved_deans = await db.execute(
-        select(User).where(User.id.in_(approved_dean_ids))
-    )
-    approved_dept_ids = {d.department_id for d in approved_deans.scalars().all() if d.department_id}
+    # Check each department to see if any of its deans have approved
+    for dept_id in dept_ids:
+        dept_deans_result = await db.execute(
+            select(User.id).where(
+                User.role == "associate_dean",
+                User.department_id == dept_id,
+                User.status == "active",
+            )
+        )
+        dept_dean_ids = [u_id for u_id in dept_deans_result.scalars().all()]
+        # If this department has deans configured, at least one must have approved
+        if dept_dean_ids:
+            if not any(d_id in approved_dean_ids for d_id in dept_dean_ids):
+                return False
+        # If a department has no deans configured in DB, skip it so workflow isn't blocked
 
-    # All required departments must be covered
-    return dept_ids.issubset(approved_dept_ids)
+    return True
 
 
 async def _get_all_collab_coordinators(db, event) -> list:
-    """Get all coordinator Users for a collaborative event:
-    creator + coordinators of all collaborating clubs.
-    Returns deduplicated list of User objects."""
-    from app.models.club import Club
+    """Get User objects for all coordinators involved: creator + collaborating club coordinators."""
+    recipients = []
+    seen_ids = set()
 
-    user_ids = set()
-    users = []
+    creator = await db.get(User, event.created_by)
+    if creator:
+        recipients.append(creator)
+        seen_ids.add(creator.id)
 
-    # Add creator
-    if event.created_by:
-        user_ids.add(event.created_by)
-
-    # Add creator's club coordinator (if different from creator)
-    if event.club_id:
-        creator_club = await db.get(Club, event.club_id)
-        if creator_club and creator_club.coordinator_id:
-            user_ids.add(creator_club.coordinator_id)
-
-    # Add all collaborating club coordinators
     collab_result = await db.execute(
         select(EventCollaboratingClub).where(EventCollaboratingClub.event_id == event.id)
     )
     collab_clubs = collab_result.scalars().all()
+
+    from app.models.club import Club
     for collab in collab_clubs:
         if collab.club_id:
-            club = await db.get(Club, collab.club_id)
-            if club and club.coordinator_id:
-                user_ids.add(club.coordinator_id)
+            collab_club = await db.get(Club, collab.club_id)
+            if collab_club and collab_club.coordinator_id:
+                if collab_club.coordinator_id not in seen_ids:
+                    coord = await db.get(User, collab_club.coordinator_id)
+                    if coord:
+                        recipients.append(coord)
+                        seen_ids.add(coord.id)
 
-    # Fetch all User objects
-    if user_ids:
-        result = await db.execute(
-            select(User).where(User.id.in_(user_ids), User.status == "active")
-        )
-        users = result.scalars().all()
-
-    return users
+    return recipients
 
 
 async def clear_approval_records(db, event_id: int):
@@ -337,3 +347,130 @@ async def clear_approval_records(db, event_id: int):
     await db.execute(
         sa_delete(EventApproval).where(EventApproval.event_id == event_id)
     )
+
+
+async def _is_college_wide_event(db: AsyncSession, event: Event) -> bool:
+    """Helper to check if an event belongs to a College-Wide club or targets College-Wide."""
+    from app.models.club import Club
+    from app.models.user import User
+
+    club = None
+    if event.club_id:
+        club = await db.get(Club, event.club_id)
+    elif event.created_by:
+        creator = await db.get(User, event.created_by)
+        if creator and creator.club_id:
+            club = await db.get(Club, creator.club_id)
+
+    if club:
+        level = str(getattr(club, "level", "department") or "department").strip().lower()
+        if level in ("college_wide", "college") or club.department_id is None:
+            return True
+
+    if event.departments_involved:
+        for d in event.departments_involved:
+            du = str(d).strip().upper()
+            if du in ("COLLEGE WIDE", "COLLEGE_WIDE", "ALL", "ALL DEPARTMENTS", "COLLEGE"):
+                return True
+            if "COLLEGE WIDE" in du or "COLLEGE-WIDE" in du:
+                return True
+
+    sd = str(event.school_department or "").strip().upper()
+    if sd in ("COLLEGE WIDE", "COLLEGE_WIDE", "COLLEGE", "ALL", "ALL DEPARTMENTS"):
+        return True
+    if "COLLEGE WIDE" in sd or "COLLEGE-WIDE" in sd:
+        return True
+
+    ta = str(event.target_audience or "").strip().upper()
+    if ta in ("COLLEGE_WIDE", "COLLEGE WIDE", "COLLEGE", "ALL", "ALL DEPARTMENTS"):
+        return True
+    if "COLLEGE WIDE" in ta or "COLLEGE-WIDE" in ta:
+        return True
+
+    return False
+
+
+async def set_non_collab_pending_status(db: AsyncSession, event: Event):
+    """Set next pending status for a non-collaborative event submission or edit.
+    For college-wide clubs or events with COLLEGE WIDE department involved: goes directly to pending_director and notifies Director.
+    For department clubs: goes to pending_associate_dean and notifies Associate Deans."""
+    from app.models.club import Club
+    from app.models.department import Department
+    club = await db.get(Club, event.club_id) if event.club_id else None
+
+    is_college_wide_event = await _is_college_wide_event(db, event)
+
+    if is_college_wide_event:
+        event.status = "pending_director"
+        director_result = await db.execute(
+            select(User).where(User.role == "director", User.status == "active")
+        )
+        directors = director_result.scalars().all()
+        for director in directors:
+            notify_pending_director(event, director)
+    else:
+        event.status = "pending_associate_dean"
+        target_dept_ids = set()
+        if club and club.department_id:
+            target_dept_ids.add(club.department_id)
+
+        # Load all departments for robust matching
+        all_depts_res = await db.execute(select(Department))
+        all_depts = all_depts_res.scalars().all()
+
+        text_candidates = []
+        if event.departments_involved:
+            for d in event.departments_involved:
+                text_candidates.append(str(d).strip())
+
+        if event.school_department:
+            for part in str(event.school_department).split(","):
+                text_candidates.append(part.strip())
+
+        if event.target_audience:
+            for part in str(event.target_audience).split(","):
+                text_candidates.append(part.strip())
+
+        for cand in text_candidates:
+            cand_lower = cand.lower()
+            if not cand_lower or cand_lower in ("multiple", "none", "all", "college wide", "college-wide", "college_wide"):
+                continue
+            for dept in all_depts:
+                dept_name_lower = (dept.name or "").lower()
+                dept_code_lower = (dept.code or "").lower()
+                if (
+                    cand_lower == dept_name_lower
+                    or cand_lower == dept_code_lower
+                    or (cand_lower in dept_name_lower and len(cand_lower) >= 3)
+                    or (dept_name_lower in cand_lower and len(dept_name_lower) >= 3)
+                    or (dept_code_lower and dept_code_lower in cand_lower)
+                ):
+                    target_dept_ids.add(dept.id)
+
+        # If still no target dept and creator has a department, consider it as well
+        if not target_dept_ids and event.created_by:
+            creator = await db.get(User, event.created_by)
+            if creator and creator.department_id:
+                target_dept_ids.add(creator.department_id)
+
+        if target_dept_ids:
+            dean_result = await db.execute(
+                select(User).where(
+                    User.role == "associate_dean",
+                    User.department_id.in_(target_dept_ids),
+                    User.status == "active",
+                )
+            )
+            deans = dean_result.scalars().all()
+        else:
+            dean_result = await db.execute(
+                select(User).where(
+                    User.role == "associate_dean",
+                    User.status == "active",
+                )
+            )
+            deans = dean_result.scalars().all()
+
+        from app.services.email_service import notify_event_submitted
+        for dean in deans:
+            notify_event_submitted(event, dean)

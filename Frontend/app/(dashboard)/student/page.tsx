@@ -12,18 +12,27 @@ import type { Event } from '@/types';
 export default function StudentDashboard() {
   const { user } = useAuthStore();
   const [upcoming, setUpcoming] = useState<Event[]>([]);
+  const [ongoing, setOngoing] = useState<Event[]>([]);
   const [myRegs, setMyRegs] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     Promise.all([
-      eventService.list({ status: 'upcoming', size: 4 }),
+      eventService.list({ status: 'upcoming', size: 4 }).catch(() => ({ data: [] })),
+      eventService.list({ status: 'ongoing', size: 4 }).catch(() => ({ data: [] })),
       registrationService.myRegistrations().catch(() => []),
-    ]).then(([upcomingRes, regs]) => {
-      const events = Array.isArray(upcomingRes) ? upcomingRes : (upcomingRes?.data || []);
-      setUpcoming(events);
+    ]).then(([upcomingRes, ongoingRes, regs]) => {
+      const upcomingEvents = Array.isArray(upcomingRes) ? upcomingRes : (upcomingRes?.data || []);
+      const ongoingEvents = Array.isArray(ongoingRes) ? ongoingRes : (ongoingRes?.data || []);
+      setUpcoming(upcomingEvents);
+      setOngoing(ongoingEvents);
       setMyRegs(Array.isArray(regs) ? regs : []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  const now = new Date();
+  const pastCount = myRegs.filter(e => e.status === 'completed' || (e.end_datetime && new Date(e.end_datetime) < now)).length;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-start justify-between">
@@ -36,8 +45,8 @@ export default function StudentDashboard() {
         {loading ? Array.from({length:4}).map((_,i)=><StatCardSkeleton key={i}/>) : <>
           <StatCard title="My Registrations" value={myRegs?.length} icon={<BookOpen className="w-6 h-6"/>} color="blue"/>
           <StatCard title="Upcoming Events" value={upcoming?.length} icon={<Calendar className="w-6 h-6"/>} color="green"/>
-          <StatCard title="Ongoing Events" value="—" icon={<Star className="w-6 h-6"/>} color="amber"/>
-          <StatCard title="Past Attended" value="—" icon={<Calendar className="w-6 h-6"/>} color="purple"/>
+          <StatCard title="Ongoing Events" value={ongoing?.length} icon={<Star className="w-6 h-6"/>} color="amber"/>
+          <StatCard title="Past Attended" value={pastCount} icon={<Calendar className="w-6 h-6"/>} color="purple"/>
         </>}
       </div>
 

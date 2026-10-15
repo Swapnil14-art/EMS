@@ -34,6 +34,8 @@ class GuestSpeaker(BaseModel):
     designation: Optional[str] = None
     organization: Optional[str] = None
     expertise: Optional[str] = None
+    speaker_type: Optional[str] = None
+    custom_speaker_type: Optional[str] = None
 
 
 class SocialLinks(BaseModel):
@@ -41,6 +43,7 @@ class SocialLinks(BaseModel):
     instagram: Optional[str] = None
     x: Optional[str] = None
     linkedin: Optional[str] = None
+    preserve_aspect_ratio: Optional[bool] = None
 
 
 class ReportSubmit(BaseModel):

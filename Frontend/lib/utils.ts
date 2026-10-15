@@ -67,17 +67,17 @@ export const STATUS_LABELS: Record<EventStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<EventStatus, string> = {
-  draft:                            'bg-gray-100 text-gray-700',
-  pending_associate_dean:           'bg-orange-100 text-orange-800',
-  pending_coordinator_parallel:     'bg-sky-100 text-sky-800',
-  pending_director:                 'bg-[rgb(var(--btn-primary-bg)/0.1)] text-[rgb(var(--color-primary))]',
-  suggested_changes:                'bg-yellow-100 text-yellow-800',
-  approved:                         'bg-emerald-100 text-emerald-800',
-  rejected:                         'bg-red-100 text-red-800',
-  cancelled:                        'bg-gray-100 text-[var(--text-muted)]',
-  ongoing:                          'bg-green-100 text-green-800',
-  completed:                        'bg-[rgb(var(--color-secondary)/0.1)] text-[var(--text-secondary)]',
-  archived:                         'bg-muted text-slate-700',
+  draft:                            'bg-[var(--surface-subtle)] text-[var(--text-secondary)]',
+  pending_associate_dean:           'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]',
+  pending_coordinator_parallel:     'bg-[var(--status-info-bg)] text-[var(--status-info-text)]',
+  pending_director:                 'bg-[var(--status-info-bg)] text-[var(--status-info-text)]',
+  suggested_changes:                'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]',
+  approved:                         'bg-[var(--status-success-bg)] text-[var(--status-success-text)]',
+  rejected:                         'bg-[var(--status-danger-bg)] text-[var(--status-danger-text)]',
+  cancelled:                        'bg-[var(--surface-subtle)] text-[var(--text-muted)]',
+  ongoing:                          'bg-[var(--status-success-bg)] text-[var(--status-success-text)]',
+  completed:                        'bg-[var(--status-info-bg)] text-[var(--status-info-text)]',
+  archived:                         'bg-[var(--surface-subtle)] text-[var(--text-secondary)]',
 };
 
 // ─── Role display ─────────────────────────────────────────────────────────────
@@ -89,14 +89,16 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   associate_dean:   'Associate Dean',
   club_coordinator: 'Club Coordinator',
   student:          'Student',
+  additional:       'Additional',
 };
 
 export const ROLE_COLORS: Record<UserRole, string> = {
-  super_admin:      'bg-red-100 text-red-800',
-  director:         'bg-[rgb(var(--color-secondary)/0.1)] text-[var(--text-secondary)]',
-  associate_dean:   'bg-[rgb(var(--btn-primary-bg)/0.1)] text-[rgb(var(--color-primary))]',
-  club_coordinator: 'bg-amber-100 text-amber-800',
-  student:          'bg-gray-100 text-gray-700',
+  super_admin:      'bg-[var(--status-danger-bg)] text-[var(--status-danger-text)]',
+  director:         'bg-[var(--surface-subtle)] text-[var(--text-secondary)]',
+  associate_dean:   'bg-[var(--status-info-bg)] text-[var(--status-info-text)]',
+  club_coordinator: 'bg-[var(--status-warning-bg)] text-[var(--status-warning-text)]',
+  student:          'bg-[var(--surface-subtle)] text-[var(--text-secondary)]',
+  additional:       'bg-[var(--status-info-bg)] text-[var(--status-info-text)]',
 };
 
 // ─── Role dashboard routes ────────────────────────────────────────────────────
@@ -107,6 +109,7 @@ export const ROLE_DASHBOARD: Record<UserRole, string> = {
   associate_dean:   '/associate_dean',
   club_coordinator: '/club_coordinator',
   student:          '/student',
+  additional:       '/additional',
 };
 
 // ─── Event type display ───────────────────────────────────────────────────────
@@ -204,3 +207,22 @@ export function getInitials(name: string): string {
     .toUpperCase()
     .slice(0, 2);
 }
+
+// ─── School Display and Tooltips ──────────────────────────────────────────────
+
+export const SCHOOL_MAP: Record<string, { abbreviation: string; fullName: string }> = {
+  ENGG: { abbreviation: 'MPSTME', fullName: 'Mukesh Patel School of Technology Management & Engineering' },
+  AGRI: { abbreviation: 'SAST', fullName: 'School of Agricultural Sciences & Technology' },
+  PHRM: { abbreviation: 'SPTM', fullName: 'School of Pharmacy & Technology Management' },
+  
+  ENGINEERING: { abbreviation: 'MPSTME', fullName: 'Mukesh Patel School of Technology Management & Engineering' },
+  AGRICULTURE: { abbreviation: 'SAST', fullName: 'School of Agricultural Sciences & Technology' },
+  PHARMACY: { abbreviation: 'SPTM', fullName: 'School of Pharmacy & Technology Management' },
+};
+
+export function getSchoolInfo(codeOrName: string) {
+  if (!codeOrName) return null;
+  const key = String(codeOrName).trim().toUpperCase();
+  return SCHOOL_MAP[key] || null;
+}
+

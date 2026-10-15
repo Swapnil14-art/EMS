@@ -1,21 +1,25 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from fastapi.staticfiles import StaticFiles
 import os
+import logging
+import time
+import uuid
 
 from app.config import settings
+from app.rate_limit import limiter
 from app.auth.router import router as auth_router
 from app.routers import (
     users, departments, clubs, venues,
     events, approvals, registrations,
-    reports, dashboard, admin,
-    system, notifications,
+    reports, rnd_reports, dashboard, admin,
+    system, notifications, permissions, legal,
 )
 
-limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger("ems.request")
 
 
 def create_app() -> FastAPI:
@@ -30,18 +34,27 @@ def create_app() -> FastAPI:
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # CORS — allow Next.js frontend + Swagger/dev origins
-    cors_origins = [
-        settings.FRONTEND_URL,
-        "http://localhost:8000",
-        "http://localhost",
-        "http://127.0.0.1:8000",
-        "http://127.0.0.1",
-        "http://127.0.0.1:3000",
-    ]
+    @app.middleware("http")
+    async def request_context(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        start = time.perf_counter()
+        try:
+            response: Response = await call_next(request)
+        except Exception:
+            logger.exception("Unhandled request failure request_id=%s method=%s path=%s", request_id, request.method, request.url.path)
+            raise
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Process-Time"] = f"{time.perf_counter() - start:.3f}"
+        path = request.url.path
+        if not (path == "/health" or path.startswith("/uploads/") or path.startswith("/static/")):
+            logger.info("request_id=%s method=%s path=%s status=%s duration_ms=%.1f", request_id, request.method, path, response.status_code, (time.perf_counter() - start) * 1000)
+        return response
+
+    # CORS must remain an explicit allow-list, including in development.
+    # Credentials cannot safely be combined with a wildcard origin policy.
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"] if settings.DEBUG else cors_origins,
+        allow_origins=settings.cors_origin_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -64,10 +77,13 @@ def create_app() -> FastAPI:
     app.include_router(approvals.router, prefix="/approvals", tags=["Approvals"])
     app.include_router(registrations.router, prefix="/registrations", tags=["Registrations"])
     app.include_router(reports.router, prefix="/reports", tags=["Reports"])
+    app.include_router(rnd_reports.router, prefix="/rnd-reports", tags=["RnD Reports"])
     app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
     app.include_router(admin.router, prefix="/admin", tags=["Admin"])
     app.include_router(system.router, prefix="/system", tags=["System Settings"])
     app.include_router(notifications.router, prefix="/notifications", tags=["Notifications"])
+    app.include_router(permissions.router, prefix="/permissions", tags=["Permissions"])
+    app.include_router(legal.router, prefix="/legal", tags=["Legal & Privacy"])
 
     @app.get("/health", tags=["Health"])
     async def health_check():

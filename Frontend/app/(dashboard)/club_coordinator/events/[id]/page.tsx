@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Calendar, MapPin, User, ArrowLeft, Download, Users, Upload, CheckCircle2, FileText, ImageIcon, X, Layers } from 'lucide-react';
 import { eventService, approvalService, reportService } from '@/lib/services';
 import { StatusBadge, EventTypeBadge } from '@/components/shared/StatusBadge';
@@ -32,6 +33,11 @@ export default function EventDetailPage() {
   if (loading) return <div className="space-y-4 animate-pulse"><div className="skeleton h-8 w-1/2 rounded"/><div className="skeleton h-64 rounded-2xl"/></div>;
   if (!event) return <div className="card p-8 text-center text-[var(--text-muted)]">Event not found.</div>;
 
+  const hasDeanOrDirectorSuggestion = approvals.some(approval =>
+    approval.status === 'suggested_changes'
+    && ['dean', 'associate_dean', 'director'].includes(approval.role_at_approval)
+  );
+
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
       {/* Full Event Details (same view as director/dean/super_admin) */}
@@ -47,6 +53,11 @@ export default function EventDetailPage() {
               <h2 className="section-title mb-4">Approval Chain</h2>
               <ApprovalChain approvals={approvals} currentStep={event.current_approval_step || 0}/>
             </div>
+            {(hasDeanOrDirectorSuggestion || event.status === 'suggested_changes' || event.status === 'draft') && (
+              <Link href={`/club_coordinator/events/${event.id}/edit`} className="block">
+                <Button className="w-full">Edit Event / Apply Changes</Button>
+              </Link>
+            )}
             {event.registration_count !== undefined && (
               <div className="card p-5 flex items-center gap-3">
                 <div className="w-10 h-10 bg-[var(--card-bg)] rounded-xl flex items-center justify-center">

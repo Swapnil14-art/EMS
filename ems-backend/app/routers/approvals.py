@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, String
 from sqlalchemy.orm import selectinload
 from typing import List
 
@@ -38,9 +38,11 @@ async def pending_approvals(
         )
         if current_user.department_id:
             from app.models.club import Club
+            from app.models.department import Department
+            dept = await db.get(Department, current_user.department_id)
             dept_clubs = select(Club.id).where(Club.department_id == current_user.department_id)
-            dept_code = current_user.department.code.strip().lower() if current_user.department and current_user.department.code else ""
-            dept_name = current_user.department.name.strip().lower() if current_user.department and current_user.department.name else ""
+            dept_code = dept.code.strip().lower() if dept and dept.code else ""
+            dept_name = dept.name.strip().lower() if dept and dept.name else ""
             
             # Collaborative clubs from this department
             collab_match = select(EventCollaboratingClub.event_id).where(
@@ -53,9 +55,17 @@ async def pending_approvals(
             ]
             if dept_code:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_code}%"))
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_code}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_code}%"))
             if dept_name:
                 dept_matchers.append(Event.school_department.ilike(f"%{dept_name}%"))
-                
+                dept_matchers.append(Event.target_audience.ilike(f"%{dept_name}%"))
+                dept_matchers.append(func.cast(Event.departments_involved, String).ilike(f"%{dept_name}%"))
+
+            # Also match events created by coordinators/users belonging to this department
+            creator_dept_users = select(User.id).where(User.department_id == current_user.department_id)
+            dept_matchers.append(Event.created_by.in_(creator_dept_users.scalar_subquery()))
+
             query = query.where(or_(*dept_matchers))
 
     elif current_user.role == "director":
@@ -206,12 +216,17 @@ async def all_approval_history(
 @router.get("/{event_id}/history", response_model=List[ApprovalOut])
 async def approval_history(
     event_id: int,
-    current_user: User = Depends(require_roles(
-        "super_admin", "director", "associate_dean", "club_coordinator"
-    )),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the full approval chain history for an event."""
+    if current_user.role not in {"super_admin", "director", "associate_dean", "club_coordinator"}:
+        if current_user.role == "additional":
+            from app.utils.additional_perms import has_perm
+            if not has_perm(current_user, "view_event_status"):
+                raise HTTPException(status_code=403, detail="Missing permission: view_event_status")
+        else:
+            raise HTTPException(status_code=403, detail="Not authorized to view approval history")
     result = await db.execute(
         select(EventApproval)
         .where(EventApproval.event_id == event_id)

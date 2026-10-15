@@ -1,4 +1,4 @@
-import api from '@/lib/api';
+import api, { getAccessToken } from '@/lib/api';
 import {
   mapUserFromApi,
   mapLoginResponse,
@@ -10,7 +10,7 @@ import type {
   EventApproval, EventDocument, EventLink, EventRegistration,
   EmailNotification, CoordinatorDashboardStats, AdminDashboardStats,
   LoginFormData, ChangePasswordFormData, CompleteProfileFormData,
-  EventReport,
+  EventReport, EventRndReport,
 } from '@/types';
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ export const authService = {
   },
 
   // POST /auth/signup — email-only registration
-  signup: async (data: { email: string }) => {
+  signup: async (data: { email: string; terms_accepted: boolean; privacy_acknowledged: boolean }) => {
     const res = await api.post('/auth/signup', data);
     return res.data;
   },
@@ -144,6 +144,7 @@ export const userService = {
     department_id?: number;
     page?: number;
     size?: number;
+    search?: string;
   }) => {
     const res = await api.get('/users/', { params });
     const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
@@ -208,6 +209,12 @@ export const userService = {
     const res = await api.patch(`/users/${id}`, data);
     return res.data;
   },
+
+  // GET /users/faculty-coordinators — list faculty coordinator emails (any authenticated user)
+  getFacultyCoordinators: async (): Promise<{ id: number; name: string; email: string }[]> => {
+    const res = await api.get('/users/faculty-coordinators');
+    return res.data;
+  },
 };
 
 // ─── Clubs ────────────────────────────────────────────────────────────────────
@@ -263,6 +270,8 @@ export const eventService = {
     from_date?: string;
     to_date?: string;
     search?: string;
+    is_rnd?: boolean;
+    document_type?: 'DOCUMENT' | 'ATTENDANCE' | 'REPORT';
     my_events?: boolean;
     manage_only?: boolean;
     page?: number;
@@ -270,7 +279,7 @@ export const eventService = {
   }) => {
     const res = await api.get('/events/', { params });
     const data = res.data;
-    let dataArray = [];
+    let dataArray: Event[] = [];
     if (data?.data && Array.isArray(data.data)) {
       dataArray = data.data.map(mapEventFromApi);
     } else if (Array.isArray(data)) {
@@ -515,7 +524,11 @@ export const approvalService = {
   // GET /approvals/{event_id}/history — full approval chain for an event
   getHistory: async (eventId: number): Promise<EventApproval[]> => {
     const res = await api.get(`/approvals/${eventId}/history`);
-    return Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    const history = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+    return history.map((item: EventApproval) => ({
+      ...item,
+      status: item.action || item.status,
+    }));
   },
 
   // Fallback for all history if needed (admin/coordinator views)
@@ -621,6 +634,18 @@ export const registrationService = {
     });
     return res.data;
   },
+
+  // POST /registrations/{event_id}/register-visitor — register visitor (non-campus)
+  registerVisitor: async (eventId: number, data: {
+    full_name: string;
+    email: string;
+    phone: string;
+    qualification: string;
+    school_college: string;
+  }) => {
+    const res = await api.post(`/registrations/${eventId}/register-visitor`, data);
+    return res.data;
+  },
 };
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
@@ -694,6 +719,76 @@ export const reportService = {
   },
 };
 
+// ─── RnD Reports ──────────────────────────────────────────────────────────────
+// API mapped from /rnd-reports endpoints
+
+export const rndReportService = {
+  // POST /rnd-reports/{event_id}/submit — submit structured RnD report (JSON)
+  submitReport: async (eventId: number, payload: object) => {
+    const res = await api.post(`/rnd-reports/${eventId}/submit`, payload);
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-flier — upload event flier (1 compulsory)
+  uploadFlier: async (eventId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post(`/rnd-reports/${eventId}/upload-flier`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-photos — upload event photos
+  uploadPhotos: async (eventId: number, files: File[]) => {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    const res = await api.post(`/rnd-reports/${eventId}/upload-photos`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-attendance — upload attendance sheet
+  uploadAttendance: async (eventId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post(`/rnd-reports/${eventId}/upload-attendance`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  // GET /rnd-reports/{event_id}/generate — download generated .docx RnD report
+  generate: async (eventId: number) => {
+    const res = await api.get(`/rnd-reports/${eventId}/generate`, {
+      responseType: 'blob',
+    });
+    return res.data;
+  },
+
+  // GET /rnd-reports/{event_id} — get RnD report metadata
+  get: async (eventId: number) => {
+    const res = await api.get(`/rnd-reports/${eventId}`);
+    return res.data;
+  },
+
+  // POST /rnd-reports/{event_id}/upload-doc — upload pre-made RnD report
+  uploadDoc: async (eventId: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await api.post(`/rnd-reports/${eventId}/upload-doc`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return res.data;
+  },
+
+  submit: async (eventId: number, data: EventRndReport) => {
+    const res = await api.post(`/rnd-reports/${eventId}/submit`, data);
+    return res.data;
+  },
+};
+
 // ─── Dashboard Stats ──────────────────────────────────────────────────────────
 // API mapped from /dashboard endpoints
 
@@ -732,7 +827,11 @@ export const notificationService = {
 
 export const fileService = {
   getFileUrl: (filePath: string) => {
-    return `/api/admin/files/${filePath}`;
+    const cleanPath = (filePath || '').replace(/^\/+/, '');
+    const token = getAccessToken();
+    return token
+      ? `/api/admin/files/${cleanPath}?token=${encodeURIComponent(token)}`
+      : `/api/admin/files/${cleanPath}`;
   },
 };
 
@@ -741,6 +840,91 @@ export const fileService = {
 export const healthService = {
   check: async () => {
     const res = await api.get('/health');
+    return res.data;
+  },
+};
+
+// ─── Permission Management (Additional Role) ──────────────────────────────────
+
+export const permissionService = {
+  getCatalog: async (): Promise<{ catalog: Record<string, string> }> => {
+    const res = await api.get('/permissions/catalog');
+    return res.data;
+  },
+  listUsers: async () => {
+    const res = await api.get('/permissions/users');
+    return res.data;
+  },
+  setPermissions: async (userId: number, permissions: string[], coordinator_type: 'student' | 'Faculty' | null = null) => {
+    const res = await api.put(`/permissions/${userId}`, { permissions, coordinator_type });
+    return res.data;
+  },
+  grantPermissions: async (userId: number, permissions: string[]) => {
+    const res = await api.post(`/permissions/${userId}/grant`, { permissions });
+    return res.data;
+  },
+  revokePermissions: async (userId: number, permissions: string[]) => {
+    const res = await api.delete(`/permissions/${userId}/revoke`, { data: { permissions } });
+    return res.data;
+  },
+};
+
+
+
+// ─── Legal & Privacy Service ─────────────────────────────────────────────────
+
+export interface LegalVersions {
+  current_versions: {
+    terms_and_conditions: string;
+    privacy_policy: string;
+    cookie_policy: string;
+  };
+  effective_dates: {
+    terms_and_conditions: string;
+    privacy_policy: string;
+    cookie_policy: string;
+  };
+  operator_name: string;
+  privacy_officer_name: string;
+  privacy_officer_email: string;
+  grievance_officer_name: string;
+  grievance_officer_email: string;
+  grievance_officer_address: string;
+}
+
+export interface LegalStatus {
+  requires_acceptance: boolean;
+  missing_documents: string[];
+  current_versions: Record<string, string>;
+  accepted_versions: Record<string, string | null>;
+}
+
+export interface LegalAcceptanceRecord {
+  id: number;
+  user_id: number;
+  document_type: string;
+  document_version: string;
+  accepted_at: string;
+  status: string;
+}
+
+export const legalService = {
+  getVersions: async (): Promise<LegalVersions> => {
+    const res = await api.get('/legal/versions');
+    return res.data;
+  },
+  getStatus: async (): Promise<LegalStatus> => {
+    const res = await api.get('/legal/status');
+    return res.data;
+  },
+  accept: async (
+    acceptances: { document_type: string; document_version: string; status?: string }[]
+  ): Promise<LegalAcceptanceRecord[]> => {
+    const res = await api.post('/legal/accept', { acceptances });
+    return res.data;
+  },
+  getMyAcceptances: async (): Promise<LegalAcceptanceRecord[]> => {
+    const res = await api.get('/legal/my-acceptances');
     return res.data;
   },
 };

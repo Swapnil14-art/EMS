@@ -48,3 +48,7 @@ async def get_email_log(
         })
         
     return {"data": serialized, "total": total}
+
+
+# Alias for backward compatibility
+get_email_logs = get_email_log

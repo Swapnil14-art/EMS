@@ -1,96 +1,99 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
-import { eventService } from '@/lib/services';
 import { EventCard, EventCardSkeleton } from '@/components/events/EventCard';
-import { Input, Tabs, Pagination, EmptyState } from '@/components/ui';
-import type { Event } from '@/types';
-import { getEventTimeStatus } from '@/lib/utils';
+import { Input, Tabs, Pagination, EmptyState, Select } from '@/components/ui';
+import { useDebouncedValue, useEventList, useEventStatusCounts } from '@/lib/event-queries';
+import { useAuthStore } from '@/store/authStore';
 
-const STATUS_TABS = [
+const DEFAULT_STATUS_TABS = [
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'ongoing', label: 'Ongoing' },
   { value: 'past', label: 'Past' },
 ];
 
-interface BrowseEventsProps {
-  hideHeader?: boolean;
-  title?: string;
-  subtitle?: string;
-}
+const COORDINATOR_STATUS_TABS = [
+  { value: '', label: 'All Statuses' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'ongoing', label: 'Ongoing' },
+  { value: 'past', label: 'Past' },
+  { value: 'pending_associate_dean,pending_director,pending_coordinator_parallel,suggested_changes', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'archived', label: 'Archived' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
 
-export function BrowseEvents({ hideHeader, title = "Browse Events", subtitle = "Discover what's happening on campus" }: BrowseEventsProps) {
-  const [allEvents, setAllEvents] = useState<Event[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [total, setTotal] = useState(0);
+const RND_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Event Types' },
+  { value: 'normal', label: 'Normal Events' },
+  { value: 'rnd', label: 'R&D Events' },
+];
+
+const PAGE_SIZE = 12;
+
+interface BrowseEventsProps { hideHeader?: boolean; title?: string; subtitle?: string; }
+
+export function BrowseEvents({ hideHeader, title = 'Browse Events', subtitle = "Discover what's happening on campus" }: BrowseEventsProps) {
+  const { user } = useAuthStore();
+  const isCoordinatorOrStaff = Boolean(user?.role && ['club_coordinator', 'associate_dean', 'director', 'super_admin'].includes(user.role));
+  const statusTabs = isCoordinatorOrStaff ? COORDINATOR_STATUS_TABS : DEFAULT_STATUS_TABS;
+
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState('upcoming');
+  const [tab, setTab] = useState(isCoordinatorOrStaff ? '' : 'upcoming');
+  const [hasInitializedTab, setHasInitializedTab] = useState(false);
   const [search, setSearch] = useState('');
-  const [tabCounts, setTabCounts] = useState<Record<string, number>>({});
-
-  const fetchAndCategorize = () => {
-    setLoading(true);
-    // Fetch all public events matching search text
-    eventService.list({ status: 'approved,ongoing,completed,archived', search: search || undefined, size: 2000 })
-      .then(r => {
-        const data = r.data || [];
-        setAllEvents(data);
-      })
-      .catch(() => setAllEvents([]))
-      .finally(() => setLoading(false));
-  };
+  const [rndFilter, setRndFilter] = useState('all');
 
   useEffect(() => {
-    fetchAndCategorize();
-  }, [search]);
+    if (user && !hasInitializedTab) {
+      if (['club_coordinator', 'associate_dean', 'director', 'super_admin'].includes(user.role)) {
+        setTab('');
+      }
+      setHasInitializedTab(true);
+    }
+  }, [user, hasInitializedTab]);
 
-  useEffect(() => {
-    // Local filtering when `tab`, `page`, or `allEvents` changes
-    const filtered = allEvents.filter(e => getEventTimeStatus(e.start_datetime, e.end_datetime) === tab);
-    
-    // Update counts
-    const newCounts = { upcoming: 0, ongoing: 0, past: 0 };
-    allEvents.forEach(e => {
-      const s = getEventTimeStatus(e.start_datetime, e.end_datetime);
-      if (s in newCounts) newCounts[s as keyof typeof newCounts]++;
-    });
-    setTabCounts(newCounts);
+  const debouncedSearch = useDebouncedValue(search);
 
-    // Local pagination
-    setTotal(filtered.length);
-    const startIdx = (page - 1) * 12;
-    setEvents(filtered.slice(startIdx, startIdx + 12));
-  }, [allEvents, tab, page]);
+  const isRndParam = rndFilter === 'rnd' ? true : rndFilter === 'normal' ? false : undefined;
 
-  const tabsWithCounts = STATUS_TABS.map(t => ({
-    value: t.value,
-    label: `${t.label} (${tabCounts[t.value] ?? '...'})`
-  }));
+  const { data, isLoading } = useEventList({
+    status: tab || undefined,
+    search: debouncedSearch || undefined,
+    is_rnd: isRndParam,
+    page,
+    size: PAGE_SIZE
+  });
 
-  return (
-    <div className="space-y-6 animate-fade-in">
-      {!hideHeader && (
-        <div>
-          <h1 className="page-title">{title}</h1>
-          <p className="page-subtitle">{subtitle}</p>
-        </div>
-      )}
+  const defaultCounts = useEventStatusCounts(debouncedSearch);
 
-      <div className="card p-4 flex flex-wrap gap-3 items-center">
-        <Input placeholder="Search events…" leftIcon={<Search className="w-4 h-4" />}
-          value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
-        <Tabs tabs={tabsWithCounts} active={tab} onChange={t => { setTab(t); setPage(1); }} />
+  useEffect(() => setPage(1), [tab, debouncedSearch, rndFilter]);
+
+  const tabsToRender = isCoordinatorOrStaff
+    ? statusTabs
+    : statusTabs.map(item => ({ ...item, label: `${item.label} (${defaultCounts[item.value as keyof typeof defaultCounts] ?? 0})` }));
+
+  const emptySubtitle = debouncedSearch
+    ? "No events match your search query. Try a different keyword!"
+    : tab === 'upcoming'
+    ? "No upcoming events scheduled right now."
+    : tab === 'ongoing'
+    ? "No events are currently ongoing."
+    : "No events found.";
+
+  return <div className="space-y-6 animate-fade-in">
+    {!hideHeader && <div><h1 className="page-title">{title}</h1><p className="page-subtitle">{subtitle}</p></div>}
+    <div className="card p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3 flex-1">
+        <Input placeholder="Search events…" leftIcon={<Search className="w-4 h-4" />} value={search} onChange={event => setSearch(event.target.value)} className="max-w-xs" />
+        <Select value={rndFilter} onChange={e => setRndFilter(e.target.value)} options={RND_FILTER_OPTIONS} className="w-44 flex-shrink-0" />
+        <Tabs tabs={tabsToRender} active={tab} onChange={setTab} />
       </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 min-h-[200px]">
-        {loading
-          ? Array.from({ length: 8 }).map((_, i) => <EventCardSkeleton key={i} />)
-          : events?.length === 0
-            ? <div className="col-span-full"><EmptyState icon="📭" title="No events found" subtitle="Try a different filter or check back later" /></div>
-            : events?.map(e => <EventCard key={e.id} event={e} />)}
-      </div>
-      <Pagination page={page} total={total} perPage={12} onChange={setPage} />
     </div>
-  );
+    <div className="grid min-h-[200px] grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {isLoading ? Array.from({ length: 8 }).map((_, index) => <EventCardSkeleton key={index} />) : data?.data.length ? data.data.map(event => <EventCard key={event.id} event={event} />) : <div className="col-span-full"><EmptyState icon="📭" title="No events found" subtitle={emptySubtitle} /></div>}
+    </div>
+    <Pagination page={page} total={data?.total ?? 0} perPage={PAGE_SIZE} onChange={setPage} />
+  </div>;
 }

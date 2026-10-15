@@ -13,11 +13,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export function Button({ variant = 'primary', size = 'md', loading, icon, children, className, disabled, ...props }: ButtonProps) {
   const base = 'inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed';
   const variants = {
-    primary:   'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:bg-[var(--btn-primary-bg)] shadow-lg',
-    secondary: 'bg-white border border-[var(--card-border)] text-[var(--text-primary)] hover:bg-[var(--page-bg)]',
-    ghost:     'text-[var(--text-secondary)] hover:bg-muted',
-    danger:    'bg-[var(--btn-danger-bg)] text-[var(--btn-primary-text)] hover:bg-[var(--btn-danger-bg)]',
-    accent:    'bg-[var(--btn-secondary-bg)] text-[var(--btn-primary-text)] hover:bg-[var(--btn-secondary-bg)]-dark',
+    primary:   'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:bg-[var(--btn-primary-hover-bg)] shadow-card',
+    secondary: 'bg-[var(--btn-secondary-bg)] border border-[var(--btn-secondary-border)] text-[var(--btn-secondary-text)] hover:bg-[var(--btn-secondary-hover-bg)]',
+    ghost:     'text-[var(--btn-ghost-text)] hover:bg-[var(--btn-ghost-hover-bg)]',
+    danger:    'bg-[var(--btn-danger-bg)] text-[var(--btn-danger-text)] hover:opacity-90',
+    accent:    'bg-[var(--brand-accent)] text-[var(--text-primary)] hover:opacity-90',
   };
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-5 py-2.5 text-sm', lg: 'px-6 py-3 text-base' };
   return (
@@ -154,7 +154,7 @@ export function Combobox({ label, error, options, placeholder, value = '', onCha
           className={cn('input', error && 'input-error', className)}
         />
         {open && filtered.length > 0 && (
-          <ul className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-auto bg-white border border-[var(--card-border)] rounded-xl shadow-card-lg animate-fade-in"
+          <ul className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-auto bg-[var(--surface-bg)] border border-[var(--card-border)] rounded-xl shadow-card-lg animate-fade-in"
             role="listbox"
           >
             {filtered.map(o => (
@@ -207,7 +207,7 @@ export function Spinner({ className }: { className?: string }) {
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 interface BadgeProps { children: React.ReactNode; color?: string; className?: string; dot?: boolean; }
-export function Badge({ children, color = 'bg-muted text-slate-700', className, dot }: BadgeProps) {
+export function Badge({ children, color = 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]', className, dot }: BadgeProps) {
   return (
     <span className={cn('badge', color, className)}>
       {dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}
@@ -230,12 +230,12 @@ export function Modal({ open, onClose, title, children, size = 'md', footer }: M
   const sizes = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-2xl' };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('relative bg-white rounded-3xl shadow-card-lg w-full animate-slide-up', sizes[size])}>
+      <div className="absolute inset-0 bg-[rgb(var(--neutral-900)/0.4)] backdrop-blur-sm" onClick={onClose} />
+      <div className={cn('relative bg-[var(--surface-bg)] rounded-3xl shadow-card-lg w-full animate-slide-up', sizes[size])}>
         {title && (
           <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[var(--card-border)]">
             <h3 className="text-lg font-display font-bold text-[var(--text-primary)]">{title}</h3>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-[var(--text-muted)] transition-colors">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-subtle)]">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -284,12 +284,12 @@ export function Toggle({ checked, onChange, label, disabled }: ToggleProps) {
         onClick={() => onChange(!checked)}
         className={cn(
           'relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary',
-          checked ? 'bg-[var(--btn-primary-bg)]' : 'bg-muted',
+          checked ? 'bg-[var(--btn-primary-bg)]' : 'bg-[var(--surface-subtle)]',
           disabled && 'opacity-50 cursor-not-allowed'
         )}
       >
         <span className={cn(
-          'absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200',
+          'absolute top-0.5 left-0.5 w-5 h-5 bg-[var(--surface-bg)] rounded-full shadow transition-transform duration-200',
           checked ? 'translate-x-5' : 'translate-x-0'
         )} />
       </button>
@@ -302,7 +302,7 @@ export function Toggle({ checked, onChange, label, disabled }: ToggleProps) {
 type AlertType = 'info' | 'success' | 'warning' | 'error';
 const alertStyles: Record<AlertType, string> = {
   info:    'bg-[rgb(var(--alert-info-bg)/0.1)] border-[rgb(var(--alert-info-border)/0.2)] text-[var(--alert-info-text)]',
-  success: 'bg-[rgb(var(--alert-info-bg)/0.1)] border-[rgb(var(--alert-info-border)/0.2)] text-[var(--alert-info-text)]',
+  success: 'bg-[rgb(var(--alert-success-bg)/0.1)] border-[rgb(var(--alert-success-border)/0.2)] text-[var(--alert-success-text)]',
   warning: 'bg-[rgb(var(--alert-warning-bg)/0.1)] border-[rgb(var(--alert-warning-border)/0.2)] text-[var(--alert-warning-text)]',
   error:   'bg-[rgb(var(--alert-error-bg)/0.1)] border-[rgb(var(--alert-error-border)/0.2)] text-[var(--alert-error-text)]',
 };
@@ -330,7 +330,7 @@ export function Tabs({ tabs, active, onChange }: TabsProps) {
           className={cn(
             'flex whitespace-nowrap shrink-0 items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150',
             active === tab.value
-              ? 'bg-white text-[rgb(var(--color-primary))] shadow-card'
+              ? 'bg-[var(--surface-bg)] text-[var(--brand-primary)] shadow-card'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           )}
         >
@@ -338,7 +338,7 @@ export function Tabs({ tabs, active, onChange }: TabsProps) {
           {tab.count !== undefined && (
             <span className={cn(
               'px-1.5 py-0.5 rounded-full text-xs font-bold',
-              active === tab.value ? 'bg-[var(--card-bg)] text-[rgb(var(--color-primary))]' : 'bg-muted text-[var(--text-muted)]'
+              active === tab.value ? 'bg-[var(--card-bg)] text-[rgb(var(--color-primary))]' : 'bg-[var(--surface-subtle)] text-[var(--text-secondary)]'
             )}>
               {tab.count}
             </span>
@@ -361,7 +361,7 @@ export function Pagination({ page, total, perPage, onChange }: PaginationProps) 
       </p>
       <div className="flex gap-1">
         <button onClick={() => onChange(page - 1)} disabled={page === 1}
-          className="px-3 py-1.5 text-xs rounded-lg border border-[var(--card-border)] bg-white hover:bg-[var(--page-bg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          className="px-3 py-1.5 text-xs rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] hover:bg-[var(--page-bg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
           Prev
         </button>
         {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
@@ -369,14 +369,14 @@ export function Pagination({ page, total, perPage, onChange }: PaginationProps) 
           return (
             <button key={p} onClick={() => onChange(p)}
               className={cn('px-3 py-1.5 text-xs rounded-lg border transition-colors',
-                p === page ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] border-[var(--input-focus-ring)]' : 'border-[var(--card-border)] bg-white hover:bg-[var(--page-bg)] text-[var(--text-secondary)]'
+                p === page ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] border-[var(--input-focus-ring)]' : 'border-[var(--card-border)] bg-[var(--surface-bg)] hover:bg-[var(--page-bg)] text-[var(--text-secondary)]'
               )}>
               {p}
             </button>
           );
         })}
         <button onClick={() => onChange(page + 1)} disabled={page === totalPages}
-          className="px-3 py-1.5 text-xs rounded-lg border border-[var(--card-border)] bg-white hover:bg-[var(--page-bg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          className="px-3 py-1.5 text-xs rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] hover:bg-[var(--page-bg)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
           Next
         </button>
       </div>

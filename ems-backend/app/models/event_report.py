@@ -14,7 +14,7 @@ class EventReport(Base):
 
     # Core report fields
     event_summary = Column(Text, nullable=False)
-    actual_budget = Column(Numeric(10, 2), nullable=False)
+    actual_budget = Column(Numeric(20, 2), nullable=False)
     outcomes = Column(Text, nullable=False)
     issues = Column(Text, nullable=True)
     feedback = Column(Text, nullable=True)
@@ -33,8 +33,8 @@ class EventReport(Base):
     program_type = Column(String(100), nullable=True)
 
     # New: objective and learning benefit (character-constrained in schema/UI)
-    objective = Column(String(200), nullable=True)       # 100 chars strict (stored generously)
-    learning_benefit = Column(String(300), nullable=True)  # 150 chars strict
+    objective = Column(Text, nullable=True)       # 100 chars strict (stored generously)
+    learning_benefit = Column(Text, nullable=True)  # 150 chars strict
 
     # New: guest speakers — list of {name, designation, organization, expertise}
     guest_speakers = Column(JSON, nullable=True)  # [{"name": "", "designation": "", "organization": "", "expertise": ""}]

@@ -1,0 +1,355 @@
+%PDF-1.3
+%ºß¬à
+3 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 841.8899999999999864 595.2799999999999727]
+/Contents 4 0 R
+>>
+endobj
+4 0 obj
+<<
+/Length 3116
+>>
+stream
+0.5670000000000001 w
+0 G
+BT
+/F1 16 Tf
+18.3999999999999986 TL
+0 g
+56.6929133858267775 538.5870866141732449 Td
+(Event Schedule and Matrix \(Wide Table\)) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 496.0674015748031138 Td
+(Time    |    Activity    |    Speaker    |    Location    |    Capacity    |    Status) Tj
+ET
+56.6929133858267775 490.3981102362204183 m
+793.7007874015748712 490.3981102362204183 l
+S
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 467.7209448818897499 Td
+(09:3 AM    |    Workshop Session 1    |    Dr. Speaker 1    |    Hall 2    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 439.3744881889763292 Td
+(09:6 AM    |    Workshop Session 2    |    Dr. Speaker 2    |    Hall 3    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 411.0280314960629084 Td
+(09:9 AM    |    Workshop Session 3    |    Dr. Speaker 3    |    Hall 1    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 382.6815748031495446 Td
+(09:12 AM    |    Workshop Session 4    |    Dr. Speaker 4    |    Hall 2    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 354.3351181102361807 Td
+(09:15 AM    |    Workshop Session 5    |    Dr. Speaker 5    |    Hall 3    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 325.9886614173227599 Td
+(09:18 AM    |    Workshop Session 6    |    Dr. Speaker 6    |    Hall 1    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 297.642204724409396 Td
+(09:21 AM    |    Workshop Session 7    |    Dr. Speaker 7    |    Hall 2    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 269.2957480314959753 Td
+(09:24 AM    |    Workshop Session 8    |    Dr. Speaker 8    |    Hall 3    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 240.9492913385826114 Td
+(09:27 AM    |    Workshop Session 9    |    Dr. Speaker 9    |    Hall 1    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 212.6028346456692475 Td
+(09:30 AM    |    Workshop Session 10    |    Dr. Speaker 10    |    Hall 2    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 184.2563779527558268 Td
+(09:33 AM    |    Workshop Session 11    |    Dr. Speaker 11    |    Hall 3    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 155.9099212598424629 Td
+(09:36 AM    |    Workshop Session 12    |    Dr. Speaker 12    |    Hall 1    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 127.5634645669290421 Td
+(09:39 AM    |    Workshop Session 13    |    Dr. Speaker 13    |    Hall 2    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 99.2170078740156782 Td
+(09:42 AM    |    Workshop Session 14    |    Dr. Speaker 14    |    Hall 3    |    100    |    Confirmed) Tj
+ET
+BT
+/F1 10 Tf
+11.5 TL
+0 g
+56.6929133858267775 70.8705511811023143 Td
+(09:45 AM    |    Workshop Session 15    |    Dr. Speaker 15    |    Hall 1    |    100    |    Confirmed) Tj
+ET
+endstream
+endobj
+1 0 obj
+<</Type /Pages
+/Kids [3 0 R ]
+/Count 1
+>>
+endobj
+5 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+6 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+7 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+8 0 obj
+<<
+/Type /Font
+/BaseFont /Helvetica-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+9 0 obj
+<<
+/Type /Font
+/BaseFont /Courier
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+10 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+11 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-Oblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+12 0 obj
+<<
+/Type /Font
+/BaseFont /Courier-BoldOblique
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+13 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+14 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Bold
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+15 0 obj
+<<
+/Type /Font
+/BaseFont /Times-Italic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+16 0 obj
+<<
+/Type /Font
+/BaseFont /Times-BoldItalic
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+17 0 obj
+<<
+/Type /Font
+/BaseFont /ZapfDingbats
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+18 0 obj
+<<
+/Type /Font
+/BaseFont /Symbol
+/Subtype /Type1
+/FirstChar 32
+/LastChar 255
+>>
+endobj
+2 0 obj
+<<
+/ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
+/Font <<
+/F1 5 0 R
+/F2 6 0 R
+/F3 7 0 R
+/F4 8 0 R
+/F5 9 0 R
+/F6 10 0 R
+/F7 11 0 R
+/F8 12 0 R
+/F9 13 0 R
+/F10 14 0 R
+/F11 15 0 R
+/F12 16 0 R
+/F13 17 0 R
+/F14 18 0 R
+>>
+/XObject <<
+>>
+>>
+endobj
+19 0 obj
+<<
+/Producer (jsPDF 4.2.1)
+/CreationDate (D:20260924233731+05'30')
+>>
+endobj
+20 0 obj
+<<
+/Type /Catalog
+/Pages 1 0 R
+/OpenAction [3 0 R /FitH null]
+/PageLayout /OneColumn
+>>
+endobj
+xref
+0 21
+0000000000 65535 f 
+0000003320 00000 n 
+0000005137 00000 n 
+0000000015 00000 n 
+0000000152 00000 n 
+0000003377 00000 n 
+0000003502 00000 n 
+0000003632 00000 n 
+0000003765 00000 n 
+0000003902 00000 n 
+0000004025 00000 n 
+0000004154 00000 n 
+0000004286 00000 n 
+0000004422 00000 n 
+0000004550 00000 n 
+0000004677 00000 n 
+0000004806 00000 n 
+0000004939 00000 n 
+0000005041 00000 n 
+0000005385 00000 n 
+0000005471 00000 n 
+trailer
+<<
+/Size 21
+/Root 20 0 R
+/Info 19 0 R
+/ID [ <B2FC16F01C727AC48733FDC57B6E8269> <B2FC16F01C727AC48733FDC57B6E8269> ]
+>>
+startxref
+5575
+%%EOF

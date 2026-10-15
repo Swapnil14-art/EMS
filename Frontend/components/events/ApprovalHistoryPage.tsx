@@ -36,7 +36,7 @@ export default function ApprovalHistoryPage() {
               <tr key={a.id}>
                 <td>
                   {a.status === 'approved'
-                    ? <span className="flex items-center gap-1.5 text-emerald-600 font-semibold text-sm"><CheckCircle2 className="w-4 h-4" />Approved</span>
+                    ? <span className="flex items-center gap-1.5 text-[var(--status-success-text)] font-semibold text-sm"><CheckCircle2 className="w-4 h-4" />Approved</span>
                     : a.status === 'rejected'
                     ? <span className="flex items-center gap-1.5 text-[var(--text-danger)] font-semibold text-sm"><XCircle className="w-4 h-4" />Rejected</span>
                     : <span className="flex items-center gap-1.5 text-[var(--text-muted)] font-semibold text-sm"><Clock className="w-4 h-4" />Pending</span>}
@@ -46,7 +46,7 @@ export default function ApprovalHistoryPage() {
                     ? <Link href={"/events/" + a.event_id} className="text-sm text-[rgb(var(--color-primary))] hover:text-[rgb(var(--color-primary))] font-medium">Event #{a.event_id}</Link>
                     : <span className="text-sm text-[var(--text-muted)]">—</span>}
                 </td>
-                <td><span className="badge bg-muted text-slate-700">{a.role_at_approval}</span></td>
+                <td><span className="badge bg-[var(--surface-subtle)] text-[var(--text-secondary)]">{a.role_at_approval}</span></td>
                 <td className="text-xs text-[var(--text-secondary)] max-w-[200px] truncate">{a.remarks || '—'}</td>
                 <td className="text-xs text-[var(--text-muted)]">{a.actioned_at ? formatDateTime(a.actioned_at) : '—'}</td>
               </tr>

@@ -1,26 +1,42 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from jose import JWTError
+from typing import Optional
 
 from app.database import get_db
 from app.auth.jwt_handler import decode_access_token
 from app.models.user import User
 from app.models.system_config import SystemSettings
 
-bearer_scheme = HTTPBearer()
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """Validates Bearer JWT and returns the current User object."""
-    token = credentials.credentials
+    """Validates Bearer JWT or query param/cookie and returns the current User object."""
+    raw_token = None
+    if credentials:
+        raw_token = credentials.credentials
+    elif request.query_params.get("token"):
+        raw_token = request.query_params.get("token")
+    elif request.cookies.get("access_token"):
+        raw_token = request.cookies.get("access_token")
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
-        payload = decode_access_token(token)
+        payload = decode_access_token(raw_token)
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -45,22 +61,30 @@ async def get_current_user(
 bearer_scheme_optional = HTTPBearer(auto_error=False)
 
 async def get_optional_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme_optional),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    if not credentials:
+    raw_token = None
+    if credentials:
+        raw_token = credentials.credentials
+    elif request.query_params.get("token"):
+        raw_token = request.query_params.get("token")
+    elif request.cookies.get("access_token"):
+        raw_token = request.cookies.get("access_token")
+
+    if not raw_token:
         payload = {}
     else:
         try:
-            payload = decode_access_token(credentials.credentials)
+            payload = decode_access_token(raw_token)
         except JWTError:
             payload = {}
 
-    # Check if a user ID is present in payload
-    user_id = payload.get("user_id") if 'payload' in locals() else None
-    
-    if not user_id:
-        # Check force_login before allowing anonymous access
+    user_id = payload.get("user_id") if payload else None
+
+    # Lazy-load system config only when needed (anonymous or invalid user)
+    async def _check_force_login():
         config_result = await db.execute(select(SystemSettings).limit(1))
         config = config_result.scalar_one_or_none()
         if config and config.force_login:
@@ -68,6 +92,9 @@ async def get_optional_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="System administrator has enforced global login. Please log in.",
             )
+
+    if not user_id:
+        await _check_force_login()
         return None
 
     result = await db.execute(
@@ -77,14 +104,7 @@ async def get_optional_user(
     )
     user = result.scalar_one_or_none()
     if not user or user.status == "inactive":
-        # Check force_login before allowing anonymous access
-        config_result = await db.execute(select(SystemSettings).limit(1))
-        config = config_result.scalar_one_or_none()
-        if config and config.force_login:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="System administrator has enforced global login. Please log in.",
-            )
+        await _check_force_login()
         return None
     return user
 
@@ -109,3 +129,28 @@ def require_roles(*roles: str):
         return current_user
 
     return role_checker
+
+
+def require_permission(perm: str):
+    """
+    Permission guard for 'additional' role users.
+    Also allows super_admin and any fixed role that is explicitly listed via require_roles.
+    Usage: Depends(require_permission("view_reports"))
+    """
+    from app.utils.additional_perms import has_perm
+
+    async def checker(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.is_first_login or not current_user.name:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Complete your profile before accessing this resource.",
+            )
+        if not has_perm(current_user, perm):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing permission: {perm}",
+            )
+        return current_user
+
+    return checker
+
