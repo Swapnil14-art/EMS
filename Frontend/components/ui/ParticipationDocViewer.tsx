@@ -93,6 +93,10 @@ export default function ParticipationDocViewer({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // References to preserve reading position across zoom changes
+  const previousZoomRef = useRef<number>(zoomLevel);
+  const activePageOnZoomRef = useRef<number>(1);
+
   const isImage = /\.(jpe?g|png|webp|svg|gif)(\?.*)?$/i.test(url);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -216,18 +220,29 @@ export default function ParticipationDocViewer({
         const page = await pdfDoc.getPage(pageNumber);
         const unscaledViewport = page.getViewport({ scale: 1.0 });
 
-        // Calculate responsive fit scale based on container width
-        const availableWidth = Math.max(containerWidth - 16, 260);
+        // Calculate responsive fit scale based on available container width
+        // Deduct scroll container padding so 100% zoom fits comfortably
+        const availableWidth = Math.max(containerWidth - 24, 260);
         const baseFitScale = availableWidth / unscaledViewport.width;
         const finalScale = baseFitScale * zoomLevel;
 
-        const viewport = page.getViewport({ scale: finalScale });
+        // Use devicePixelRatio for HiDPI/Retina crispness without affine transform drift
         const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+        const viewport = page.getViewport({ scale: finalScale * dpr });
 
-        canvas.width = Math.floor(viewport.width * dpr);
-        canvas.height = Math.floor(viewport.height * dpr);
-        canvas.style.width = `${Math.floor(viewport.width)}px`;
-        canvas.style.height = `${Math.floor(viewport.height)}px`;
+        // Canvas internal pixel buffer dimensions (device pixels)
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+
+        // Canvas CSS layout dimensions (CSS pixels)
+        // Guaranteed strictly proportional: cssWidth / cssHeight === unscaledViewport.width / unscaledViewport.height
+        const cssWidth = Math.floor(viewport.width / dpr);
+        const cssHeight = Math.floor(viewport.height / dpr);
+
+        canvas.style.width = `${cssWidth}px`;
+        canvas.style.height = `${cssHeight}px`;
+        canvas.style.maxWidth = 'none';
+        canvas.style.maxHeight = 'none';
 
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -235,7 +250,6 @@ export default function ParticipationDocViewer({
         const renderContext = {
           canvasContext: ctx,
           viewport: viewport,
-          transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
         };
 
         const renderTask = page.render(renderContext);
@@ -331,16 +345,38 @@ export default function ParticipationDocViewer({
 
   // Zoom controls
   const handleZoomIn = () => {
+    activePageOnZoomRef.current = currentPage;
     setZoomLevel((prev) => Math.min(Number((prev + 0.2).toFixed(2)), 2.5));
   };
 
   const handleZoomOut = () => {
+    activePageOnZoomRef.current = currentPage;
     setZoomLevel((prev) => Math.max(Number((prev - 0.2).toFixed(2)), 0.6));
   };
 
   const handleZoomReset = () => {
+    activePageOnZoomRef.current = currentPage;
     setZoomLevel(1.0);
   };
+
+  // Preserve reading position on zoom change
+  useEffect(() => {
+    if (previousZoomRef.current !== zoomLevel) {
+      previousZoomRef.current = zoomLevel;
+      const targetPage = activePageOnZoomRef.current;
+      if (targetPage > 1 && numPages > 0) {
+        const timer = setTimeout(() => {
+          const container = isFullScreen ? fullScreenScrollContainerRef.current : scrollContainerRef.current;
+          const refs = isFullScreen ? fullScreenPageRefs.current : pageRefs.current;
+          const targetEl = refs[targetPage - 1];
+          if (targetEl && container) {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }, 70);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [zoomLevel, isFullScreen, numPages]);
 
   // Full-screen expand and collapse handlers
   const handleExpand = () => {
@@ -525,12 +561,12 @@ export default function ParticipationDocViewer({
             if (!fillContainer && isMobile) handleExpand();
           }}
           onScroll={() => handleScroll(scrollContainerRef.current, pageRefs.current)}
-          className={`flex-1 w-full overflow-y-auto overflow-x-auto p-3 flex flex-col items-center gap-3 scroll-smooth ${
+          className={`flex-1 w-full overflow-y-auto overflow-x-auto p-3 scroll-smooth ${
             !fillContainer && isMobile ? 'cursor-pointer' : ''
           }`}
         >
           {isImage ? (
-            <div className="flex-1 w-full flex items-center justify-center p-2">
+            <div className="min-w-full w-max flex items-center justify-center p-2 mx-auto">
               <img
                 src={url}
                 alt={title}
@@ -578,27 +614,29 @@ export default function ParticipationDocViewer({
               )}
 
               {!isLoading && !loadError && numPages > 0 && (
-                Array.from({ length: numPages }).map((_, index) => {
-                  const pageNum = index + 1;
-                  return (
-                    <div
-                      key={`pdf-page-${pageNum}`}
-                      ref={(el) => {
-                        pageRefs.current[index] = el;
-                      }}
-                      className="flex flex-col items-center max-w-full"
-                    >
-                      <div className="relative shadow-sm rounded-sm bg-white overflow-hidden max-w-full">
-                        <canvas className="block max-w-full h-auto" />
+                <div className="min-w-full w-max flex flex-col items-center gap-3 py-1 mx-auto">
+                  {Array.from({ length: numPages }).map((_, index) => {
+                    const pageNum = index + 1;
+                    return (
+                      <div
+                        key={`pdf-page-${pageNum}`}
+                        ref={(el) => {
+                          pageRefs.current[index] = el;
+                        }}
+                        className="flex flex-col items-center shrink-0"
+                      >
+                        <div className="relative shadow-sm rounded-sm bg-white overflow-hidden shrink-0">
+                          <canvas className="block shrink-0" />
+                        </div>
+                        {numPages > 1 && (
+                          <span className="text-[9px] text-[var(--text-muted)] mt-1 select-none font-medium">
+                            Page {pageNum} of {numPages}
+                          </span>
+                        )}
                       </div>
-                      {numPages > 1 && (
-                        <span className="text-[9px] text-[var(--text-muted)] mt-1 select-none font-medium">
-                          Page {pageNum} of {numPages}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </div>
               )}
             </>
           )}
@@ -705,10 +743,10 @@ export default function ParticipationDocViewer({
             ref={fullScreenScrollContainerRef}
             data-testid="fullscreen-pdf-scroll-container"
             onScroll={() => handleScroll(fullScreenScrollContainerRef.current, fullScreenPageRefs.current)}
-            className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-auto p-1.5 sm:p-2 flex flex-col items-center gap-2 overscroll-contain scroll-smooth bg-zinc-100 dark:bg-zinc-950"
+            className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-auto p-1.5 sm:p-2 overscroll-contain scroll-smooth bg-zinc-100 dark:bg-zinc-950"
           >
             {isImage ? (
-              <div className="flex-1 w-full flex items-center justify-center p-2">
+              <div className="min-w-full w-max flex items-center justify-center p-2 mx-auto">
                 <img
                   src={url}
                   alt={title}
@@ -752,27 +790,29 @@ export default function ParticipationDocViewer({
                 )}
 
                 {!isLoading && !loadError && numPages > 0 && (
-                  Array.from({ length: numPages }).map((_, index) => {
-                    const pageNum = index + 1;
-                    return (
-                      <div
-                        key={`fullscreen-pdf-page-${pageNum}`}
-                        ref={(el) => {
-                          fullScreenPageRefs.current[index] = el;
-                        }}
-                        className="flex flex-col items-center max-w-full"
-                      >
-                        <div className="relative shadow rounded-sm bg-white overflow-hidden max-w-full">
-                          <canvas className="block max-w-full h-auto" />
+                  <div className="min-w-full w-max flex flex-col items-center gap-2 py-1 mx-auto">
+                    {Array.from({ length: numPages }).map((_, index) => {
+                      const pageNum = index + 1;
+                      return (
+                        <div
+                          key={`fullscreen-pdf-page-${pageNum}`}
+                          ref={(el) => {
+                            fullScreenPageRefs.current[index] = el;
+                          }}
+                          className="flex flex-col items-center shrink-0"
+                        >
+                          <div className="relative shadow rounded-sm bg-white overflow-hidden shrink-0">
+                            <canvas className="block shrink-0" />
+                          </div>
+                          {numPages > 1 && (
+                            <span className="text-[9px] text-[var(--text-muted)] mt-0.5 select-none font-medium">
+                              {pageNum} / {numPages}
+                            </span>
+                          )}
                         </div>
-                        {numPages > 1 && (
-                          <span className="text-[9px] text-[var(--text-muted)] mt-0.5 select-none font-medium">
-                            {pageNum} / {numPages}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
+                      );
+                    })}
+                  </div>
                 )}
               </>
             )}
