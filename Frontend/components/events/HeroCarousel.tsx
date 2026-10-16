@@ -91,6 +91,16 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
         )}
       </div>
 
+      {/* Subtle horizontal edge fade (left and right) */}
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 z-[5] w-20 sm:w-28 lg:w-40 bg-gradient-to-r from-[var(--card-bg)] to-transparent"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 z-[5] w-20 sm:w-28 lg:w-40 bg-gradient-to-l from-[var(--card-bg)] to-transparent"
+        aria-hidden="true"
+      />
+
       {/* Content */}
       <div className="relative z-10 h-full flex items-end">
         <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-12 lg:px-8 lg:pb-16">
