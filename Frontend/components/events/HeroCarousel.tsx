@@ -103,18 +103,18 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
 
       {/* Content */}
       <div className="relative z-10 h-full flex items-end">
-        <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-12 lg:px-8 lg:pb-16">
+        <div className="mx-auto w-full max-w-7xl px-6 pb-5 sm:px-10 sm:pb-7 lg:px-12 lg:pb-8">
           <div className={`max-w-2xl transition-all duration-500 ${isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
-            <div className="mb-3 flex items-center gap-2 sm:mb-4 sm:gap-3">
+            <div className="mb-2 flex items-center gap-2 sm:mb-2.5 sm:gap-3">
               <StatusPill status={event.status} />
               <EventTypeBadge type={event.event_type} className="bg-white/20 text-[var(--btn-primary-text)] border border-white/20 backdrop-blur-sm" />
             </div>
 
-            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-white sm:mb-4 sm:text-4xl md:text-5xl [text-shadow:_-1px_-1px_0_rgba(0,0,0,0.85),_1px_-1px_0_rgba(0,0,0,0.85),_-1px_1px_0_rgba(0,0,0,0.85),_1px_1px_0_rgba(0,0,0,0.85),_0_4px_14px_rgba(0,0,0,0.95)]">
+            <h2 className="mb-2 font-display text-2xl font-bold leading-tight text-white sm:mb-3 sm:text-4xl md:text-5xl [text-shadow:_-1px_-1px_0_rgba(0,0,0,0.85),_1px_-1px_0_rgba(0,0,0,0.85),_-1px_1px_0_rgba(0,0,0,0.85),_1px_1px_0_rgba(0,0,0,0.85),_0_4px_14px_rgba(0,0,0,0.95)]">
               {event.title}
             </h2>
 
-            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white sm:mb-6 sm:gap-4 sm:text-sm [text-shadow:_0_1px_2px_rgba(0,0,0,0.9),_0_2px_8px_rgba(0,0,0,0.9)]">
+            <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white sm:mb-4 sm:gap-4 sm:text-sm [text-shadow:_0_1px_2px_rgba(0,0,0,0.9),_0_2px_8px_rgba(0,0,0,0.9)]">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
                 {formatDate(event.start_datetime)}
@@ -134,12 +134,12 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <Link href={`/events/${event.id}`} className="btn-primary px-4 py-2 text-sm sm:px-6 sm:py-3 sm:text-base">
+              <Link href={`/events/${event.id}`} className="btn-primary px-4 py-2 text-sm sm:px-6 sm:py-2.5 sm:text-base">
                 View Details
               </Link>
               {event.status === 'approved' && (
                 <Link href={`/events/${event.id}#register`}
-                  className="rounded-xl border-2 border-white/40 px-4 py-2 text-sm font-semibold text-[var(--btn-primary-text)] backdrop-blur-sm transition-colors hover:bg-[rgb(var(--card-bg)/0.1)] sm:px-6 sm:py-3 sm:text-base">
+                  className="rounded-xl border-2 border-white/40 px-4 py-2 text-sm font-semibold text-[var(--btn-primary-text)] backdrop-blur-sm transition-colors hover:bg-[rgb(var(--card-bg)/0.1)] sm:px-6 sm:py-2.5 sm:text-base">
                   Register
                 </Link>
               )}
