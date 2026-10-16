@@ -80,18 +80,15 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
 
   return (
     <div className="relative h-[480px] w-full overflow-hidden sm:h-[580px] lg:h-[620px]">
-      {/* Background image or gradient */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${bgGradient} transition-all duration-700`}>
+      {/* Background image or fallback placeholder */}
+      <div className={`absolute inset-0 ${!event.poster_url ? `bg-gradient-to-br ${bgGradient}` : 'bg-transparent'} transition-all duration-700`}>
         {event.poster_url && (
           <img
             src={event.poster_url}
             alt={event.title}
-            className="absolute inset-0 w-full h-full object-cover opacity-45 transition-opacity duration-700"
+            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
           />
         )}
-        {/* Dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
       </div>
 
       {/* Content */}
