@@ -91,27 +91,30 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
         )}
       </div>
 
-      {/* Subtle horizontal edge fade (left and right) */}
+      {/* Subtle horizontal edge fade (left and right) with blackish gradient */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 z-[5] w-10 sm:w-20 md:w-28 lg:w-36 bg-gradient-to-r from-[var(--card-bg)] via-[var(--card-bg)]/40 to-transparent transition-opacity duration-300"
+        className="pointer-events-none absolute inset-y-0 left-0 z-[5] w-12 sm:w-24 md:w-32 lg:w-44 bg-gradient-to-r from-black/80 via-black/35 to-transparent transition-opacity duration-300"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute inset-y-0 right-0 z-[5] w-10 sm:w-20 md:w-28 lg:w-36 bg-gradient-to-l from-[var(--card-bg)] via-[var(--card-bg)]/40 to-transparent transition-opacity duration-300"
+        className="pointer-events-none absolute inset-y-0 right-0 z-[5] w-12 sm:w-24 md:w-32 lg:w-44 bg-gradient-to-l from-black/80 via-black/35 to-transparent transition-opacity duration-300"
         aria-hidden="true"
       />
 
       {/* Content */}
       <div className="relative z-10 h-full flex items-end">
         <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-12 lg:px-8 lg:pb-16">
-          <div className={`max-w-2xl transition-all duration-500 ${isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
-
+          <div
+            className={`max-w-2xl rounded-2xl sm:rounded-3xl bg-black/55 backdrop-blur-md sm:backdrop-blur-lg border border-white/20 p-5 sm:p-7 shadow-2xl transition-all duration-500 ${
+              isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
+            }`}
+          >
             <div className="mb-3 flex items-center gap-2 sm:mb-4 sm:gap-3">
               <StatusPill status={event.status} />
               <EventTypeBadge type={event.event_type} className="bg-white/20 text-[var(--btn-primary-text)] border border-white/20 backdrop-blur-sm" />
             </div>
 
-            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] sm:mb-4 sm:text-4xl md:text-5xl">
+            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] sm:mb-4 sm:text-4xl md:text-5xl [text-shadow:_0_1px_2px_rgba(0,0,0,0.9),_0_0_1px_rgba(255,255,255,0.4)]">
               {event.title}
             </h2>
 
