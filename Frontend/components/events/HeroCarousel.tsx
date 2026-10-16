@@ -93,11 +93,11 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
 
       {/* Subtle horizontal edge fade (left and right) */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 z-[5] w-20 sm:w-28 lg:w-40 bg-gradient-to-r from-[var(--card-bg)] to-transparent"
+        className="pointer-events-none absolute inset-y-0 left-0 z-[5] w-10 sm:w-20 md:w-28 lg:w-36 bg-gradient-to-r from-[var(--card-bg)] via-[var(--card-bg)]/40 to-transparent transition-opacity duration-300"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute inset-y-0 right-0 z-[5] w-20 sm:w-28 lg:w-40 bg-gradient-to-l from-[var(--card-bg)] to-transparent"
+        className="pointer-events-none absolute inset-y-0 right-0 z-[5] w-10 sm:w-20 md:w-28 lg:w-36 bg-gradient-to-l from-[var(--card-bg)] via-[var(--card-bg)]/40 to-transparent transition-opacity duration-300"
         aria-hidden="true"
       />
 
@@ -111,11 +111,11 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
               <EventTypeBadge type={event.event_type} className="bg-white/20 text-[var(--btn-primary-text)] border border-white/20 backdrop-blur-sm" />
             </div>
 
-            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-[var(--btn-primary-text)] drop-shadow-lg sm:mb-4 sm:text-4xl md:text-5xl">
+            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] sm:mb-4 sm:text-4xl md:text-5xl">
               {event.title}
             </h2>
 
-            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-[rgb(var(--color-primary))]/10 sm:mb-6 sm:gap-4 sm:text-sm">
+            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)] sm:mb-6 sm:gap-4 sm:text-sm">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
                 {formatDate(event.start_datetime)}
@@ -128,7 +128,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
               )}
               {event.club && (
                 <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--btn-primary-bg)]/30" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/70" />
                   {event.club.name}
                 </span>
               )}
