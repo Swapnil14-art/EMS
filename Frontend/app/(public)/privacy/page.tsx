@@ -4,9 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import PublicNavbar from '@/components/layout/PublicNavbar';
 import { AppFooter } from '@/components/layout/AppFooter';
-import { 
-  Shield, Lock, FileText, Database, Server, Mail, 
-  Users, AlertCircle, Clock, ChevronRight, CheckCircle2 
+import {
+  Shield, Lock, FileText, Database, Server,
+  Users, CheckCircle2, ChevronRight
 } from 'lucide-react';
 
 export default function PrivacyPolicyPage() {
@@ -17,10 +17,10 @@ export default function PrivacyPolicyPage() {
       <main className="flex-1 pt-24 pb-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           
-          {/* Header Banner */}
-          <div className="mb-10 text-center sm:text-left">
+          {/* Header */}
+          <div className="mb-8">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--brand-soft)] text-[rgb(var(--color-primary))] text-xs font-semibold uppercase tracking-wider mb-3">
-              <Shield className="w-3.5 h-3.5" /> Official Privacy Policy
+              <Shield className="w-3.5 h-3.5" /> Privacy &amp; Data Protection
             </div>
             <h1 className="font-display font-bold text-3xl sm:text-4xl text-[var(--text-primary)] tracking-tight">
               EMS Privacy Policy
@@ -32,185 +32,157 @@ export default function PrivacyPolicyPage() {
               <span>•</span>
               <span><strong>System:</strong> Event Management System (EMS)</span>
               <span>•</span>
-              <span><strong>Campus:</strong> SVKM&apos;s NMIMS, Shirpur Campus</span>
+              <span><strong>Institution:</strong> SVKM&apos;s NMIMS, Shirpur Campus</span>
             </div>
           </div>
 
-          {/* Quick Notice Alert */}
-          <div className="p-4 mb-8 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-subtle)] shadow-sm flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-[rgb(var(--color-primary))] flex-shrink-0 mt-0.5" />
-            <div className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
-              <strong>Notice:</strong> This Privacy Policy outlines the categories of personal data processed by the Event Management System (EMS), the purposes for processing, role-based access safeguards, retention practices, and your privacy rights under applicable data protection laws, including the <em>Digital Personal Data Protection Act, 2023 (DPDP Act)</em>.
-            </div>
+          {/* Scope Summary */}
+          <div className="p-4 mb-8 rounded-2xl bg-[var(--card-bg)] border border-[var(--card-border)] shadow-sm text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
+            This Privacy Policy explains how the Event Management System (EMS) at SVKM&apos;s NMIMS, Shirpur Campus collects, uses, stores, and protects personal data in compliance with institutional regulations and the <em>Digital Personal Data Protection Act, 2023 (DPDP Act)</em>.
           </div>
 
-          {/* Table of Contents */}
-          <nav aria-label="Table of Contents" className="mb-12 p-6 rounded-2xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-[var(--text-primary)] mb-3">Contents</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-              <a href="#operator" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 1. Operating Entity</a>
-              <a href="#data-collected" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 2. Personal Data Collected</a>
-              <a href="#purposes" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 3. Purposes of Processing</a>
-              <a href="#rbac" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 4. Role-Based Data Access</a>
-              <a href="#third-parties" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 5. Third-Party Service Providers</a>
-              <a href="#cross-border" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 6. International Data Transfers</a>
-              <a href="#retention" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 7. Data Retention & Archival</a>
-              <a href="#rights" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 8. User Rights & Choices</a>
-              <a href="#security" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 9. Technical Security Measures</a>
-              <a href="#minors" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 10. Student Age & Minor Processing</a>
-              <a href="#grievance" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3.5 h-3.5" /> 11. Grievance Redressal & Contact</a>
+          {/* Quick Navigation */}
+          <nav aria-label="Table of Contents" className="mb-10 p-5 rounded-2xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-primary)] mb-3">Sections</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <a href="#scope" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 1. Institutional Scope</a>
+              <a href="#data-collected" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 2. Data Collected</a>
+              <a href="#purposes" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 3. Purposes of Processing</a>
+              <a href="#rbac" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 4. Role-Based Access Controls</a>
+              <a href="#third-parties" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 5. Service Providers &amp; Sharing</a>
+              <a href="#retention" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 6. Data Retention</a>
+              <a href="#security" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 7. Security Safeguards</a>
+              <a href="#rights" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 8. User Rights</a>
+              <a href="#grievance" className="text-[rgb(var(--color-primary))] hover:underline flex items-center gap-1.5"><ChevronRight className="w-3 h-3" /> 9. Grievance Redressal</a>
             </div>
           </nav>
 
-          {/* Sections */}
-          <div className="space-y-10 text-sm leading-relaxed text-[var(--text-secondary)]">
+          {/* Policy Content */}
+          <div className="space-y-8 text-sm leading-relaxed text-[var(--text-secondary)]">
 
             {/* Section 1 */}
-            <section id="operator" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                1. Operating Institution
+            <section id="scope" className="scroll-mt-24">
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                1. Institutional Scope
               </h2>
-              <p className="mb-3">
-                The Event Management System (EMS) is operated by:
-              </p>
-              <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)] text-xs sm:text-sm space-y-1">
-                <p><strong>Operating Institution:</strong> SVKM&apos;s NMIMS, Shirpur Campus</p>
-                <p><strong>Campus Address:</strong> Mukesh Patel Technology Park, Babulde, Bank of Tapi River, Mumbai-Agra National Highway 3, Shirpur, Dhule, Maharashtra 425405, India</p>
-                <p><strong>Institutional Email:</strong> <a href="mailto:privacy@shirpur.nmims.edu" className="text-[rgb(var(--color-primary))] hover:underline">privacy@shirpur.nmims.edu</a></p>
-              </div>
-              <p className="mt-3 text-xs text-[var(--text-muted)]">
-                Note: In accordance with statutory compliance guidelines, the formal legal trustee entity and registered society details are established under Shri Vile Parle Kelavani Mandal (SVKM).
+              <p>
+                EMS is an official internal platform operated by SVKM&apos;s NMIMS, Shirpur Campus to coordinate extracurricular events, approvals, venue scheduling, and student registrations. This policy governs the processing of personal data for enrolled students, faculty, coordinators, and authorized administrative personnel.
               </p>
             </section>
 
             {/* Section 2 */}
             <section id="data-collected" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                2. Categories of Personal Data Collected
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                2. Personal Data Collected
               </h2>
               <p className="mb-3">
-                Based on the architectural data audit of the EMS codebase, EMS collects and processes only the information necessary for university event administration, participant verification, and workflow management:
+                EMS adheres to the principle of data minimization and processes only information required for academic event coordination:
               </p>
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-[rgb(var(--color-primary))]" /> A. Identity & Institutional Academic Data
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
+                  <h3 className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5 mb-1">
+                    <Users className="w-4 h-4 text-[rgb(var(--color-primary))]" /> Identity &amp; Academic Affiliation
                   </h3>
-                  <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm pl-2">
-                    <li><strong>Full Name:</strong> Provided during profile completion.</li>
-                    <li><strong>Student SAP ID / Roll Number:</strong> Unique institutional identifier used to ensure singular account attribution.</li>
-                    <li><strong>Academic Affiliation:</strong> School / Department, Branch/Specialization, Course, and Year of Study.</li>
-                    <li><strong>Contact Details:</strong> Official institutional email (restricted to <code>@nmims.in</code> or <code>@nmims.edu</code> domains) and phone number.</li>
-                  </ul>
+                  <p className="text-xs">
+                    Full name, institutional student roll / SAP identifier, school or department, branch, academic course, and year of study.
+                  </p>
                 </div>
-
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                    <Database className="w-4 h-4 text-[rgb(var(--color-primary))]" /> B. Event Participation & Visitor Records
+                <div className="p-3.5 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
+                  <h3 className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5 mb-1">
+                    <Database className="w-4 h-4 text-[rgb(var(--color-primary))]" /> Event &amp; Attendance Records
                   </h3>
-                  <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm pl-2">
-                    <li><strong>Student Event Registrations:</strong> Registration timestamps, status, and participation records.</li>
-                    <li><strong>Outside Campus Visitor Information:</strong> For inter-college events, external attendee details including name, parent college/institution, email address, and telephone number.</li>
-                    <li><strong>Attendance & Check-in Data:</strong> Verification timestamps recorded by club coordinators during event execution.</li>
-                  </ul>
+                  <p className="text-xs">
+                    Event registration timestamps, ticket status, check-in records, and external visitor information where inter-college registration is permitted.
+                  </p>
                 </div>
-
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-[rgb(var(--color-primary))]" /> C. Uploaded Documents, Media & Reports
+                <div className="p-3.5 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
+                  <h3 className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5 mb-1">
+                    <FileText className="w-4 h-4 text-[rgb(var(--color-primary))]" /> Proposals &amp; Uploaded Documents
                   </h3>
-                  <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm pl-2">
-                    <li><strong>Participation Document PDFs:</strong> Official documents uploaded by club coordinators detailing participant schedules or rosters. Note that information contained within uploaded documents constitutes personal data.</li>
-                    <li><strong>Event Proposals & Budgets:</strong> Detailed itemized expenditure proposals, resource requests, and justifications.</li>
-                    <li><strong>Event Summary & RnD Reports:</strong> Post-event documentation, research metrics, and attached event photographs.</li>
-                  </ul>
+                  <p className="text-xs">
+                    Event proposals, resource and budget estimates, post-event reports, and PDF rosters submitted by authorized club coordinators.
+                  </p>
                 </div>
-
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-[rgb(var(--color-primary))]" /> D. Authentication, Session & Technical Metadata
+                <div className="p-3.5 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
+                  <h3 className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5 mb-1">
+                    <Lock className="w-4 h-4 text-[rgb(var(--color-primary))]" /> Authentication &amp; System Metadata
                   </h3>
-                  <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm pl-2">
-                    <li><strong>Credentials:</strong> Bcrypt-hashed passwords and temporary activation passwords sent via email. Plaintext passwords are never stored.</li>
-                    <li><strong>Session Identifiers:</strong> Signed JSON Web Tokens (access & refresh tokens) held in browser memory and local storage (<code>ems-auth</code>), and role cookie (<code>ems-role</code>).</li>
-                    <li><strong>Audit Logs & Technical Telemetry:</strong> Client IP address, user-agent, request UUIDs, and response timings recorded in server logs for security monitoring.</li>
-                  </ul>
+                  <p className="text-xs">
+                    Bcrypt password hashes, signed session tokens, client IP addresses, and standard HTTP audit logs for security monitoring.
+                  </p>
                 </div>
               </div>
             </section>
 
             {/* Section 3 */}
             <section id="purposes" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
                 3. Purposes of Processing
               </h2>
-              <p className="mb-3">
-                EMS processes personal data exclusively for lawful academic and campus administration purposes:
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
-                <div className="p-3 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-[var(--status-success-text)] flex-shrink-0 mt-0.5" />
-                  <span><strong>Account Authentication:</strong> Verification of student status and secure session management.</span>
+                  <span><strong>Account Authentication:</strong> Verification of student status and session management.</span>
                 </div>
-                <div className="p-3 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-[var(--status-success-text)] flex-shrink-0 mt-0.5" />
-                  <span><strong>Governance & Approvals:</strong> Routing event requests across Coordinator, Associate Dean, and Director tiers.</span>
+                  <span><strong>Governance &amp; Approvals:</strong> Routing event proposals through coordinator, dean, and director reviews.</span>
                 </div>
-                <div className="p-3 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-[var(--status-success-text)] flex-shrink-0 mt-0.5" />
-                  <span><strong>Event Ticketing & Access:</strong> Managing participant rosters, attendee capacity, and campus security access.</span>
+                  <span><strong>Event Ticketing:</strong> Managing attendee rosters, capacities, and check-in verifications.</span>
                 </div>
-                <div className="p-3 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-[var(--status-success-text)] flex-shrink-0 mt-0.5" />
-                  <span><strong>Communication:</strong> Transactional emails for temporary passwords, status changes, and approvals.</span>
+                  <span><strong>Notifications:</strong> Transmitting temporary activation passwords, confirmations, and status updates.</span>
                 </div>
-                <div className="p-3 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-[var(--status-success-text)] flex-shrink-0 mt-0.5" />
-                  <span><strong>Institutional Reporting:</strong> Documenting campus activities for academic reviews and accreditation.</span>
+                  <span><strong>Institutional Records:</strong> Archiving campus activities for accreditation and administrative reviews.</span>
                 </div>
-                <div className="p-3 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
+                <div className="p-2.5 rounded-lg bg-[var(--surface-bg)] border border-[var(--border-subtle)] flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-[var(--status-success-text)] flex-shrink-0 mt-0.5" />
-                  <span><strong>Security & Auditability:</strong> Rate limiting, brute-force defense, and compliance record-keeping.</span>
+                  <span><strong>Security &amp; Auditing:</strong> Rate limiting, brute-force defense, and compliance tracking.</span>
                 </div>
               </div>
             </section>
 
             {/* Section 4 */}
             <section id="rbac" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                4. Role-Based Access Control (RBAC)
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                4. Role-Based Access Controls
               </h2>
-              <p className="mb-3">
-                Personal data is segregated according to the principle of least privilege. Users may only access information appropriate to their assigned institutional role:
+              <p className="mb-3 text-xs sm:text-sm">
+                Personal data access follows the principle of least privilege according to assigned institutional roles:
               </p>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm border border-[var(--border-subtle)] rounded-xl overflow-hidden">
+                <table className="w-full text-xs border border-[var(--border-subtle)] rounded-xl overflow-hidden">
                   <thead className="bg-[var(--surface-bg)] font-semibold text-[var(--text-primary)]">
                     <tr>
-                      <th className="p-3 text-left border-b border-[var(--border-subtle)]">Role</th>
-                      <th className="p-3 text-left border-b border-[var(--border-subtle)]">Permitted Data Access</th>
+                      <th className="p-2.5 text-left border-b border-[var(--border-subtle)]">Role</th>
+                      <th className="p-2.5 text-left border-b border-[var(--border-subtle)]">Permitted Data Access</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-subtle)]">
                     <tr>
-                      <td className="p-3 font-medium">Students</td>
-                      <td className="p-3">Access own profile, browse approved public events, register for events, and view own registration tickets.</td>
+                      <td className="p-2.5 font-medium">Students</td>
+                      <td className="p-2.5">Own profile, public event listings, own event registrations, and ticketing passes.</td>
                     </tr>
                     <tr>
-                      <td className="p-3 font-medium">Club Coordinators</td>
-                      <td className="p-3">Manage assigned club events, view attendee lists for own club events, upload event documentation, and submit post-event reports.</td>
+                      <td className="p-2.5 font-medium">Club Coordinators</td>
+                      <td className="p-2.5">Assigned club events, attendee rosters for own club events, and event report submissions.</td>
                     </tr>
                     <tr>
-                      <td className="p-3 font-medium">Associate Deans</td>
-                      <td className="p-3">Review pending event proposals within their respective school/department, review budget requests, and manage venue override clearances.</td>
+                      <td className="p-2.5 font-medium">Associate Deans</td>
+                      <td className="p-2.5">Event proposals, budget justifications, and venue allocations within their school or department.</td>
                     </tr>
                     <tr>
-                      <td className="p-3 font-medium">Campus Director</td>
-                      <td className="p-3">Campus-wide review of high-level approvals, institutional event calendar oversight, and historical compliance records.</td>
+                      <td className="p-2.5 font-medium">Campus Director</td>
+                      <td className="p-2.5">Campus-wide event proposals, institutional scheduling approvals, and administrative records.</td>
                     </tr>
                     <tr>
-                      <td className="p-3 font-medium">Super Administrators</td>
-                      <td className="p-3">Technical management of user roles, system settings, venue registries, email delivery audit logs, and legal acceptance compliance logs.</td>
+                      <td className="p-2.5 font-medium">Super Administrators</td>
+                      <td className="p-2.5">System operations, user role configuration, venue registries, and compliance audit logs.</td>
                     </tr>
                   </tbody>
                 </table>
@@ -219,156 +191,93 @@ export default function PrivacyPolicyPage() {
 
             {/* Section 5 */}
             <section id="third-parties" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                5. Third-Party Service Providers
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                5. Service Providers &amp; Third Parties
               </h2>
-              <p className="mb-3">
-                EMS engages only service providers required for core infrastructure operation:
-              </p>
-              <div className="space-y-3">
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-[rgb(var(--color-primary))]" /> Transactional Email Relay (SMTP Provider)
+              <div className="space-y-3 text-xs sm:text-sm">
+                <p>
+                  EMS engages external services solely for core operational infrastructure:
+                </p>
+                <div className="p-3.5 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
+                  <h3 className="font-semibold text-xs text-[var(--text-primary)] flex items-center gap-1.5 mb-1">
+                    <Server className="w-4 h-4 text-[rgb(var(--color-primary))]" /> Infrastructure &amp; Email Delivery
                   </h3>
-                  <p className="text-xs sm:text-sm">
-                    EMS utilizes an authenticated SMTP relay provider (configured via Brevo or institutional SMTP relay) to transmit transactional emails such as temporary account passwords, approval notifications, and registration confirmations. In this process, recipient email addresses, notification categories, and message bodies are processed by the email relay provider solely for message delivery.
+                  <p className="text-xs">
+                    The platform runs on institutional database and server infrastructure. An authenticated SMTP email relay is utilized exclusively to transmit system notifications, temporary passwords, and status confirmations.
                   </p>
                 </div>
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] mb-1 flex items-center gap-2">
-                    <Server className="w-4 h-4 text-[rgb(var(--color-primary))]" /> Hosting, Database & Cache Infrastructure
-                  </h3>
-                  <p className="text-xs sm:text-sm">
-                    EMS utilizes self-hosted PostgreSQL database servers and Redis cache instances deployed within campus or dedicated cloud virtual private networks. File uploads (PDF documents and images) are stored in configured server storage repositories.
-                  </p>
-                </div>
-                <div className="p-4 rounded-xl bg-[var(--status-success-bg)] border border-[var(--status-success-text)] text-[var(--status-success-text)]">
-                  <p className="font-semibold text-xs sm:text-sm">No Advertising or Commercial Tracking</p>
-                  <p className="text-xs mt-1">
-                    EMS does not partner with advertising networks, third-party data brokers, or marketing trackers. No analytics SDKs (e.g., Google Analytics, Facebook Pixel) are present in the application.
-                  </p>
+                <div className="p-3.5 rounded-xl bg-[var(--card-bg)] border border-[var(--border-subtle)] text-xs">
+                  <strong>Zero Advertising or Commercial Tracking:</strong> EMS contains no marketing cookies, no third-party analytics trackers, no social tracking pixels, and does not sell or share data with data brokers.
                 </div>
               </div>
             </section>
 
             {/* Section 6 */}
-            <section id="cross-border" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                6. International Data Transfers
+            <section id="retention" className="scroll-mt-24">
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                6. Data Retention
               </h2>
-              <p>
-                The primary database and application servers for EMS are configured for deployment within India. However, depending on the third-party email relay service provider (such as Brevo) and their underlying routing architecture, transactional email delivery packets may be routed through relay nodes situated outside India. The institution ensures that third-party processors adhere to standard security safeguards.
-              </p>
+              <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm pl-1">
+                <li><strong>Temporary Passwords:</strong> Expire automatically within 24 hours of issuance.</li>
+                <li><strong>Session Tokens:</strong> Access tokens expire after 24 hours; refresh tokens expire after 7 days.</li>
+                <li><strong>Event &amp; Registration Records:</strong> Maintained for the duration of the student&apos;s active academic tenure to support institutional transcript and participation verification.</li>
+                <li><strong>Audit Records:</strong> Legal acceptances and access logs are archived to satisfy statutory compliance obligations.</li>
+              </ul>
             </section>
 
             {/* Section 7 */}
-            <section id="retention" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                7. Data Retention Framework
+            <section id="security" className="scroll-mt-24">
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                7. Technical Security Safeguards
               </h2>
-              <p className="mb-3">
-                Data retention in EMS reflects both technical requirements and upcoming institutional archiving schedules:
-              </p>
-              <ul className="list-disc list-inside space-y-2 pl-2">
-                <li>
-                  <strong>Temporary Account Activation Credentials:</strong> Temporary passwords issued during signup automatically expire within <strong>24 hours</strong>. If an account is not activated within this period, the pending record must be re-requested (limited to 4 attempts).
-                </li>
-                <li>
-                  <strong>Authentication Sessions:</strong> Access tokens expire after <strong>24 hours</strong>. Refresh tokens expire after <strong>7 days</strong>.
-                </li>
-                <li>
-                  <strong>Legal Acceptance Audit Records:</strong> User acceptances of the Terms of Use and Privacy Policy are retained permanently in the <code>legal_acceptances</code> audit log to substantiate regulatory compliance.
-                </li>
-                <li>
-                  <strong>Academic & Event Records:</strong> Event history, approval logs, attendance rolls, and uploaded event reports are currently retained for the duration of the student&apos;s active academic cycle, pending the formal institutional retention schedule established by university authorities.
-                </li>
+              <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm pl-1">
+                <li>Bcrypt hashing for password storage; passwords are never saved in cleartext.</li>
+                <li>Cryptographically signed JSON Web Tokens for session verification.</li>
+                <li>Server-side role-based authorization enforced on every API route.</li>
+                <li>Strict rate limiting on sensitive and authentication endpoints to mitigate automated attacks.</li>
+                <li>Restricted Cross-Origin Resource Sharing (CORS) limited to verified institutional domains.</li>
               </ul>
             </section>
 
             {/* Section 8 */}
             <section id="rights" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                8. User Rights & Data Requests
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                8. User Rights &amp; Choices
               </h2>
-              <p className="mb-3">
-                In compliance with the <em>Digital Personal Data Protection Act, 2023</em>, students and authorized users possess the following rights regarding their personal data:
+              <p className="mb-2 text-xs sm:text-sm">
+                Under applicable data protection frameworks, users have the following rights:
               </p>
-              <div className="space-y-2">
-                <p><strong>Right to Access:</strong> You may request a summary of the personal data processed about you within EMS.</p>
-                <p><strong>Right to Correction & Updating:</strong> You may update your profile information via the EMS profile interface or submit correction requests for official academic records.</p>
-                <p><strong>Right to Erasure:</strong> You may request deletion of non-statutory data, subject to university academic record-retention obligations.</p>
-                <p><strong>Right to Grievance Redressal:</strong> You have the right to file a privacy concern with our designated Grievance Officer.</p>
-              </div>
-              <p className="mt-3 text-xs text-[var(--text-muted)]">
-                To exercise any of these rights, please submit a written request to the designated contact listed in Section 11 below.
-              </p>
+              <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm pl-1">
+                <li><strong>Access:</strong> The right to review your personal profile and event participation history.</li>
+                <li><strong>Correction:</strong> The right to update inaccurate personal information via the profile portal.</li>
+                <li><strong>Erasure:</strong> The right to request removal of non-essential records, subject to mandatory university academic record-keeping requirements.</li>
+                <li><strong>Grievance Redressal:</strong> The right to submit privacy-related inquiries to institutional administration.</li>
+              </ul>
             </section>
 
             {/* Section 9 */}
-            <section id="security" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                9. Technical Security Measures
-              </h2>
-              <p className="mb-3">
-                EMS employs reasonable administrative, technical, and operational safeguards to protect personal data from unauthorized access, alteration, or disclosure:
-              </p>
-              <ul className="list-disc list-inside space-y-1.5 pl-2">
-                <li>Cryptographic password hashing using bcrypt.</li>
-                <li>Cryptographically signed JSON Web Tokens (HS256) for session authentication.</li>
-                <li>Server-side role-based access control (RBAC) enforced on every API route.</li>
-                <li>Strict rate limiting on authentication and sensitive endpoints to mitigate brute-force attempts.</li>
-                <li>Cross-Origin Resource Sharing (CORS) restricted to verified institutional frontend domains.</li>
-              </ul>
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
-                While EMS implements standard security safeguards, no digital system can guarantee absolute invulnerability. Users are responsible for safeguarding their login credentials.
-              </p>
-            </section>
-
-            {/* Section 10 */}
-            <section id="minors" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                10. Student Age & Minor Processing
-              </h2>
-              <p>
-                EMS is designed for university higher education students admitted to SVKM&apos;s NMIMS. Because university admissions may include first-year students who are under 18 years of age, EMS treats all enrolled student data with standard institutional safeguards. Institutional guidelines and parent/guardian consent frameworks regarding student data processing comply with statutory university regulations and the DPDP Act.
-              </p>
-            </section>
-
-            {/* Section 11 */}
             <section id="grievance" className="scroll-mt-24">
-              <h2 className="text-xl font-bold font-display text-[var(--text-primary)] mb-3 pb-2 border-b border-[var(--border-subtle)]">
-                11. Grievance Redressal & Contact Information
+              <h2 className="text-lg font-bold font-display text-[var(--text-primary)] mb-2 pb-1 border-b border-[var(--border-subtle)]">
+                9. Institutional Privacy &amp; Grievance Redressal
               </h2>
-              <p className="mb-3">
-                If you have questions, concerns, or grievances regarding the processing of your personal data under this Privacy Policy, please contact our designated institutional officers:
+              <p className="mb-3 text-xs sm:text-sm">
+                For questions regarding data processing, privacy rights, or to submit a formal grievance, please contact the institutional grievance redressal office through official campus administration channels or via the campus portal helpdesk.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm mb-1">Grievance Redressal Officer</h3>
-                  <p className="text-xs text-[var(--text-muted)] mb-2">[Designated Grievance Redressal Officer]</p>
-                  <p className="text-xs"><strong>Email:</strong> <a href="mailto:grievance-ems@shirpur.nmims.edu" className="text-[rgb(var(--color-primary))] hover:underline">grievance-ems@shirpur.nmims.edu</a></p>
-                  <p className="text-xs mt-1"><strong>Address:</strong> SVKM&apos;s NMIMS, Shirpur Campus, Maharashtra 425405</p>
-                </div>
-                <div className="p-4 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)]">
-                  <h3 className="font-semibold text-[var(--text-primary)] text-sm mb-1">Privacy Coordination Office</h3>
-                  <p className="text-xs text-[var(--text-muted)] mb-2">[Designated Privacy Officer / Coordinator]</p>
-                  <p className="text-xs"><strong>Email:</strong> <a href="mailto:privacy@shirpur.nmims.edu" className="text-[rgb(var(--color-primary))] hover:underline">privacy@shirpur.nmims.edu</a></p>
-                  <p className="text-xs mt-1"><strong>Scope:</strong> Data access requests, corrections, and general policy inquiries</p>
-                </div>
+              <div className="p-3.5 rounded-xl bg-[var(--surface-bg)] border border-[var(--border-subtle)] text-xs space-y-1">
+                <p><strong>Operating Authority:</strong> SVKM&apos;s NMIMS, Shirpur Campus</p>
+                <p><strong>Designated Office:</strong> Institutional Privacy &amp; Grievance Redressal Office</p>
+                <p><strong>Submissions:</strong> Submit requests through official campus student portal ticketing or the campus administrative office.</p>
               </div>
-              <p className="mt-4 text-xs text-[var(--text-muted)]">
-                Under Section 13 of the Digital Personal Data Protection Act, 2023, if your privacy grievance remains unresolved after exhausting institutional mechanisms, you may register a complaint with the Data Protection Board of India.
-              </p>
             </section>
 
           </div>
 
-          {/* Bottom Back Button */}
-          <div className="mt-12 pt-6 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-4">
-            <Link href="/" className="text-xs font-semibold text-[rgb(var(--color-primary))] hover:underline">
+          {/* Navigation Links */}
+          <div className="mt-10 pt-5 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 text-xs">
+            <Link href="/" className="font-semibold text-[rgb(var(--color-primary))] hover:underline">
               ← Return to EMS Home
             </Link>
-            <div className="flex gap-4 text-xs text-[var(--text-muted)]">
+            <div className="flex gap-4 text-[var(--text-muted)]">
               <Link href="/terms" className="hover:text-[var(--text-primary)]">Terms of Use</Link>
               <Link href="/cookies" className="hover:text-[var(--text-primary)]">Cookie Policy</Link>
             </div>

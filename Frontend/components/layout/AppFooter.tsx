@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import { BrandMark } from './BrandMark';
+import { openCookiePreferences } from '@/components/shared/CookieConsentBanner';
 
 export function AppFooter({ compact = false }: { compact?: boolean }) {
   const copyright = `© ${new Date().getFullYear()} SVKM's NMIMS, Shirpur. All rights reserved.`;
@@ -21,6 +24,13 @@ export function AppFooter({ compact = false }: { compact?: boolean }) {
           <Link href="/cookies" className="font-medium hover:text-[var(--brand-primary)] transition-colors">
             Cookie Policy
           </Link>
+          <button
+            type="button"
+            onClick={() => openCookiePreferences()}
+            className="font-medium hover:text-[var(--brand-primary)] transition-colors cursor-pointer"
+          >
+            Cookie Preferences
+          </button>
           <Link href="/privacy#grievance" className="font-medium hover:text-[var(--brand-primary)] transition-colors">
             Privacy Grievance
           </Link>

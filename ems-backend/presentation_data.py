@@ -57,6 +57,7 @@ from app.models.event import (
 from app.models.event_approval import EventApproval
 from app.models.event_registration import EventRegistration
 from app.models.event_report import EventReport
+from app.models.legal import LegalAcceptance
 from app.models import (  # noqa: F401 – ensure all tables exist
     department, club, event, venue,
     event_approval, event_registration,
@@ -138,6 +139,20 @@ def upsert_user(db, *, email, name, role, password, department_id=None, club_id=
         if branch:        obj.branch        = branch
         if course:        obj.course        = course
         print(f"  · User updated: {name} <{email}>")
+
+    # Ensure baseline legal acceptances are recorded for seeded demo user
+    for doc_type in ["terms_and_conditions", "privacy_policy"]:
+        existing_acc = db.query(LegalAcceptance).filter_by(user_id=obj.id, document_type=doc_type).first()
+        if not existing_acc:
+            acc_status = "accepted" if doc_type == "terms_and_conditions" else "acknowledged"
+            db.add(LegalAcceptance(
+                user_id=obj.id,
+                document_type=doc_type,
+                document_version=settings.CURRENT_TERMS_VERSION if doc_type == "terms_and_conditions" else settings.CURRENT_PRIVACY_VERSION,
+                status=acc_status,
+            ))
+            db.flush()
+
     return obj
 
 
