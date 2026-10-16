@@ -627,8 +627,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                             detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                           }, 50);
                         }}
-                        className={`border-r border-[var(--border-subtle)] cursor-pointer ${
-                          isToday ? 'sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:shadow-[inset_0_0_0_2px_rgb(18,47,83)]' : ''
+                        className={`cursor-pointer transition-colors ${
+                          isToday 
+                            ? 'border-r border-[var(--border-subtle)] sm:border-2 sm:border-[rgb(18,47,83)] sm:dark:border-blue-400 sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:-m-[1px] sm:z-10' 
+                            : 'border-r border-[var(--border-subtle)]'
                         }`} 
                       />
                     );
@@ -636,7 +638,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                 </div>
 
                 {/* Date Numbers Row */}
-                <div className="grid grid-cols-7 relative">
+                <div className="grid grid-cols-7 relative z-20">
                   {weekDays.map((cell, dayIdx) => {
                     const isToday = isSameDay(cell.date, today);
                     const isSelected = isSameDay(cell.date, selectedDate);
@@ -682,7 +684,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
 
                 {/* Continuous Horizontal Event Bars Container (No text inside cells by default) */}
                 <div 
-                  className="grid grid-cols-7 relative pb-1 pt-0.5"
+                  className="grid grid-cols-7 relative pb-2 pt-0.5 z-20"
                   style={{
                     gridTemplateRows: `repeat(${Math.max(1, maxVisibleSlot + 1) + (hasAnyOverflow ? 1 : 0)}, minmax(6px, auto))`,
                   }}
@@ -730,7 +732,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                           borderTopRightRadius: layout.continuesNext ? 0 : 3,
                           borderBottomRightRadius: layout.continuesNext ? 0 : 3,
                         }}
-                        className="h-[5px] sm:h-[6px] my-[1.5px] mx-[1px] transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer shadow-xs z-10"
+                        className="h-[5px] sm:h-[6px] my-[1.5px] mx-[2px] transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer shadow-xs z-10"
                         title=""
                       />
                     );
