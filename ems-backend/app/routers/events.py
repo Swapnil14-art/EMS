@@ -511,7 +511,10 @@ async def get_calendar_events(
     current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Event).options(selectinload(Event.venue))
+    query = select(Event).options(
+        selectinload(Event.venue),
+        selectinload(Event.venues),
+    )
 
     # Base date range overlap logic
     query = query.where(
@@ -574,7 +577,15 @@ async def get_calendar_events(
             elif st_dt <= now <= en_dt: evt_status = 'ongoing'
             elif now > en_dt: evt_status = 'past'
             
-        venue_name = e.venue.name if e.venue else (e.venue_custom or "TBA")
+        assigned_venues = []
+        if getattr(e, "venues", None) and len(e.venues) > 0:
+            assigned_venues = [v.name for v in e.venues if v and v.name]
+        if not assigned_venues and e.venue and e.venue.name:
+            assigned_venues = [e.venue.name]
+        if not assigned_venues and e.venue_custom and e.venue_custom.strip():
+            assigned_venues = [e.venue_custom.strip()]
+
+        venue_name = ", ".join(assigned_venues) if assigned_venues else "Venue not decided"
             
         calendar_data.append({
             "id": e.id,
@@ -683,6 +694,10 @@ async def get_event(
         "registration_deadline": event.registration_deadline,
         "venue_id": event.venue_id,
         "venue_ids": [v.id for v in event.venues] if hasattr(event, "venues") else [],
+        "venue": {"id": event.venue.id, "name": event.venue.name} if event.venue else (
+            {"id": event.venues[0].id, "name": ", ".join(v.name for v in event.venues if v and v.name)} if (getattr(event, "venues", None) and len(event.venues) > 0) else None
+        ),
+        "venues": [{"id": v.id, "name": v.name} for v in event.venues] if getattr(event, "venues", None) else [],
         "venue_custom": event.venue_custom,
         "venue_type": event.venue_type,
         "departments_involved": event.departments_involved or [],

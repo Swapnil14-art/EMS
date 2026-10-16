@@ -184,7 +184,7 @@ export default function PublicEventDetailPage() {
                   {[
                     { label: 'Start', value: formatDateTime(event.start_datetime), icon: <Calendar className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     { label: 'End', value: formatDateTime(event.end_datetime), icon: <Clock className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
-                    ...(event.venue?.name || event.venue_custom ? [{ label: 'Venue', value: event.venue?.name || event.venue_custom!, icon: <MapPin className="w-4 h-4 text-[rgb(var(--color-primary))]" /> }] : []),
+                    { label: 'Venue', value: event.venue?.name || event.venue_custom || 'Venue not decided', icon: <MapPin className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     { label: 'Organising School', value: event.school_department, icon: <Building className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     { label: 'Event Incharge', value: event.event_incharge_name, icon: <User className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },
                     { label: 'Contact', value: event.event_incharge_contact, icon: <Phone className="w-4 h-4 text-[rgb(var(--color-primary))]" /> },

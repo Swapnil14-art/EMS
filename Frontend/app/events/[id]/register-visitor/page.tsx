@@ -148,12 +148,10 @@ export default function VisitorRegistrationPage() {
                 <Calendar className="w-3.5 h-3.5 text-[rgb(var(--color-primary))]" />
                 {formatDateTime(event.start_datetime)}
               </span>
-              {(event.venue?.name || event.venue_custom) && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-[rgb(var(--color-primary))]" />
-                  {event.venue?.name || event.venue_custom}
-                </span>
-              )}
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[rgb(var(--color-primary))]" />
+                {event.venue?.name || event.venue_custom || 'Venue not decided'}
+              </span>
               <span className="flex items-center gap-1.5">
                 <Building className="w-3.5 h-3.5 text-[rgb(var(--color-primary))]" />
                 {event.school_department}
