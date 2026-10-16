@@ -41,6 +41,7 @@ interface HoveredEventData {
 // Exactly two alternating colors for all event bars
 const EVENT_COLOR_GREEN = '#10b981'; // Green
 const EVENT_COLOR_BLUE = '#2563eb';  // Blue
+const MAX_VISIBLE_BARS = 3;           // Maximum event bars per date before '+N more' overflow
 
 export default function EventCalendar({ isPublic = false }: EventCalendarProps) {
   const router = useRouter();
@@ -604,20 +605,29 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
         <div className="border-l border-t border-[var(--border-subtle)] bg-[var(--surface-bg)]">
           {weeks.map((weekDays, weekIdx) => {
             const weekLayouts = getWeekEventLayouts(weekDays);
-            const visibleLayouts = weekLayouts.filter((l) => l.slotIndex < 5);
+            const visibleLayouts = weekLayouts.filter((l) => l.slotIndex < MAX_VISIBLE_BARS);
             const maxVisibleSlot = visibleLayouts.reduce((max, l) => Math.max(max, l.slotIndex), -1);
-            const hasAnyOverflow = weekDays.some((day) => getEventsForDate(day.date).length > 5);
+            const hasAnyOverflow = weekDays.some((day) => getEventsForDate(day.date).length > MAX_VISIBLE_BARS);
 
             return (
               <div key={weekIdx} className="border-b border-[var(--border-subtle)] relative">
                 {/* Full-height day column backgrounds (Continuous cell highlight for today) */}
-                <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
+                <div className="absolute inset-0 grid grid-cols-7">
                   {weekDays.map((cell, colIdx) => {
                     const isToday = isSameDay(cell.date, today);
                     return (
                       <div 
                         key={colIdx} 
-                        className={`border-r border-[var(--border-subtle)] ${
+                        onClick={() => {
+                          setSelectedDate(cell.date);
+                          if (!cell.isCurrentMonth) {
+                            setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
+                          }
+                          setTimeout(() => {
+                            detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                          }, 50);
+                        }}
+                        className={`border-r border-[var(--border-subtle)] cursor-pointer ${
                           isToday ? 'sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:shadow-[inset_0_0_0_2px_rgb(18,47,83)]' : ''
                         }`} 
                       />
@@ -639,6 +649,9 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                           if (!cell.isCurrentMonth) {
                             setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
                           }
+                          setTimeout(() => {
+                            detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                          }, 50);
                         }}
                         className={`flex flex-col items-center justify-start pt-1.5 pb-1 transition-colors relative group min-h-[30px] sm:min-h-[36px] ${
                           isToday 
@@ -723,11 +736,11 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                     );
                   })}
 
-                  {/* '+N more' Overflow Indicator (Max 5 bars per day) */}
+                  {/* '+N more' Overflow Indicator (Max 3 bars per day) */}
                   {hasAnyOverflow && weekDays.map((cell, colIdx) => {
                     const dayEvents = getEventsForDate(cell.date);
-                    if (dayEvents.length <= 5) return null;
-                    const overflowCount = dayEvents.length - 5;
+                    if (dayEvents.length <= MAX_VISIBLE_BARS) return null;
+                    const overflowCount = dayEvents.length - MAX_VISIBLE_BARS;
 
                     return (
                       <div
