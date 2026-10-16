@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
 import { 
   AlertCircle, CalendarDays, Filter, ChevronLeft, ChevronRight, 
   ChevronDown, Clock, MapPin, ExternalLink, X, RotateCcw
@@ -40,26 +38,15 @@ interface HoveredEventData {
   color?: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  approved: '#10b981',
-  upcoming: '#10b981',
-  ongoing: '#2563eb',
-  completed: '#64748b',
-  past: '#64748b',
-  draft: '#64748b',
-  pending_associate_dean: '#d97706',
-  pending_coordinator_parallel: '#d97706',
-  pending_director: '#d97706',
-  suggested_changes: '#9333ea',
-  rejected: '#dc2626',
-  cancelled: '#dc2626',
-};
+// Exactly two alternating colors for all event bars
+const EVENT_COLOR_GREEN = '#10b981'; // Green
+const EVENT_COLOR_BLUE = '#2563eb';  // Blue
 
 export default function EventCalendar({ isPublic = false }: EventCalendarProps) {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const calendarRef = useRef<FullCalendar>(null);
   const isRestrictedCalendar = user?.role === 'student' || (isPublic && !user);
+  const detailsSectionRef = useRef<HTMLDivElement>(null);
   
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -139,7 +126,6 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               id: String(event.id),
               title: event.title?.trim() || 'Untitled event',
               venue,
-              color: event.color || STATUS_COLORS[event.status || ''] || '#2563eb',
             };
           }));
         setError(null);
@@ -155,7 +141,22 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
     fetchCalendarEvents();
   }, [dateRange, selectedDept, selectedClub, selectedStatus, isPublic, user?.role]);
 
-  // Mobile monthly grid calculations
+  // Assign consistent alternating Green and Blue colors to all events
+  const processedEvents = useMemo(() => {
+    const sorted = [...events].sort((a, b) => {
+      const aTime = a.start ? new Date(a.start).getTime() : 0;
+      const bTime = b.start ? new Date(b.start).getTime() : 0;
+      if (aTime !== bTime) return aTime - bTime;
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+    return sorted.map((ev, index) => ({
+      ...ev,
+      barColor: index % 2 === 0 ? EVENT_COLOR_GREEN : EVENT_COLOR_BLUE,
+    }));
+  }, [events]);
+
+  // Monthly grid calculations
   const calendarGridDays = useMemo(() => {
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -198,7 +199,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
     return days;
   }, [currentMonth]);
 
-  // Group grid days into 7-day weeks for mobile row layout
+  // Group grid days into 7-day weeks for row layout
   const weeks = useMemo(() => {
     const result: { date: Date; isCurrentMonth: boolean }[][] = [];
     for (let i = 0; i < calendarGridDays.length; i += 7) {
@@ -230,7 +231,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
   };
 
   const getEventsForDate = (date: Date) => {
-    return events.filter((e) => {
+    return processedEvents.filter((e) => {
       if (!e.start) return false;
       const evStart = new Date(e.start);
       if (isSameDay(evStart, date)) return true;
@@ -247,9 +248,9 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
 
   const selectedDateEvents = useMemo(() => {
     return getEventsForDate(selectedDate);
-  }, [events, selectedDate]);
+  }, [processedEvents, selectedDate]);
 
-  // Calculate continuous multi-day bar layouts for a 7-day mobile week
+  // Calculate continuous multi-day bar layouts for a 7-day week
   const getWeekEventLayouts = (weekDays: { date: Date; isCurrentMonth: boolean }[]) => {
     if (weekDays.length !== 7) return [];
 
@@ -258,15 +259,15 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
     const weekEnd = new Date(weekDays[6].date);
     weekEnd.setHours(23, 59, 59, 999);
 
-    // 1. Filter events that overlap this week
-    const weekEvents = events.filter((e) => {
+    // 1. Filter events overlapping this week
+    const weekEvents = processedEvents.filter((e) => {
       if (!e.start) return false;
       const evStart = new Date(e.start);
       const evEnd = e.end ? new Date(e.end) : evStart;
       return evStart <= weekEnd && evEnd >= weekStart;
     });
 
-    // 2. Sort by start time, then duration descending (longer multi-day events first)
+    // 2. Sort by start date, then duration descending
     weekEvents.sort((a, b) => {
       const aStart = new Date(a.start!).getTime();
       const bStart = new Date(b.start!).getTime();
@@ -277,10 +278,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
       return (bEnd - bStart) - (aEnd - aStart);
     });
 
-    // 3. Assign to vertical stacking slots (0 to 4+)
+    // 3. Assign slots
     const slotOccupied: boolean[][] = [];
     const layouts: {
-      event: CalendarEvent;
+      event: typeof processedEvents[0];
       startCol: number;
       endCol: number;
       slotIndex: number;
@@ -348,40 +349,16 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
 
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-    if (calendarRef.current) {
-      calendarRef.current.getApi().prev();
-    }
   };
 
   const handleNextMonth = () => {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-    if (calendarRef.current) {
-      calendarRef.current.getApi().next();
-    }
   };
 
   const handleGoToToday = () => {
     const now = new Date();
     setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     setSelectedDate(now);
-    if (calendarRef.current) {
-      calendarRef.current.getApi().today();
-    }
-  };
-
-  const handleDatesSet = (dateInfo: any) => {
-    const viewStart = dateInfo.view.currentStart;
-    if (viewStart && (viewStart.getMonth() !== currentMonth.getMonth() || viewStart.getFullYear() !== currentMonth.getFullYear())) {
-      setCurrentMonth(new Date(viewStart.getFullYear(), viewStart.getMonth(), 1));
-    }
-    setDateRange({
-      start: dateInfo.start,
-      end: dateInfo.end
-    });
-  };
-
-  const handleEventClick = (info: any) => {
-    router.push(`/events/${info.event.id}`);
   };
 
   const handleResetFilters = () => {
@@ -412,6 +389,16 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
 
   const formatDateHeader = (date: Date) => {
     return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const handleBarClick = (e: React.MouseEvent, event: typeof processedEvents[0], targetDate: Date) => {
+    e.stopPropagation();
+    setSelectedDate(targetDate);
+    setExpandedEventId(event.id);
+    // Smoothly focus/scroll to the details section below
+    setTimeout(() => {
+      detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
   };
 
   return (
@@ -462,7 +449,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           </div>
         </div>
 
-        {/* Collapsible Filter Panel (Hidden by default) */}
+        {/* Collapsible Filter Panel (Hidden by default, no emojis) */}
         {isFilterOpen && (
           <div className="p-3 bg-[var(--surface-subtle)] rounded-xl border border-[var(--card-border)] animate-fadeIn">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -535,7 +522,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               </div>
             </div>
 
-            {/* Clear Filter mobile action */}
+            {/* Clear Filter action */}
             {activeFilterCount > 0 && (
               <div className="mt-2.5 pt-2 border-t border-[var(--border-subtle)] flex sm:hidden justify-end">
                 <button
@@ -551,7 +538,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
         )}
       </div>
 
-      {/* Main Calendar View Container */}
+      {/* Main Calendar View Container (Clean Matrix Grid for Mobile & Desktop) */}
       <div className="calendar-container rounded-xl border border-[var(--card-border)] bg-[var(--surface-bg)] relative overflow-hidden">
         {loading && (
           <div className="absolute inset-0 z-20 bg-white/70 backdrop-blur-[2px] flex items-center justify-center">
@@ -568,503 +555,346 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           </div>
         )}
 
-        {/* ── 1. MOBILE COMPACT CALENDAR (Continuous Bars & Matrix Grid) ── */}
-        <div className="block md:hidden">
-          {/* Month Navigation Toolbar */}
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--card-border)] bg-[var(--surface-subtle)]">
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">
-              {currentMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}
-            </h3>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handlePrevMonth}
-                aria-label="Previous month"
-                className="p-1 rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] active:scale-95 transition-all"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={handleGoToToday}
-                aria-label="Go to today"
-                className="px-2.5 py-1 text-xs font-semibold rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:scale-95 transition-all"
-              >
-                Today
-              </button>
-              <button
-                onClick={handleNextMonth}
-                aria-label="Next month"
-                className="p-1 rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] active:scale-95 transition-all"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
+        {/* Month Navigation Toolbar */}
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-[var(--card-border)] bg-[var(--surface-subtle)]">
+          <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
+            {currentMonth.toLocaleDateString([], { month: 'long', year: 'numeric' })}
+          </h3>
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <button
+              onClick={handlePrevMonth}
+              aria-label="Previous month"
+              className="p-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] active:scale-95 transition-all"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleGoToToday}
+              aria-label="Go to today"
+              className="px-2.5 sm:px-3 py-1 text-xs font-semibold rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] active:scale-95 transition-all"
+            >
+              Today
+            </button>
+            <button
+              onClick={handleNextMonth}
+              aria-label="Next month"
+              className="p-1.5 rounded-lg border border-[var(--card-border)] bg-[var(--surface-bg)] text-[var(--text-secondary)] hover:bg-[var(--surface-subtle)] active:scale-95 transition-all"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Weekday Column Headers */}
+        <div className="grid grid-cols-7 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-center py-1 sm:py-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
+            <div 
+              key={idx} 
+              className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${
+                idx === 0 ? 'text-[var(--text-danger)] opacity-85' : 'text-[var(--text-secondary)]'
+              }`}
+            >
+              <span className="sm:hidden">{day.charAt(0)}</span>
+              <span className="hidden sm:inline">{day}</span>
             </div>
-          </div>
+          ))}
+        </div>
 
-          {/* Weekday Column Headers */}
-          <div className="grid grid-cols-7 border-b border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-center py-1">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, idx) => (
-              <div 
-                key={idx} 
-                className={`text-[10px] font-bold ${idx === 0 ? 'text-[var(--text-danger)] opacity-80' : 'text-[var(--text-muted)]'}`}
-              >
-                {day}
-              </div>
-            ))}
-          </div>
+        {/* Monthly Matrix Grid with Thin Divider Partitions */}
+        <div className="border-l border-t border-[var(--border-subtle)] bg-[var(--surface-bg)]">
+          {weeks.map((weekDays, weekIdx) => {
+            const weekLayouts = getWeekEventLayouts(weekDays);
+            const visibleLayouts = weekLayouts.filter((l) => l.slotIndex < 5);
+            const maxVisibleSlot = visibleLayouts.reduce((max, l) => Math.max(max, l.slotIndex), -1);
+            const hasAnyOverflow = weekDays.some((day) => getEventsForDate(day.date).length > 5);
 
-          {/* Compact Monthly Matrix (~1/3 screen) with Thin Matrix Partitions */}
-          <div className="border-l border-t border-[var(--border-subtle)] bg-[var(--surface-bg)]">
-            {weeks.map((weekDays, weekIdx) => {
-              const weekLayouts = getWeekEventLayouts(weekDays);
-              const visibleLayouts = weekLayouts.filter((l) => l.slotIndex < 5);
-              const maxVisibleSlot = visibleLayouts.reduce((max, l) => Math.max(max, l.slotIndex), -1);
-              const hasAnyOverflow = weekDays.some((day) => getEventsForDate(day.date).length > 5);
+            return (
+              <div key={weekIdx} className="border-b border-[var(--border-subtle)]">
+                {/* Date Numbers Row */}
+                <div className="grid grid-cols-7">
+                  {weekDays.map((cell, dayIdx) => {
+                    const isToday = isSameDay(cell.date, today);
+                    const isSelected = isSameDay(cell.date, selectedDate);
 
-              return (
-                <div key={weekIdx} className="border-b border-[var(--border-subtle)]">
-                  {/* Date Numbers Row */}
-                  <div className="grid grid-cols-7">
-                    {weekDays.map((cell, dayIdx) => {
-                      const isToday = isSameDay(cell.date, today);
-                      const isSelected = isSameDay(cell.date, selectedDate);
-
-                      return (
-                        <button
-                          key={dayIdx}
-                          onClick={() => {
-                            setSelectedDate(cell.date);
-                            if (!cell.isCurrentMonth) {
-                              setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
-                            }
-                          }}
-                          className={`flex flex-col items-center justify-center pt-1.5 pb-0.5 border-r border-[var(--border-subtle)] transition-colors relative group min-h-[28px] ${
-                            isSelected ? 'bg-[var(--brand-soft)]/50' : ''
+                    return (
+                      <button
+                        key={dayIdx}
+                        onClick={() => {
+                          setSelectedDate(cell.date);
+                          if (!cell.isCurrentMonth) {
+                            setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
+                          }
+                        }}
+                        className={`flex flex-col items-center justify-start pt-1.5 pb-1 border-r border-[var(--border-subtle)] transition-colors relative group min-h-[30px] sm:min-h-[36px] ${
+                          isToday 
+                            ? 'sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:shadow-[inset_0_0_0_2px_rgb(18,47,83)]' 
+                            : isSelected 
+                            ? 'bg-[var(--brand-soft)]/50' 
+                            : 'hover:bg-[var(--surface-subtle)]'
+                        }`}
+                      >
+                        {/* Date Number Badge */}
+                        <span
+                          className={`w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full text-xs sm:text-sm transition-all ${
+                            isToday
+                              ? 'bg-[rgb(var(--color-primary))] text-white font-bold shadow-sm'
+                              : isSelected
+                              ? 'ring-2 ring-[rgb(var(--color-primary))] bg-[var(--brand-soft)] text-[var(--text-primary)] font-bold'
+                              : cell.isCurrentMonth
+                              ? 'text-[var(--text-primary)] font-medium'
+                              : 'text-[var(--text-muted)] opacity-35 font-normal'
                           }`}
                         >
-                          {/* Mobile Today Highlight: Kept EXACTLY as it was */}
-                          <span
-                            className={`w-6 h-6 flex items-center justify-center rounded-full text-xs transition-all ${
-                              isToday
-                                ? 'bg-[rgb(var(--color-primary))] text-white font-bold shadow-sm'
-                                : isSelected
-                                ? 'ring-2 ring-[rgb(var(--color-primary))] bg-[var(--brand-soft)] text-[var(--text-primary)] font-bold'
-                                : cell.isCurrentMonth
-                                ? 'text-[var(--text-primary)] font-medium group-hover:bg-[var(--surface-subtle)]'
-                                : 'text-[var(--text-muted)] opacity-35 font-normal'
-                            }`}
-                          >
-                            {cell.date.getDate()}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          {cell.date.getDate()}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  {/* Continuous Horizontal Event Bars Container */}
-                  <div 
-                    className="grid grid-cols-7 relative pb-1 pt-0.5"
-                    style={{
-                      gridTemplateRows: `repeat(${Math.max(1, maxVisibleSlot + 1) + (hasAnyOverflow ? 1 : 0)}, minmax(6px, auto))`,
-                    }}
-                  >
-                    {/* Background Column Partitions */}
-                    {weekDays.map((_, colIdx) => (
+                {/* Continuous Horizontal Event Bars Container (No text inside cells by default) */}
+                <div 
+                  className="grid grid-cols-7 relative pb-1 pt-0.5"
+                  style={{
+                    gridTemplateRows: `repeat(${Math.max(1, maxVisibleSlot + 1) + (hasAnyOverflow ? 1 : 0)}, minmax(6px, auto))`,
+                  }}
+                >
+                  {/* Background Column Dividers */}
+                  {weekDays.map((cell, colIdx) => {
+                    const isToday = isSameDay(cell.date, today);
+                    return (
                       <div 
                         key={colIdx} 
                         style={{ gridColumnStart: colIdx + 1, gridRowStart: 1, gridRowEnd: -1 }} 
-                        className="border-r border-[var(--border-subtle)] pointer-events-none" 
+                        className={`border-r border-[var(--border-subtle)] pointer-events-none ${
+                          isToday ? 'sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:shadow-[inset_0_0_0_2px_rgb(18,47,83)]' : ''
+                        }`} 
                       />
-                    ))}
+                    );
+                  })}
 
-                    {/* Multi-day / Single-day Continuous Event Bars */}
-                    {visibleLayouts.map((layout) => (
+                  {/* Multi-Day Continuous Event Bars (Alternating Green & Blue) */}
+                  {visibleLayouts.map((layout) => {
+                    const barColor = layout.event.barColor;
+                    const representativeDate = weekDays[layout.startCol]?.date || selectedDate;
+
+                    return (
                       <div
                         key={`${layout.event.id}-${weekIdx}-${layout.startCol}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedDate(new Date(layout.event.start!));
-                          setExpandedEventId(layout.event.id);
+                        onClick={(e) => handleBarClick(e, layout.event, representativeDate)}
+                        onMouseEnter={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const placeAbove = rect.top > 160;
+                          setHoverPosition({
+                            x: Math.max(12, Math.min(window.innerWidth - 275, rect.left)),
+                            y: placeAbove ? rect.top - 6 : rect.bottom + 6,
+                            placeAbove
+                          });
+                          setHoveredEvent({
+                            id: layout.event.id,
+                            title: layout.event.title || 'Untitled event',
+                            venue: layout.event.venue || 'Venue not decided',
+                            start: layout.event.start,
+                            end: layout.event.end,
+                            status: layout.event.status,
+                            department: layout.event.department,
+                            color: barColor
+                          });
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredEvent(null);
+                          setHoverPosition(null);
                         }}
                         style={{
                           gridColumnStart: layout.startCol + 1,
                           gridColumnEnd: layout.endCol + 2,
                           gridRowStart: layout.slotIndex + 1,
-                          backgroundColor: layout.event.color || '#2563eb',
+                          backgroundColor: barColor,
                           borderTopLeftRadius: layout.continuesPrior ? 0 : 3,
                           borderBottomLeftRadius: layout.continuesPrior ? 0 : 3,
                           borderTopRightRadius: layout.continuesNext ? 0 : 3,
                           borderBottomRightRadius: layout.continuesNext ? 0 : 3,
                         }}
-                        className="h-[5px] my-[1px] mx-[1px] transition-all hover:opacity-85 cursor-pointer shadow-xs z-10"
-                        title={`${layout.event.title} (${layout.event.venue})`}
+                        className="h-[5px] sm:h-[6px] my-[1.5px] mx-[1px] transition-all hover:brightness-110 active:scale-[0.99] cursor-pointer shadow-xs z-10"
+                        title=""
                       />
-                    ))}
+                    );
+                  })}
 
-                    {/* '+N more' Overflow Indicator */}
-                    {hasAnyOverflow && weekDays.map((cell, colIdx) => {
-                      const dayEvents = getEventsForDate(cell.date);
-                      if (dayEvents.length <= 5) return null;
-                      const overflowCount = dayEvents.length - 5;
+                  {/* '+N more' Overflow Indicator (Max 5 bars per day) */}
+                  {hasAnyOverflow && weekDays.map((cell, colIdx) => {
+                    const dayEvents = getEventsForDate(cell.date);
+                    if (dayEvents.length <= 5) return null;
+                    const overflowCount = dayEvents.length - 5;
 
-                      return (
-                        <div
-                          key={colIdx}
-                          style={{
-                            gridColumnStart: colIdx + 1,
-                            gridRowStart: maxVisibleSlot + 2,
-                          }}
-                          onClick={() => setSelectedDate(cell.date)}
-                          className="text-center py-0.5 cursor-pointer z-10"
-                        >
-                          <span className="text-[8px] font-bold text-[rgb(var(--color-primary))] bg-blue-50/90 dark:bg-blue-950/80 rounded px-1 py-0.2 shadow-xs">
-                            +{overflowCount} more
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Selected Date Events List Below Calendar */}
-          <div className="border-t border-[var(--card-border)] bg-[var(--surface-subtle)] p-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-[var(--text-primary)]">
-                  {formatDateHeader(selectedDate)}
-                </span>
-                {isSameDay(selectedDate, today) && (
-                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[rgb(var(--color-primary))] text-white">
-                    Today
-                  </span>
-                )}
-              </div>
-              <span className="text-[11px] text-[var(--text-muted)] font-medium">
-                {selectedDateEvents.length === 1 ? '1 event' : `${selectedDateEvents.length} events`}
-              </span>
-            </div>
-
-            {selectedDateEvents.length > 0 ? (
-              <div className="space-y-2">
-                {selectedDateEvents.map((event) => {
-                  const isExpanded = expandedEventId === event.id;
-                  const venue = event.venue && event.venue !== 'TBA' && event.venue !== 'Venue TBA'
-                    ? event.venue
-                    : 'Venue not decided';
-                  const dept = event.department || 'Campus Event';
-
-                  return (
-                    <div
-                      key={event.id}
-                      className="rounded-xl border border-[var(--card-border)] bg-[var(--surface-bg)] shadow-sm overflow-hidden"
-                    >
+                    return (
                       <div
-                        onClick={() => setExpandedEventId(isExpanded ? null : event.id)}
-                        className="p-2.5 cursor-pointer hover:bg-[var(--surface-subtle)] transition-colors flex items-start justify-between gap-2"
+                        key={colIdx}
+                        style={{
+                          gridColumnStart: colIdx + 1,
+                          gridRowStart: maxVisibleSlot + 2,
+                        }}
+                        onClick={() => {
+                          setSelectedDate(cell.date);
+                          setTimeout(() => {
+                            detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                          }, 50);
+                        }}
+                        className="text-center py-0.5 cursor-pointer z-10"
                       >
-                        <div className="flex items-start gap-2 flex-1 min-w-0">
-                          {/* Accent Bar */}
-                          <span
-                            className="w-1 self-stretch rounded-full flex-shrink-0 mt-0.5"
-                            style={{ backgroundColor: event.color || '#2563eb' }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                              <span className="font-semibold text-xs text-[var(--text-primary)] truncate">
-                                {event.title}
-                              </span>
-                              <span
-                                className="px-1.5 py-0.2 rounded text-[9px] font-semibold"
-                                style={{
-                                  backgroundColor: `${event.color || '#2563eb'}18`,
-                                  color: event.color || '#2563eb'
-                                }}
-                              >
-                                {getDisplayStatusText(event.status)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2.5 text-[11px] text-[var(--text-secondary)] flex-wrap">
-                              {event.start && (
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3 text-[var(--text-muted)] flex-shrink-0" />
-                                  {formatTime(event.start)}
-                                  {event.end && ` - ${formatTime(event.end)}`}
-                                </span>
-                              )}
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3 text-[var(--text-muted)] flex-shrink-0" />
-                                <span className="truncate max-w-[130px]">{venue}</span>
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          aria-label={isExpanded ? 'Collapse event' : 'Expand event'}
-                          className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                        >
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                        </button>
+                        <span className="text-[8px] sm:text-[9px] font-bold text-[rgb(var(--color-primary))] bg-blue-50/95 dark:bg-blue-950/80 rounded px-1.5 py-0.2 shadow-xs hover:bg-blue-100 transition-colors">
+                          +{overflowCount} more
+                        </span>
                       </div>
-
-                      {/* Expandable Details */}
-                      {isExpanded && (
-                        <div className="px-3 pb-2.5 pt-1 border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-xs space-y-2">
-                          <div className="grid grid-cols-2 gap-2 text-[11px]">
-                            <div>
-                              <span className="text-[var(--text-muted)] block text-[10px]">Organiser:</span>
-                              <span className="font-medium text-[var(--text-primary)]">{dept}</span>
-                            </div>
-                            <div>
-                              <span className="text-[var(--text-muted)] block text-[10px]">Venue:</span>
-                              <span className="font-medium text-[var(--text-primary)]">{venue}</span>
-                            </div>
-                          </div>
-                          <div className="pt-1.5 flex justify-end">
-                            <button
-                              onClick={() => router.push(`/events/${event.id}`)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[rgb(var(--color-primary))] text-white text-[11px] font-semibold hover:opacity-95 active:scale-95 transition-all shadow-sm"
-                            >
-                              <span>View details</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            ) : (
-              <div className="py-4 text-center text-xs text-[var(--text-muted)]">
-                No events scheduled for this date.
-              </div>
-            )}
-          </div>
+            );
+          })}
         </div>
 
-        {/* ── 2. DESKTOP / TABLET MINIMALIST CALENDAR (Continuous Bars & Hover Details) ── */}
-        <div className="hidden md:block">
-          <style dangerouslySetInnerHTML={{__html: `
-            .fc {
-              --fc-border-color: var(--border-subtle, #e2e8f0);
-              --fc-button-bg-color: var(--surface-bg, #ffffff);
-              --fc-button-border-color: var(--border-strong, #cbd5e1);
-              --fc-button-text-color: var(--text-secondary, #334155);
-              --fc-button-hover-bg-color: var(--surface-subtle, #f8fafc);
-              --fc-button-hover-border-color: var(--border-strong, #cbd5e1);
-              --fc-button-active-bg-color: var(--brand-soft, rgba(18, 47, 83, 0.08));
-              --fc-button-active-border-color: var(--brand-primary, #122f53);
-              --fc-event-border-color: transparent;
-              font-family: inherit;
-            }
-            .fc-header-toolbar {
-              padding: 0.625rem 0.875rem !important;
-              margin-bottom: 0 !important;
-              border-bottom: 1px solid var(--border-subtle, #e2e8f0);
-              background: var(--surface-subtle, #f8fafc);
-            }
-            .fc-toolbar-title { 
-              font-size: 1rem !important; 
-              font-weight: 700 !important; 
-              color: var(--text-primary); 
-            }
-            .fc-button-primary { 
-              border-radius: 0.5rem !important; 
-              font-weight: 600 !important; 
-              font-size: 0.75rem !important; 
-              box-shadow: none !important;
-              text-transform: capitalize;
-              padding: 0.25rem 0.6rem !important;
-            }
-            .fc-col-header-cell-cushion { 
-              padding: 0.4rem 0.25rem !important; 
-              font-weight: 600; 
-              font-size: 0.75rem;
-              color: var(--text-secondary); 
-              text-transform: uppercase;
-              letter-spacing: 0.03em;
-            }
-            /* Thin Matrix-like Partitions */
-            .fc-theme-standard td, 
-            .fc-theme-standard th {
-              border: 1px solid var(--border-subtle, #e2e8f0) !important;
-            }
-            .fc-scrollgrid {
-              border: 1px solid var(--border-subtle, #e2e8f0) !important;
-              border-radius: 8px;
-              overflow: hidden;
-            }
-            .fc-daygrid-day-frame {
-              min-height: 78px !important;
-              padding: 2px 3px !important;
-            }
-            .fc-daygrid-day-number { 
-              padding: 0.2rem 0.4rem !important; 
-              font-weight: 500; 
-              font-size: 0.8125rem;
-              color: var(--text-secondary); 
-            }
-            .fc-day-other .fc-daygrid-day-number {
-              color: var(--text-muted);
-              opacity: 0.45;
-            }
+        {/* Selected Date Events List Below Calendar (Inline Expansion) */}
+        <div ref={detailsSectionRef} className="border-t border-[var(--card-border)] bg-[var(--surface-subtle)] p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)]">
+                {formatDateHeader(selectedDate)}
+              </h3>
+              {isSameDay(selectedDate, today) && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[rgb(var(--color-primary))] text-white">
+                  Today
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-[var(--text-muted)] font-medium">
+              {selectedDateEvents.length === 1 ? '1 event' : `${selectedDateEvents.length} events`}
+            </span>
+          </div>
 
-            /* ── Desktop Today's Date Highlighting: Visibly distinguish entire date cell ── */
-            .fc-day-today {
-              background-color: #edf2f7 !important;
-              position: relative;
-            }
-            .fc-day-today .fc-daygrid-day-frame {
-              background-color: #e2e8f0 !important;
-              box-shadow: inset 0 0 0 2px rgb(18, 47, 83) !important;
-              border-radius: 4px;
-            }
-            .fc-day-today .fc-daygrid-day-number {
-              background-color: rgb(18, 47, 83) !important;
-              color: #ffffff !important;
-              font-weight: 700 !important;
-              width: 24px !important;
-              height: 24px !important;
-              border-radius: 9999px !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              justify-content: center !important;
-              margin: 2px !important;
-              box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
-            }
+          {selectedDateEvents.length > 0 ? (
+            <div className="space-y-2.5">
+              {selectedDateEvents.map((event) => {
+                const isExpanded = expandedEventId === event.id;
+                const venue = event.venue && event.venue !== 'TBA' && event.venue !== 'Venue TBA'
+                  ? event.venue
+                  : 'Venue not decided';
+                const dept = event.department || 'Campus Event';
 
-            /* ── Thin Continuous Event Bars ── */
-            .fc-daygrid-event,
-            .fc-daygrid-block-event,
-            .fc-h-event { 
-              height: 18px !important;
-              min-height: 18px !important;
-              margin-top: 1.5px !important;
-              margin-bottom: 1.5px !important;
-              padding: 0 6px !important;
-              border-radius: 3px !important;
-              border: none !important;
-              cursor: pointer !important;
-              transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease !important;
-              box-shadow: 0 1px 2px rgba(0,0,0,0.08) !important;
-              background-color: var(--fc-event-bg-color, #2563eb) !important;
-            }
-            .fc-daygrid-event:hover,
-            .fc-daygrid-block-event:hover,
-            .fc-h-event:hover { 
-              filter: brightness(1.1) !important;
-              transform: translateY(-0.5px) !important;
-              z-index: 25 !important;
-              box-shadow: 0 2px 5px rgba(0,0,0,0.18) !important;
-            }
-            .fc-daygrid-event-dot { display: none !important; }
-            .fc-event-time { display: none !important; }
+                return (
+                  <div
+                    key={event.id}
+                    className="rounded-xl border border-[var(--card-border)] bg-[var(--surface-bg)] shadow-xs overflow-hidden transition-all"
+                  >
+                    <div
+                      onClick={() => setExpandedEventId(isExpanded ? null : event.id)}
+                      className="p-3 cursor-pointer hover:bg-[var(--surface-subtle)] transition-colors flex items-start justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                        {/* Left accent bar matching the event's alternating color */}
+                        <span
+                          className="w-1.5 self-stretch rounded-full flex-shrink-0 mt-0.5"
+                          style={{ backgroundColor: event.barColor }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="font-semibold text-xs sm:text-sm text-[var(--text-primary)] truncate">
+                              {event.title}
+                            </span>
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{
+                                backgroundColor: `${event.barColor}18`,
+                                color: event.barColor
+                              }}
+                            >
+                              {getDisplayStatusText(event.status)}
+                            </span>
+                          </div>
 
-            /* Smooth connection across week and month boundaries */
-            .fc-event-start {
-              border-top-left-radius: 4px !important;
-              border-bottom-left-radius: 4px !important;
-            }
-            .fc-event-end {
-              border-top-right-radius: 4px !important;
-              border-bottom-right-radius: 4px !important;
-            }
+                          <div className="flex items-center gap-3 text-xs text-[var(--text-secondary)] flex-wrap">
+                            {event.start && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
+                                {formatTime(event.start)}
+                                {event.end && ` - ${formatTime(event.end)}`}
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
+                              <span className="truncate max-w-[200px]">{venue}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-            /* Popover and More Link */
-            .fc-popover { 
-              border-radius: 0.75rem; 
-              overflow: hidden; 
-              box-shadow: var(--shadow-card-md); 
-              border: 1px solid var(--card-border);
-            }
-            .fc-more-link { 
-              color: rgb(var(--color-primary, 18, 47, 83)) !important; 
-              font-weight: 700 !important; 
-              font-size: 0.72rem !important; 
-              padding: 0.1rem 0.35rem !important; 
-              background-color: var(--brand-soft, rgba(18, 47, 83, 0.08)) !important;
-              border-radius: 4px !important;
-              margin-top: 1px !important;
-            }
-            .fc-more-link:hover {
-              background-color: var(--brand-soft, rgba(18, 47, 83, 0.16)) !important;
-            }
-          `}} />
-          
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,dayGridWeek'
-            }}
-            events={events}
-            eventDisplay="block"
-            displayEventTime={false}
-            eventClick={handleEventClick}
-            datesSet={handleDatesSet}
-            height="auto"
-            contentHeight={560}
-            fixedWeekCount={false}
-            dayMaxEvents={5}
-            dayMaxEventRows={5}
-            nextDayThreshold="00:00:00"
-            dateClick={(info) => {
-              setSelectedDate(info.date);
-            }}
-            moreLinkClick={(info) => {
-              setSelectedDate(info.date);
-              return 'popover';
-            }}
-            eventMouseEnter={(mouseEnterInfo) => {
-              const rect = mouseEnterInfo.el.getBoundingClientRect();
-              const rawVenue = mouseEnterInfo.event.extendedProps.venue;
-              const venue = rawVenue && rawVenue !== 'TBA' && rawVenue !== 'Venue TBA'
-                ? rawVenue
-                : 'Venue not decided';
-              
-              const placeAbove = rect.top > 200;
-              setHoverPosition({
-                x: Math.max(12, Math.min(window.innerWidth - 275, rect.left)),
-                y: placeAbove ? rect.top - 8 : rect.bottom + 8,
-                placeAbove
-              });
-              setHoveredEvent({
-                id: String(mouseEnterInfo.event.id),
-                title: mouseEnterInfo.event.title,
-                venue,
-                start: mouseEnterInfo.event.start?.toISOString(),
-                end: mouseEnterInfo.event.end?.toISOString(),
-                status: mouseEnterInfo.event.extendedProps.status,
-                department: mouseEnterInfo.event.extendedProps.department,
-                color: mouseEnterInfo.event.backgroundColor || '#2563eb'
-              });
-            }}
-            eventMouseLeave={() => {
-              setHoveredEvent(null);
-              setHoverPosition(null);
-            }}
-            eventContent={(eventInfo) => {
-              return (
-                <div 
-                  className="flex items-center w-full h-full truncate text-[10px] font-semibold text-white select-none leading-none px-0.5"
-                >
-                  <span className="truncate">{eventInfo.event.title}</span>
-                </div>
-              );
-            }}
-          />
+                      <button
+                        type="button"
+                        aria-label={isExpanded ? 'Collapse event details' : 'Expand event details'}
+                        className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                      >
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+
+                    {/* Inline Expanded Information & View Full Details Button */}
+                    {isExpanded && (
+                      <div className="px-4 pb-3.5 pt-2 border-t border-[var(--border-subtle)] bg-[var(--surface-subtle)] text-xs space-y-3 animate-fadeIn">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <span className="text-[var(--text-muted)] block text-[11px] mb-0.5">Organising School / Department:</span>
+                            <span className="font-medium text-[var(--text-primary)]">{dept}</span>
+                          </div>
+                          <div>
+                            <span className="text-[var(--text-muted)] block text-[11px] mb-0.5">Assigned Venue:</span>
+                            <span className="font-medium text-[var(--text-primary)]">{venue}</span>
+                          </div>
+                          {event.start && (
+                            <div>
+                              <span className="text-[var(--text-muted)] block text-[11px] mb-0.5">Schedule:</span>
+                              <span className="font-medium text-[var(--text-primary)]">
+                                {formatTime(event.start)} {event.end && `to ${formatTime(event.end)}`}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-[var(--text-muted)] block text-[11px] mb-0.5">Status:</span>
+                            <span className="font-medium text-[var(--text-primary)]">{getDisplayStatusText(event.status)}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 flex items-center justify-between border-t border-[var(--border-subtle)]">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedEventId(null)}
+                            className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          >
+                            Collapse
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/events/${event.id}`)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[rgb(var(--color-primary))] text-white text-xs font-semibold hover:opacity-95 active:scale-95 transition-all shadow-sm"
+                          >
+                            <span>View Full Details</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="py-5 text-center text-xs text-[var(--text-muted)]">
+              No events scheduled for this date.
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Floating Hover Card (Desktop/Laptop Hover Interaction) */}
+      {/* Floating Hover Card Preview (Desktop/Laptop Hover Interaction) */}
       {hoveredEvent && hoverPosition && (
         <div 
           className="fixed z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95"
@@ -1074,23 +904,18 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             transform: hoverPosition.placeAbove ? 'translateY(-100%)' : 'translateY(0)',
           }}
         >
-          <div className="bg-white border border-[var(--card-border)] rounded-xl shadow-xl p-3 w-64 text-xs space-y-2 backdrop-blur-md">
+          <div className="bg-white border border-[var(--card-border)] rounded-xl shadow-xl p-3 w-64 text-xs space-y-1.5 backdrop-blur-md">
             <div className="flex items-start justify-between gap-1.5">
               <h4 className="font-bold text-[var(--text-primary)] text-xs line-clamp-2">
                 {hoveredEvent.title}
               </h4>
               <span 
-                className="px-1.5 py-0.5 rounded text-[9px] font-semibold flex-shrink-0"
-                style={{
-                  backgroundColor: `${hoveredEvent.color}20`,
-                  color: hoveredEvent.color
-                }}
-              >
-                {getDisplayStatusText(hoveredEvent.status)}
-              </span>
+                className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
+                style={{ backgroundColor: hoveredEvent.color }}
+              />
             </div>
 
-            <div className="space-y-1.5 text-[11px] text-[var(--text-secondary)] border-t border-[var(--border-subtle)] pt-1.5">
+            <div className="space-y-1 text-[11px] text-[var(--text-secondary)] border-t border-[var(--border-subtle)] pt-1.5">
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
                 <span className="truncate">{hoveredEvent.venue}</span>
@@ -1104,15 +929,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                   </span>
                 </div>
               )}
-              {hoveredEvent.department && (
-                <div className="text-[10px] text-[var(--text-muted)] truncate pl-5">
-                  {hoveredEvent.department}
-                </div>
-              )}
             </div>
 
             <div className="text-[9px] text-[var(--text-muted)] font-medium text-right pt-0.5">
-              Click to view event details
+              Click bar to expand details below
             </div>
           </div>
         </div>
@@ -1125,27 +945,6 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Try changing month or adjusting filter options.</p>
         </div>
       )}
-
-      {/* Clean Legend */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11px]">
-        <span className="font-semibold text-[var(--text-muted)] uppercase tracking-wider text-[10px]">Legend</span>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-1.5 rounded-sm bg-[#10b981]" />
-          <span className="text-[var(--text-secondary)]">Upcoming / Approved</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-1.5 rounded-sm bg-[#2563eb]" />
-          <span className="text-[var(--text-secondary)]">Ongoing</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-1.5 rounded-sm bg-[#64748b]" />
-          <span className="text-[var(--text-secondary)]">Completed / Past</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-[rgb(var(--color-primary))] text-white text-[7px] font-bold flex items-center justify-center">●</span>
-          <span className="text-[var(--text-secondary)] font-medium">Today</span>
-        </div>
-      </div>
     </div>
   );
 }
