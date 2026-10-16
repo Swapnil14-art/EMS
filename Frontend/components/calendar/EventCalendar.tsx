@@ -609,9 +609,24 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             const hasAnyOverflow = weekDays.some((day) => getEventsForDate(day.date).length > 5);
 
             return (
-              <div key={weekIdx} className="border-b border-[var(--border-subtle)]">
+              <div key={weekIdx} className="border-b border-[var(--border-subtle)] relative">
+                {/* Full-height day column backgrounds (Continuous cell highlight for today) */}
+                <div className="absolute inset-0 grid grid-cols-7 pointer-events-none">
+                  {weekDays.map((cell, colIdx) => {
+                    const isToday = isSameDay(cell.date, today);
+                    return (
+                      <div 
+                        key={colIdx} 
+                        className={`border-r border-[var(--border-subtle)] ${
+                          isToday ? 'sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:shadow-[inset_0_0_0_2px_rgb(18,47,83)]' : ''
+                        }`} 
+                      />
+                    );
+                  })}
+                </div>
+
                 {/* Date Numbers Row */}
-                <div className="grid grid-cols-7">
+                <div className="grid grid-cols-7 relative">
                   {weekDays.map((cell, dayIdx) => {
                     const isToday = isSameDay(cell.date, today);
                     const isSelected = isSameDay(cell.date, selectedDate);
@@ -625,9 +640,9 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                             setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
                           }
                         }}
-                        className={`flex flex-col items-center justify-start pt-1.5 pb-1 border-r border-[var(--border-subtle)] transition-colors relative group min-h-[30px] sm:min-h-[36px] ${
+                        className={`flex flex-col items-center justify-start pt-1.5 pb-1 transition-colors relative group min-h-[30px] sm:min-h-[36px] ${
                           isToday 
-                            ? 'sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:shadow-[inset_0_0_0_2px_rgb(18,47,83)]' 
+                            ? '' 
                             : isSelected 
                             ? 'bg-[var(--brand-soft)]/50' 
                             : 'hover:bg-[var(--surface-subtle)]'
@@ -659,19 +674,6 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
                     gridTemplateRows: `repeat(${Math.max(1, maxVisibleSlot + 1) + (hasAnyOverflow ? 1 : 0)}, minmax(6px, auto))`,
                   }}
                 >
-                  {/* Background Column Dividers */}
-                  {weekDays.map((cell, colIdx) => {
-                    const isToday = isSameDay(cell.date, today);
-                    return (
-                      <div 
-                        key={colIdx} 
-                        style={{ gridColumnStart: colIdx + 1, gridRowStart: 1, gridRowEnd: -1 }} 
-                        className={`border-r border-[var(--border-subtle)] pointer-events-none ${
-                          isToday ? 'sm:bg-[#edf2f7] sm:dark:bg-slate-800/60 sm:shadow-[inset_0_0_0_2px_rgb(18,47,83)]' : ''
-                        }`} 
-                      />
-                    );
-                  })}
 
                   {/* Multi-Day Continuous Event Bars (Alternating Green & Blue) */}
                   {visibleLayouts.map((layout) => {
