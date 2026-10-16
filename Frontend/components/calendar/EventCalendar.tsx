@@ -29,6 +29,17 @@ type CalendarEvent = {
   [key: string]: unknown;
 };
 
+interface HoveredEventData {
+  id: string;
+  title: string;
+  venue: string;
+  start?: string;
+  end?: string;
+  status?: string;
+  department?: string;
+  color?: string;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   approved: '#10b981',
   upcoming: '#10b981',
@@ -67,6 +78,10 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+
+  // Desktop hover card state
+  const [hoveredEvent, setHoveredEvent] = useState<HoveredEventData | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number; placeAbove: boolean } | null>(null);
 
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date } | null>(null);
 
@@ -171,7 +186,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
       });
     }
     
-    // Next month filler days to complete rows
+    // Next month filler days to complete rows (multiple of 7)
     const remaining = (7 - (days.length % 7)) % 7;
     for (let d = 1; d <= remaining; d++) {
       days.push({
@@ -183,7 +198,16 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
     return days;
   }, [currentMonth]);
 
-  // Keep dateRange synced for mobile calendar view
+  // Group grid days into 7-day weeks for mobile row layout
+  const weeks = useMemo(() => {
+    const result: { date: Date; isCurrentMonth: boolean }[][] = [];
+    for (let i = 0; i < calendarGridDays.length; i += 7) {
+      result.push(calendarGridDays.slice(i, i + 7));
+    }
+    return result;
+  }, [calendarGridDays]);
+
+  // Keep dateRange synced for calendar queries
   useEffect(() => {
     if (calendarGridDays.length === 0) return;
     const start = new Date(calendarGridDays[0].date);
@@ -224,6 +248,103 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
   const selectedDateEvents = useMemo(() => {
     return getEventsForDate(selectedDate);
   }, [events, selectedDate]);
+
+  // Calculate continuous multi-day bar layouts for a 7-day mobile week
+  const getWeekEventLayouts = (weekDays: { date: Date; isCurrentMonth: boolean }[]) => {
+    if (weekDays.length !== 7) return [];
+
+    const weekStart = new Date(weekDays[0].date);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(weekDays[6].date);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    // 1. Filter events that overlap this week
+    const weekEvents = events.filter((e) => {
+      if (!e.start) return false;
+      const evStart = new Date(e.start);
+      const evEnd = e.end ? new Date(e.end) : evStart;
+      return evStart <= weekEnd && evEnd >= weekStart;
+    });
+
+    // 2. Sort by start time, then duration descending (longer multi-day events first)
+    weekEvents.sort((a, b) => {
+      const aStart = new Date(a.start!).getTime();
+      const bStart = new Date(b.start!).getTime();
+      if (aStart !== bStart) return aStart - bStart;
+
+      const aEnd = a.end ? new Date(a.end).getTime() : aStart;
+      const bEnd = b.end ? new Date(b.end).getTime() : bStart;
+      return (bEnd - bStart) - (aEnd - aStart);
+    });
+
+    // 3. Assign to vertical stacking slots (0 to 4+)
+    const slotOccupied: boolean[][] = [];
+    const layouts: {
+      event: CalendarEvent;
+      startCol: number;
+      endCol: number;
+      slotIndex: number;
+      continuesPrior: boolean;
+      continuesNext: boolean;
+    }[] = [];
+
+    for (const ev of weekEvents) {
+      const evStart = new Date(ev.start!);
+      const evEnd = ev.end ? new Date(ev.end) : evStart;
+
+      let startCol = 0;
+      let continuesPrior = false;
+      if (evStart < weekStart) {
+        startCol = 0;
+        continuesPrior = true;
+      } else {
+        const idx = weekDays.findIndex((d) => isSameDay(d.date, evStart));
+        startCol = idx >= 0 ? idx : 0;
+      }
+
+      let endCol = 6;
+      let continuesNext = false;
+      if (evEnd > weekEnd) {
+        endCol = 6;
+        continuesNext = true;
+      } else {
+        const idx = weekDays.findIndex((d) => isSameDay(d.date, evEnd));
+        endCol = idx >= 0 ? idx : 6;
+      }
+
+      if (endCol < startCol) endCol = startCol;
+
+      // Find lowest non-colliding slot
+      let slot = 0;
+      while (true) {
+        if (!slotOccupied[slot]) slotOccupied[slot] = new Array(7).fill(false);
+        let collision = false;
+        for (let c = startCol; c <= endCol; c++) {
+          if (slotOccupied[slot][c]) {
+            collision = true;
+            break;
+          }
+        }
+        if (!collision) break;
+        slot++;
+      }
+
+      for (let c = startCol; c <= endCol; c++) {
+        slotOccupied[slot][c] = true;
+      }
+
+      layouts.push({
+        event: ev,
+        startCol,
+        endCol,
+        slotIndex: slot,
+        continuesPrior,
+        continuesNext,
+      });
+    }
+
+    return layouts;
+  };
 
   const handlePrevMonth = () => {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -447,7 +568,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           </div>
         )}
 
-        {/* ── 1. MOBILE COMPACT CALENDAR (Samsung Calendar Inspired) ── */}
+        {/* ── 1. MOBILE COMPACT CALENDAR (Continuous Bars & Matrix Grid) ── */}
         <div className="block md:hidden">
           {/* Month Navigation Toolbar */}
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--card-border)] bg-[var(--surface-subtle)]">
@@ -491,54 +612,118 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
             ))}
           </div>
 
-          {/* Compact Monthly Matrix (~1/3 initial screen height) */}
-          <div className="grid grid-cols-7 p-1 bg-[var(--surface-bg)]">
-            {calendarGridDays.map((cell, idx) => {
-              const isToday = isSameDay(cell.date, today);
-              const isSelected = isSameDay(cell.date, selectedDate);
-              const dayEvents = getEventsForDate(cell.date);
-              const hasEvents = dayEvents.length > 0;
+          {/* Compact Monthly Matrix (~1/3 screen) with Thin Matrix Partitions */}
+          <div className="border-l border-t border-[var(--border-subtle)] bg-[var(--surface-bg)]">
+            {weeks.map((weekDays, weekIdx) => {
+              const weekLayouts = getWeekEventLayouts(weekDays);
+              const visibleLayouts = weekLayouts.filter((l) => l.slotIndex < 5);
+              const maxVisibleSlot = visibleLayouts.reduce((max, l) => Math.max(max, l.slotIndex), -1);
+              const hasAnyOverflow = weekDays.some((day) => getEventsForDate(day.date).length > 5);
 
               return (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setSelectedDate(cell.date);
-                    if (!cell.isCurrentMonth) {
-                      setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
-                    }
-                  }}
-                  className="flex flex-col items-center justify-center py-1 rounded-lg transition-colors relative group min-h-[36px]"
-                >
-                  {/* Date Number Badge */}
-                  <span
-                    className={`w-6 h-6 flex items-center justify-center rounded-full text-xs transition-all ${
-                      isToday
-                        ? 'bg-[rgb(var(--color-primary))] text-white font-bold shadow-sm'
-                        : isSelected
-                        ? 'ring-2 ring-[rgb(var(--color-primary))] bg-[var(--brand-soft)] text-[var(--text-primary)] font-bold'
-                        : cell.isCurrentMonth
-                        ? 'text-[var(--text-primary)] font-medium group-hover:bg-[var(--surface-subtle)]'
-                        : 'text-[var(--text-muted)] opacity-35 font-normal'
-                    }`}
-                  >
-                    {cell.date.getDate()}
-                  </span>
+                <div key={weekIdx} className="border-b border-[var(--border-subtle)]">
+                  {/* Date Numbers Row */}
+                  <div className="grid grid-cols-7">
+                    {weekDays.map((cell, dayIdx) => {
+                      const isToday = isSameDay(cell.date, today);
+                      const isSelected = isSameDay(cell.date, selectedDate);
 
-                  {/* Colored Indicator Dot(s) */}
-                  <div className="h-1 flex items-center justify-center gap-0.5 mt-0.5">
-                    {hasEvents && dayEvents.slice(0, 3).map((ev, evIdx) => (
-                      <span
-                        key={evIdx}
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ backgroundColor: ev.color || '#2563eb' }}
+                      return (
+                        <button
+                          key={dayIdx}
+                          onClick={() => {
+                            setSelectedDate(cell.date);
+                            if (!cell.isCurrentMonth) {
+                              setCurrentMonth(new Date(cell.date.getFullYear(), cell.date.getMonth(), 1));
+                            }
+                          }}
+                          className={`flex flex-col items-center justify-center pt-1.5 pb-0.5 border-r border-[var(--border-subtle)] transition-colors relative group min-h-[28px] ${
+                            isSelected ? 'bg-[var(--brand-soft)]/50' : ''
+                          }`}
+                        >
+                          {/* Mobile Today Highlight: Kept EXACTLY as it was */}
+                          <span
+                            className={`w-6 h-6 flex items-center justify-center rounded-full text-xs transition-all ${
+                              isToday
+                                ? 'bg-[rgb(var(--color-primary))] text-white font-bold shadow-sm'
+                                : isSelected
+                                ? 'ring-2 ring-[rgb(var(--color-primary))] bg-[var(--brand-soft)] text-[var(--text-primary)] font-bold'
+                                : cell.isCurrentMonth
+                                ? 'text-[var(--text-primary)] font-medium group-hover:bg-[var(--surface-subtle)]'
+                                : 'text-[var(--text-muted)] opacity-35 font-normal'
+                            }`}
+                          >
+                            {cell.date.getDate()}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Continuous Horizontal Event Bars Container */}
+                  <div 
+                    className="grid grid-cols-7 relative pb-1 pt-0.5"
+                    style={{
+                      gridTemplateRows: `repeat(${Math.max(1, maxVisibleSlot + 1) + (hasAnyOverflow ? 1 : 0)}, minmax(6px, auto))`,
+                    }}
+                  >
+                    {/* Background Column Partitions */}
+                    {weekDays.map((_, colIdx) => (
+                      <div 
+                        key={colIdx} 
+                        style={{ gridColumnStart: colIdx + 1, gridRowStart: 1, gridRowEnd: -1 }} 
+                        className="border-r border-[var(--border-subtle)] pointer-events-none" 
                       />
                     ))}
-                    {dayEvents.length > 3 && (
-                      <span className="w-1 h-1 rounded-full bg-[var(--text-muted)]" />
-                    )}
+
+                    {/* Multi-day / Single-day Continuous Event Bars */}
+                    {visibleLayouts.map((layout) => (
+                      <div
+                        key={`${layout.event.id}-${weekIdx}-${layout.startCol}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDate(new Date(layout.event.start!));
+                          setExpandedEventId(layout.event.id);
+                        }}
+                        style={{
+                          gridColumnStart: layout.startCol + 1,
+                          gridColumnEnd: layout.endCol + 2,
+                          gridRowStart: layout.slotIndex + 1,
+                          backgroundColor: layout.event.color || '#2563eb',
+                          borderTopLeftRadius: layout.continuesPrior ? 0 : 3,
+                          borderBottomLeftRadius: layout.continuesPrior ? 0 : 3,
+                          borderTopRightRadius: layout.continuesNext ? 0 : 3,
+                          borderBottomRightRadius: layout.continuesNext ? 0 : 3,
+                        }}
+                        className="h-[5px] my-[1px] mx-[1px] transition-all hover:opacity-85 cursor-pointer shadow-xs z-10"
+                        title={`${layout.event.title} (${layout.event.venue})`}
+                      />
+                    ))}
+
+                    {/* '+N more' Overflow Indicator */}
+                    {hasAnyOverflow && weekDays.map((cell, colIdx) => {
+                      const dayEvents = getEventsForDate(cell.date);
+                      if (dayEvents.length <= 5) return null;
+                      const overflowCount = dayEvents.length - 5;
+
+                      return (
+                        <div
+                          key={colIdx}
+                          style={{
+                            gridColumnStart: colIdx + 1,
+                            gridRowStart: maxVisibleSlot + 2,
+                          }}
+                          onClick={() => setSelectedDate(cell.date)}
+                          className="text-center py-0.5 cursor-pointer z-10"
+                        >
+                          <span className="text-[8px] font-bold text-[rgb(var(--color-primary))] bg-blue-50/90 dark:bg-blue-950/80 rounded px-1 py-0.2 shadow-xs">
+                            +{overflowCount} more
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -662,7 +847,7 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
           </div>
         </div>
 
-        {/* ── 2. DESKTOP / TABLET MINIMALIST CALENDAR ── */}
+        {/* ── 2. DESKTOP / TABLET MINIMALIST CALENDAR (Continuous Bars & Hover Details) ── */}
         <div className="hidden md:block">
           <style dangerouslySetInnerHTML={{__html: `
             .fc {
@@ -704,57 +889,111 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               text-transform: uppercase;
               letter-spacing: 0.03em;
             }
+            /* Thin Matrix-like Partitions */
+            .fc-theme-standard td, 
+            .fc-theme-standard th {
+              border: 1px solid var(--border-subtle, #e2e8f0) !important;
+            }
+            .fc-scrollgrid {
+              border: 1px solid var(--border-subtle, #e2e8f0) !important;
+              border-radius: 8px;
+              overflow: hidden;
+            }
             .fc-daygrid-day-frame {
-              min-height: 70px !important;
+              min-height: 78px !important;
+              padding: 2px 3px !important;
             }
             .fc-daygrid-day-number { 
-              padding: 0.25rem 0.4rem !important; 
+              padding: 0.2rem 0.4rem !important; 
               font-weight: 500; 
               font-size: 0.8125rem;
               color: var(--text-secondary); 
             }
             .fc-day-other .fc-daygrid-day-number {
               color: var(--text-muted);
-              opacity: 0.5;
+              opacity: 0.45;
             }
-            /* Prominent Today Highlight */
+
+            /* ── Desktop Today's Date Highlighting: Visibly distinguish entire date cell ── */
             .fc-day-today {
-              background-color: rgba(var(--color-primary, 18, 47, 83), 0.04) !important;
+              background-color: #edf2f7 !important;
+              position: relative;
+            }
+            .fc-day-today .fc-daygrid-day-frame {
+              background-color: #e2e8f0 !important;
+              box-shadow: inset 0 0 0 2px rgb(18, 47, 83) !important;
+              border-radius: 4px;
             }
             .fc-day-today .fc-daygrid-day-number {
-              background-color: rgb(var(--color-primary, 18, 47, 83)) !important;
+              background-color: rgb(18, 47, 83) !important;
               color: #ffffff !important;
               font-weight: 700 !important;
-              width: 22px !important;
-              height: 22px !important;
+              width: 24px !important;
+              height: 24px !important;
               border-radius: 9999px !important;
               display: inline-flex !important;
               align-items: center !important;
               justify-content: center !important;
               margin: 2px !important;
-              box-shadow: 0 1px 2px rgba(0,0,0,0.2) !important;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.2) !important;
             }
-            /* Clean Minimalist Event Badge */
-            .fc-event { 
-              border-radius: 6px;
-              padding: 1px 4px;
-              margin: 1px 2px !important;
-              cursor: pointer; 
-              transition: all 0.15s ease; 
-              background: var(--surface-bg, #ffffff) !important;
-              color: var(--text-primary) !important;
-              box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-              border: 1px solid var(--border-subtle, #e2e8f0) !important;
+
+            /* ── Thin Continuous Event Bars ── */
+            .fc-daygrid-event,
+            .fc-daygrid-block-event,
+            .fc-h-event { 
+              height: 18px !important;
+              min-height: 18px !important;
+              margin-top: 1.5px !important;
+              margin-bottom: 1.5px !important;
+              padding: 0 6px !important;
+              border-radius: 3px !important;
+              border: none !important;
+              cursor: pointer !important;
+              transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease !important;
+              box-shadow: 0 1px 2px rgba(0,0,0,0.08) !important;
+              background-color: var(--fc-event-bg-color, #2563eb) !important;
             }
-            .fc-event:hover { 
-              transform: translateY(-1px); 
-              box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-              border-color: var(--border-strong, #cbd5e1) !important;
-              z-index: 10;
+            .fc-daygrid-event:hover,
+            .fc-daygrid-block-event:hover,
+            .fc-h-event:hover { 
+              filter: brightness(1.1) !important;
+              transform: translateY(-0.5px) !important;
+              z-index: 25 !important;
+              box-shadow: 0 2px 5px rgba(0,0,0,0.18) !important;
             }
-            .fc-daygrid-event-dot { display: none; }
-            .fc-popover { border-radius: 0.75rem; overflow: hidden; box-shadow: var(--shadow-card-md); }
-            .fc-more-link { color: rgb(var(--color-primary, 18, 47, 83)); font-weight: 600; font-size: 0.7rem; padding: 0.1rem 0.25rem; }
+            .fc-daygrid-event-dot { display: none !important; }
+            .fc-event-time { display: none !important; }
+
+            /* Smooth connection across week and month boundaries */
+            .fc-event-start {
+              border-top-left-radius: 4px !important;
+              border-bottom-left-radius: 4px !important;
+            }
+            .fc-event-end {
+              border-top-right-radius: 4px !important;
+              border-bottom-right-radius: 4px !important;
+            }
+
+            /* Popover and More Link */
+            .fc-popover { 
+              border-radius: 0.75rem; 
+              overflow: hidden; 
+              box-shadow: var(--shadow-card-md); 
+              border: 1px solid var(--card-border);
+            }
+            .fc-more-link { 
+              color: rgb(var(--color-primary, 18, 47, 83)) !important; 
+              font-weight: 700 !important; 
+              font-size: 0.72rem !important; 
+              padding: 0.1rem 0.35rem !important; 
+              background-color: var(--brand-soft, rgba(18, 47, 83, 0.08)) !important;
+              border-radius: 4px !important;
+              margin-top: 1px !important;
+            }
+            .fc-more-link:hover {
+              background-color: var(--brand-soft, rgba(18, 47, 83, 0.16)) !important;
+            }
           `}} />
           
           <FullCalendar
@@ -767,50 +1006,117 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
               right: 'dayGridMonth,dayGridWeek'
             }}
             events={events}
+            eventDisplay="block"
+            displayEventTime={false}
             eventClick={handleEventClick}
             datesSet={handleDatesSet}
             height="auto"
-            contentHeight={540}
+            contentHeight={560}
             fixedWeekCount={false}
-            dayMaxEvents={3}
+            dayMaxEvents={5}
+            dayMaxEventRows={5}
             nextDayThreshold="00:00:00"
-            eventTimeFormat={{
-              hour: 'numeric',
-              minute: '2-digit',
-              meridiem: 'short'
+            dateClick={(info) => {
+              setSelectedDate(info.date);
             }}
-            displayEventTime={true}
-            eventContent={(eventInfo) => {
-              const dept = eventInfo.event.extendedProps.department || 'Campus event';
-              const rawVenue = eventInfo.event.extendedProps.venue;
+            moreLinkClick={(info) => {
+              setSelectedDate(info.date);
+              return 'popover';
+            }}
+            eventMouseEnter={(mouseEnterInfo) => {
+              const rect = mouseEnterInfo.el.getBoundingClientRect();
+              const rawVenue = mouseEnterInfo.event.extendedProps.venue;
               const venue = rawVenue && rawVenue !== 'TBA' && rawVenue !== 'Venue TBA'
                 ? rawVenue
                 : 'Venue not decided';
-              const status = eventInfo.event.extendedProps.status;
-
+              
+              const placeAbove = rect.top > 200;
+              setHoverPosition({
+                x: Math.max(12, Math.min(window.innerWidth - 275, rect.left)),
+                y: placeAbove ? rect.top - 8 : rect.bottom + 8,
+                placeAbove
+              });
+              setHoveredEvent({
+                id: String(mouseEnterInfo.event.id),
+                title: mouseEnterInfo.event.title,
+                venue,
+                start: mouseEnterInfo.event.start?.toISOString(),
+                end: mouseEnterInfo.event.end?.toISOString(),
+                status: mouseEnterInfo.event.extendedProps.status,
+                department: mouseEnterInfo.event.extendedProps.department,
+                color: mouseEnterInfo.event.backgroundColor || '#2563eb'
+              });
+            }}
+            eventMouseLeave={() => {
+              setHoveredEvent(null);
+              setHoverPosition(null);
+            }}
+            eventContent={(eventInfo) => {
               return (
                 <div 
-                  className="flex items-center gap-1.5 w-full overflow-hidden text-[11px] font-medium leading-tight select-none"
-                  title={`${eventInfo.event.title}\n📍 ${venue}\nStatus: ${getDisplayStatusText(status)}\nDept: ${dept}`}
+                  className="flex items-center w-full h-full truncate text-[10px] font-semibold text-white select-none leading-none px-0.5"
                 >
-                  <span 
-                    className="w-1.5 h-1.5 rounded-full flex-shrink-0" 
-                    style={{ backgroundColor: eventInfo.event.backgroundColor || '#2563eb' }} 
-                  />
-                  {eventInfo.timeText && (
-                    <span className="font-semibold text-[10px] opacity-75 flex-shrink-0">
-                      {eventInfo.timeText}
-                    </span>
-                  )}
-                  <span className="truncate flex-1 text-[var(--text-primary)]">
-                    {eventInfo.event.title}
-                  </span>
+                  <span className="truncate">{eventInfo.event.title}</span>
                 </div>
               );
             }}
           />
         </div>
       </div>
+
+      {/* Floating Hover Card (Desktop/Laptop Hover Interaction) */}
+      {hoveredEvent && hoverPosition && (
+        <div 
+          className="fixed z-50 pointer-events-none transition-all duration-150 animate-in fade-in zoom-in-95"
+          style={{
+            left: `${hoverPosition.x}px`,
+            top: `${hoverPosition.y}px`,
+            transform: hoverPosition.placeAbove ? 'translateY(-100%)' : 'translateY(0)',
+          }}
+        >
+          <div className="bg-white border border-[var(--card-border)] rounded-xl shadow-xl p-3 w-64 text-xs space-y-2 backdrop-blur-md">
+            <div className="flex items-start justify-between gap-1.5">
+              <h4 className="font-bold text-[var(--text-primary)] text-xs line-clamp-2">
+                {hoveredEvent.title}
+              </h4>
+              <span 
+                className="px-1.5 py-0.5 rounded text-[9px] font-semibold flex-shrink-0"
+                style={{
+                  backgroundColor: `${hoveredEvent.color}20`,
+                  color: hoveredEvent.color
+                }}
+              >
+                {getDisplayStatusText(hoveredEvent.status)}
+              </span>
+            </div>
+
+            <div className="space-y-1.5 text-[11px] text-[var(--text-secondary)] border-t border-[var(--border-subtle)] pt-1.5">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
+                <span className="truncate">{hoveredEvent.venue}</span>
+              </div>
+              {hoveredEvent.start && (
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
+                  <span>
+                    {formatTime(hoveredEvent.start)}
+                    {hoveredEvent.end && ` - ${formatTime(hoveredEvent.end)}`}
+                  </span>
+                </div>
+              )}
+              {hoveredEvent.department && (
+                <div className="text-[10px] text-[var(--text-muted)] truncate pl-5">
+                  {hoveredEvent.department}
+                </div>
+              )}
+            </div>
+
+            <div className="text-[9px] text-[var(--text-muted)] font-medium text-right pt-0.5">
+              Click to view event details
+            </div>
+          </div>
+        </div>
+      )}
 
       {!loading && !error && events.length === 0 && (
         <div className="mt-3 rounded-xl border border-dashed border-[var(--card-border)] bg-[var(--card-bg)] px-4 py-4 text-center">
@@ -824,15 +1130,15 @@ export default function EventCalendar({ isPublic = false }: EventCalendarProps) 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 px-1 text-[11px]">
         <span className="font-semibold text-[var(--text-muted)] uppercase tracking-wider text-[10px]">Legend</span>
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#10b981]" />
+          <span className="w-3 h-1.5 rounded-sm bg-[#10b981]" />
           <span className="text-[var(--text-secondary)]">Upcoming / Approved</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#2563eb]" />
+          <span className="w-3 h-1.5 rounded-sm bg-[#2563eb]" />
           <span className="text-[var(--text-secondary)]">Ongoing</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#64748b]" />
+          <span className="w-3 h-1.5 rounded-sm bg-[#64748b]" />
           <span className="text-[var(--text-secondary)]">Completed / Past</span>
         </div>
         <div className="flex items-center gap-1.5">
