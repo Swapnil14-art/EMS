@@ -104,21 +104,17 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
       {/* Content */}
       <div className="relative z-10 h-full flex items-end">
         <div className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 sm:pb-12 lg:px-8 lg:pb-16">
-          <div
-            className={`max-w-2xl rounded-2xl sm:rounded-3xl bg-black/55 backdrop-blur-md sm:backdrop-blur-lg border border-white/20 p-5 sm:p-7 shadow-2xl transition-all duration-500 ${
-              isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
-            }`}
-          >
+          <div className={`max-w-2xl transition-all duration-500 ${isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
             <div className="mb-3 flex items-center gap-2 sm:mb-4 sm:gap-3">
               <StatusPill status={event.status} />
               <EventTypeBadge type={event.event_type} className="bg-white/20 text-[var(--btn-primary-text)] border border-white/20 backdrop-blur-sm" />
             </div>
 
-            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] sm:mb-4 sm:text-4xl md:text-5xl [text-shadow:_0_1px_2px_rgba(0,0,0,0.9),_0_0_1px_rgba(255,255,255,0.4)]">
+            <h2 className="mb-3 font-display text-2xl font-bold leading-tight text-white sm:mb-4 sm:text-4xl md:text-5xl [text-shadow:_-1px_-1px_0_rgba(0,0,0,0.85),_1px_-1px_0_rgba(0,0,0,0.85),_-1px_1px_0_rgba(0,0,0,0.85),_1px_1px_0_rgba(0,0,0,0.85),_0_4px_14px_rgba(0,0,0,0.95)]">
               {event.title}
             </h2>
 
-            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)] sm:mb-6 sm:gap-4 sm:text-sm">
+            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white sm:mb-6 sm:gap-4 sm:text-sm [text-shadow:_0_1px_2px_rgba(0,0,0,0.9),_0_2px_8px_rgba(0,0,0,0.9)]">
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
                 {formatDate(event.start_datetime)}
