@@ -7,7 +7,7 @@ Run INSIDE Docker:
     docker exec ems_backend python seed_presentation_data.py
 
 Run locally (DATABASE_URL_SYNC must be set in .env):
-    cd ems-backend
+    cd Backend
     python seed_presentation_data.py
 
 What gets seeded
@@ -26,14 +26,13 @@ EVENTS
        status  : approved (fully live)
        open for outsiders + on-campus registration
        registration window : CURRENTLY OPEN
-       venue   : Main Auditorium  (Aug 20 09:00 – Aug 20 17:00)
+       venue   : Main Auditorium  (Dynamic future date: NOW + 7 days, 09:00 – 17:00 IST)
                  *** A second event (Event C) is intentionally booked at the
                      SAME venue & overlapping time – triggers venue clash ***
        coord   : coord.gdsc@nmims.in
-       students 1 & 2 are registered
 
   B) "Cloud Computing Workshop" (COMPLETED – for doc-upload & report demo)
-       status  : completed
+       status  : completed (conducted in the past: NOW - 14 days)
        all approval stages done
        documents uploaded + event report submitted
        coord   : coord.tech@nmims.in
@@ -41,7 +40,7 @@ EVENTS
   C) "Leadership Summit 2026" (PENDING DIRECTOR APPROVAL)
        status  : pending_director
        approval chain: dean approved, director pending
-       venue   : Main Auditorium  (Aug 20 10:00 – Aug 20 16:00)  ← CLASHES with Event A
+       venue   : Main Auditorium  (Dynamic future date: NOW + 7 days, 10:00 – 16:00 IST)  ← CLASHES with Event A
        coord   : coord.gdsc@nmims.in
 """
 
@@ -76,6 +75,8 @@ ADMIN_PASSWORD  = "Admin@123"
 DEFAULT_PASSWORD = "Test@123"
 
 NOW = datetime.now(timezone.utc)
+IST = timezone(timedelta(hours=5, minutes=30))
+NOW_IST = datetime.now(IST)
 
 engine  = create_engine(settings.DATABASE_URL_SYNC)
 Session = sessionmaker(bind=engine)
@@ -334,20 +335,29 @@ def seed():
 
         # ── 5. EVENT A — LIVE / OPEN REGISTRATION ────────────────────────────
         # ⚠️  VENUE CLASH NOTE:
-        #     Event A  →  Main Auditorium  |  Aug 20 09:00 – 17:00 IST
-        #     Event C  →  Main Auditorium  |  Aug 20 10:00 – 16:00 IST  (overlaps!)
+        #     Event A  →  Main Auditorium  |  future_date 09:00 – 17:00 IST
+        #     Event C  →  Main Auditorium  |  future_date 10:00 – 16:00 IST  (overlaps!)
         #     During the Event C approval flow the system will flag a venue clash.
         print("\n📅 Event A – TechFest 2026 (LIVE, registration open)")
 
-        # Event dates: next Aug 20 using current system year
-        year = NOW.year
-        # Event A: Aug 20, 09:00 – 17:00 IST (UTC+5:30)
-        ist_offset = timedelta(hours=5, minutes=30)
-        ev_a_start = datetime(year, 8, 20, 9, 0, 0, tzinfo=timezone(ist_offset))
-        ev_a_end   = datetime(year, 8, 20, 17, 0, 0, tzinfo=timezone(ist_offset))
-        # Registration window: TODAY – 7 days ago  to  30 days from now (window is OPEN)
-        reg_start  = NOW - timedelta(days=7)
-        reg_end    = NOW + timedelta(days=30)
+        # Dynamic dates based on current time:
+        # Event date is 7 days from now in IST so it is upcoming / active
+        future_date = (NOW_IST + timedelta(days=7)).date()
+        future_date_str = future_date.strftime("%b %d, %Y")
+
+        ev_a_start = datetime(future_date.year, future_date.month, future_date.day, 9, 0, 0, tzinfo=IST)
+        ev_a_end   = datetime(future_date.year, future_date.month, future_date.day, 17, 0, 0, tzinfo=IST)
+        # Registration window: opened 5 days ago, closes 2 hours before event (window is OPEN)
+        reg_start  = NOW_IST - timedelta(days=5)
+        reg_end    = ev_a_start - timedelta(hours=2)
+
+        ev_a_comments = (
+            "PRESENTATION NOTE – VENUE CLASH:\n"
+            f"This event occupies Main Auditorium on {future_date_str}, 09:00–17:00 IST.\n"
+            "Event C (Leadership Summit) is also booked at Main Auditorium\n"
+            f"on {future_date_str}, 10:00–16:00 IST — a direct clash.\n"
+            "The system will detect and flag this during Event C's approval."
+        )
 
         event_a = db.query(Event).filter_by(title="TechFest 2026 – Innovation Showcase").first()
         if not event_a:
@@ -386,13 +396,7 @@ def seed():
                 volunteers_details="15 student volunteers needed",
                 # Budget & docs
                 budget=25000.00,
-                comments=(
-                    "PRESENTATION NOTE – VENUE CLASH:\n"
-                    "This event occupies Main Auditorium on Aug 20, 09:00–17:00 IST.\n"
-                    "Event C (Leadership Summit) is also booked at Main Auditorium\n"
-                    "on Aug 20, 10:00–16:00 IST — a direct clash.\n"
-                    "The system will detect and flag this during Event C's approval."
-                ),
+                comments=ev_a_comments,
                 # Registration flags
                 outside_campus_registration=True,   # open to outsiders
                 registration_accepted=True,          # on-campus registration also ON
@@ -405,18 +409,37 @@ def seed():
             db.add(event_a); db.flush()
             print(f"  + Event A id={event_a.id}")
         else:
-            print(f"  · Event A exists id={event_a.id}")
+            event_a.start_datetime = ev_a_start
+            event_a.end_datetime = ev_a_end
+            event_a.registration_start_datetime = reg_start
+            event_a.registration_deadline = reg_end
+            event_a.status = "approved"
+            event_a.venue_id = venue_audi.id
+            event_a.outside_campus_registration = True
+            event_a.registration_accepted = True
+            event_a.current_approval_step = 4
+            event_a.comments = ev_a_comments
+            db.flush()
+            print(f"  · Event A updated id={event_a.id}")
 
         # Attach venue to event_venues table as well
         add_event_venue(db, event_a.id, venue_audi.id)
 
         # Full approval chain for Event A (all approved)
-        add_approval(db, event_a.id, coord1.id,   "club_coordinator",  1, "approved",
-                     NOW - timedelta(days=14), "Event proposal looks good.")
-        add_approval(db, event_a.id, dean.id,     "associate_dean",    2, "approved",
-                     NOW - timedelta(days=13), "Approved from Dean side.")
-        add_approval(db, event_a.id, director.id, "director",          3, "approved",
-                     NOW - timedelta(days=12), "Approved. Best of luck!")
+        for seq, approver_id, role, days_ago, rem in [
+            (1, coord1.id, "club_coordinator", 14, "Event proposal looks good."),
+            (2, dean.id, "associate_dean", 13, "Approved from Dean side."),
+            (3, director.id, "director", 12, "Approved. Best of luck!"),
+        ]:
+            appr = db.query(EventApproval).filter_by(event_id=event_a.id, sequence_order=seq).first()
+            if appr:
+                appr.action = "approved"
+                appr.actioned_at = NOW - timedelta(days=days_ago)
+                appr.remarks = rem
+                db.flush()
+            else:
+                add_approval(db, event_a.id, approver_id, role, seq, "approved",
+                             NOW - timedelta(days=days_ago), rem)
         db.commit()
 
         # NOTE: No pre-seeded registrations for Event A.
@@ -427,8 +450,12 @@ def seed():
         # ── 6. EVENT B — COMPLETED (documents + report) ──────────────────────
         print("\n📅 Event B – Cloud Computing Workshop (COMPLETED)")
 
-        ev_b_start = datetime(year, 7, 10, 10, 0, 0, tzinfo=timezone(ist_offset))
-        ev_b_end   = datetime(year, 7, 10, 16, 0, 0, tzinfo=timezone(ist_offset))
+        # Completed event conducted 14 days ago in IST
+        past_date = (NOW_IST - timedelta(days=14)).date()
+        past_date_str = past_date.strftime("%b %d, %Y")
+
+        ev_b_start = datetime(past_date.year, past_date.month, past_date.day, 10, 0, 0, tzinfo=IST)
+        ev_b_end   = datetime(past_date.year, past_date.month, past_date.day, 16, 0, 0, tzinfo=IST)
 
         event_b = db.query(Event).filter_by(title="Cloud Computing Workshop").first()
         if not event_b:
@@ -463,7 +490,13 @@ def seed():
             db.add(event_b); db.flush()
             print(f"  + Event B id={event_b.id}")
         else:
-            print(f"  · Event B exists id={event_b.id}")
+            event_b.start_datetime = ev_b_start
+            event_b.end_datetime = ev_b_end
+            event_b.status = "completed"
+            event_b.venue_id = venue_semA.id
+            event_b.current_approval_step = 4
+            db.flush()
+            print(f"  · Event B updated id={event_b.id}")
 
         add_event_venue(db, event_b.id, venue_semA.id)
 
@@ -491,7 +524,7 @@ def seed():
                 event_id=event_b.id,
                 submitted_by=coord2.id,
                 event_summary=(
-                    "The Cloud Computing Workshop was conducted successfully on 10th July. "
+                    f"The Cloud Computing Workshop was conducted successfully on {past_date_str}. "
                     "Students got hands-on exposure to AWS EC2, S3 and Lambda. "
                     "Expert from TCS delivered an industry session."
                 ),
@@ -535,17 +568,31 @@ def seed():
             db.add(report); db.flush()
             print("  + Event Report submitted for Event B")
         else:
-            print("  · Event Report already exists for Event B")
+            existing_report.event_summary = (
+                f"The Cloud Computing Workshop was conducted successfully on {past_date_str}. "
+                "Students got hands-on exposure to AWS EC2, S3 and Lambda. "
+                "Expert from TCS delivered an industry session."
+            )
+            db.flush()
+            print("  · Event Report updated for Event B")
         db.commit()
 
         # ── 7. EVENT C — PENDING DIRECTOR (venue clash with Event A) ─────────
         # ⚠️  VENUE CLASH:
-        #     Event A  →  Main Auditorium  Aug 20  09:00–17:00 IST
-        #     Event C  →  Main Auditorium  Aug 20  10:00–16:00 IST  ← OVERLAPS
+        #     Event A  →  Main Auditorium  future_date  09:00–17:00 IST
+        #     Event C  →  Main Auditorium  future_date  10:00–16:00 IST  ← OVERLAPS
         print("\n📅 Event C – Leadership Summit 2026 (PENDING DIRECTOR)")
 
-        ev_c_start = datetime(year, 8, 20, 10, 0, 0, tzinfo=timezone(ist_offset))
-        ev_c_end   = datetime(year, 8, 20, 16, 0, 0, tzinfo=timezone(ist_offset))
+        ev_c_start = datetime(future_date.year, future_date.month, future_date.day, 10, 0, 0, tzinfo=IST)
+        ev_c_end   = datetime(future_date.year, future_date.month, future_date.day, 16, 0, 0, tzinfo=IST)
+
+        ev_c_comments = (
+            "PRESENTATION NOTE – VENUE CLASH:\n"
+            f"This event is booked at Main Auditorium {future_date_str}, 10:00–16:00 IST.\n"
+            "Event A (TechFest 2026) is already approved at the same venue\n"
+            f"on {future_date_str}, 09:00–17:00 IST.\n"
+            "The Director's approval screen will show the venue clash warning."
+        )
 
         event_c = db.query(Event).filter_by(title="Leadership Summit 2026").first()
         if not event_c:
@@ -570,13 +617,7 @@ def seed():
                 it_audio=True,
                 it_audio_details="Panel mic setup for 5 speakers",
                 budget=15000.00,
-                comments=(
-                    "PRESENTATION NOTE – VENUE CLASH:\n"
-                    "This event is booked at Main Auditorium Aug 20, 10:00–16:00 IST.\n"
-                    "Event A (TechFest 2026) is already approved at the same venue\n"
-                    "on Aug 20, 09:00–17:00 IST.\n"
-                    "The Director's approval screen will show the venue clash warning."
-                ),
+                comments=ev_c_comments,
                 outside_campus_registration=False,
                 registration_accepted=False,
                 # Pending director – dean already approved
@@ -588,7 +629,14 @@ def seed():
             db.add(event_c); db.flush()
             print(f"  + Event C id={event_c.id}")
         else:
-            print(f"  · Event C exists id={event_c.id}")
+            event_c.start_datetime = ev_c_start
+            event_c.end_datetime = ev_c_end
+            event_c.status = "pending_director"
+            event_c.venue_id = venue_audi.id
+            event_c.current_approval_step = 3
+            event_c.comments = ev_c_comments
+            db.flush()
+            print(f"  · Event C updated id={event_c.id}")
 
         add_event_venue(db, event_c.id, venue_audi.id)
 
@@ -597,7 +645,17 @@ def seed():
                      NOW - timedelta(days=3), "Leadership summit proposal submitted.")
         add_approval(db, event_c.id, dean.id,   "associate_dean",   2, "approved",
                      NOW - timedelta(days=2), "Good topic, approved from dean side.")
-        add_approval(db, event_c.id, director.id, "director",       3, "pending")
+        # Ensure director approval is pending for demo
+        dir_appr = (db.query(EventApproval)
+                      .filter_by(event_id=event_c.id, sequence_order=3)
+                      .first())
+        if dir_appr:
+            dir_appr.action = "pending"
+            dir_appr.actioned_at = None
+            dir_appr.remarks = None
+            db.flush()
+        else:
+            add_approval(db, event_c.id, director.id, "director", 3, "pending")
         db.commit()
 
         # ── Summary ──────────────────────────────────────────────────────────
@@ -632,15 +690,15 @@ def seed():
         print("  EVENTS")
         print("  ─────────────────────────────────────────────────────")
         print(f"  A) TechFest 2026          [APPROVED]  id={event_a.id}")
-        print(f"     Main Auditorium | Aug {year}-08-20 09:00–17:00 IST")
-        print(f"     Registration OPEN | outsiders + on-campus")
+        print(f"     Main Auditorium | {ev_a_start.strftime('%Y-%m-%d %H:%M')}–{ev_a_end.strftime('%H:%M')} IST")
+        print(f"     Registration OPEN (deadline: {reg_end.strftime('%Y-%m-%d %H:%M')} IST) | outsiders + on-campus")
         print()
         print(f"  B) Cloud Computing Workshop [COMPLETED] id={event_b.id}")
-        print(f"     Seminar Hall A  | Jul {year}-07-10 10:00–16:00 IST")
+        print(f"     Seminar Hall A  | {ev_b_start.strftime('%Y-%m-%d %H:%M')}–{ev_b_end.strftime('%H:%M')} IST")
         print(f"     Documents uploaded + Report submitted")
         print()
         print(f"  C) Leadership Summit 2026  [PENDING DIRECTOR] id={event_c.id}")
-        print(f"     Main Auditorium | Aug {year}-08-20 10:00–16:00 IST")
+        print(f"     Main Auditorium | {ev_c_start.strftime('%Y-%m-%d %H:%M')}–{ev_c_end.strftime('%H:%M')} IST")
         print(f"     ⚠️  VENUE CLASH with Event A detected!")
         print("═" * 60)
         print()

@@ -21,7 +21,7 @@ services:
     networks: [ems_net]
 
   backend:
-    build: ./ems-backend
+    build: ./Backend
     restart: unless-stopped
     env_file: .env.production
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
@@ -40,7 +40,7 @@ services:
     networks: [ems_net]
 
   celery_worker:
-    build: ./ems-backend
+    build: ./Backend
     restart: unless-stopped
     env_file: .env.production
     command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
@@ -54,7 +54,7 @@ services:
     networks: [ems_net]
 
   celery_beat:
-    build: ./ems-backend
+    build: ./Backend
     restart: unless-stopped
     env_file: .env.production
     command: celery -A app.tasks.celery_app beat --loglevel=info

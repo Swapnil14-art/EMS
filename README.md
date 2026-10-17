@@ -73,7 +73,7 @@ The **Event Management System (EMS)** is a multi-role web platform designed for 
 │   ├── store/                   # Zustand store (authStore, etc.)
 │   └── types/                   # TypeScript interface definitions
 │
-├── ems-backend/                 # FastAPI REST API Backend
+├── Backend/                     # FastAPI REST API Backend
 │   ├── app/
 │   │   ├── auth/                # JWT auth endpoints & token handler
 │   │   ├── models/              # SQLAlchemy ORM models (19 tables)
@@ -111,7 +111,7 @@ git clone <repo-url>
 cd "4 Faculty Meeting Version"
 
 # 2. Configure Environment Files
-cp ems-backend/.env.example ems-backend/.env
+cp Backend/.env.example Backend/.env
 cp Frontend/.env.example Frontend/.env.local  # If applicable
 ```
 
@@ -174,8 +174,8 @@ The production stack uses the Next.js standalone runner, non-reload Uvicorn work
 
 ## Documentation Index
 
-- **Backend Architecture & Commands:** Refer to [`ems-backend/README.md`](file:///d:/Projects/EMS/Files/3%20After%20Director%20Meeting/Current/4%20Faculty%20Meeting%20Version/ems-backend/README.md)
-- **API Endpoint Reference:** Refer to [`ems-backend/API_REFERENCE.md`](file:///d:/Projects/EMS/Files/3%20After%20Director%20Meeting/Current/4%20Faculty%20Meeting%20Version/ems-backend/API_REFERENCE.md)
+- **Backend Architecture & Commands:** Refer to `Backend/README.md`
+- **API Endpoint Reference:** Refer to `Backend/API_REFERENCE.md`
 
 ---
 

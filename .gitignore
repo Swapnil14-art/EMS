@@ -28,6 +28,7 @@ coverage.xml
 *.cover
 .hypothesis/
 .pytest_cache/
+Backend/storage/
 ems-backend/storage/
 celerybeat-schedule
 *.md
@@ -36,6 +37,8 @@ celerybeat-schedule
 !PROJECT_CONTEXT.md
 !SYSTEM_SPECIFICATION.md
 !PLAYWRIGHT_FAILED_TESTS_ANALYSIS.md
+!Backend/API_REFERENCE.md
+!Backend/README.md
 
 # Playwright
 /test-results/

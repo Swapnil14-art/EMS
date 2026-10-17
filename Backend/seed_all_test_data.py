@@ -5,7 +5,7 @@ Usage (Docker — recommended):
     docker exec ems_backend python seed_all_test_data.py
 
 Usage (local, if DATABASE_URL_SYNC points to your DB):
-    cd ems-backend
+    cd Backend
     python seed_all_test_data.py
 
 Idempotent: safe to re-run. Existing records are skipped; user passwords are

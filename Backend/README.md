@@ -33,7 +33,7 @@ Copy `.env.example` to `.env` and configure your environment variables:
 ```bash
 # Clone the repository
 git clone <repo-url>
-cd ems-backend
+cd Backend
 
 # Create .env from example
 cp .env.example .env
@@ -94,7 +94,7 @@ docker compose down -v
 ## Project Structure
 
 ```
-ems-backend/
+Backend/
 ├── app/
 │   ├── main.py                  # FastAPI app factory + middleware + router registration
 │   ├── config.py                # App configuration via pydantic-settings
