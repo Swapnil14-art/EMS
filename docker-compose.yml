@@ -53,6 +53,7 @@ services:
     image: postgres:16-alpine
     container_name: ems_db
     restart: unless-stopped
+    command: postgres -c shared_buffers=64MB -c max_connections=25 -c work_mem=2MB
     environment:
       POSTGRES_USER: ems_user
       POSTGRES_PASSWORD: ems_pass
