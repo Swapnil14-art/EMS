@@ -45,3 +45,4 @@ celerybeat-schedule
 /playwright/.auth/
 tests/.results/
 tests/.auth/
+*.sql

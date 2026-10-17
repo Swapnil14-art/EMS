@@ -1,6 +1,6 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     SMTP_TIMEOUT_SECONDS: int = 20
 
     STORAGE_ROOT: str = "storage"
+    STORAGE_DRIVER: str = "local"  # 'local' or 's3'
+    MAX_IMAGE_UPLOAD_BYTES: int = 5 * 1024 * 1024       # 5MB
+    MAX_DOCUMENT_UPLOAD_BYTES: int = 15 * 1024 * 1024   # 15MB
+    S3_BUCKET_NAME: Optional[str] = None
+    S3_ENDPOINT_URL: Optional[str] = None
+    S3_ACCESS_KEY: Optional[str] = None
+    S3_SECRET_KEY: Optional[str] = None
+    S3_REGION: Optional[str] = "auto"
+
     FRONTEND_URL: str = "http://localhost:3000"
     CORS_ORIGINS: str = ""
     COLLEGE_NAME: str = "SVKM's NMIMS, Shirpur Campus"
