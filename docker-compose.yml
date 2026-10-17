@@ -4,21 +4,21 @@ services:
   frontend:
     build:
       context: ./Frontend
-      target: deps
+      target: runner
+      args:
+        NEXT_PUBLIC_API_URL: /api
+        NEXT_PUBLIC_APP_NAME: EMS
+        NEXT_PUBLIC_COLLEGE_NAME: "SVKM's NMIMS, Shirpur Campus"
     container_name: ems_frontend
     restart: unless-stopped
-    command: npx next dev --turbo
-    working_dir: /app
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}
-      - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-EMS}
-      - NEXT_PUBLIC_COLLEGE_NAME=${NEXT_PUBLIC_COLLEGE_NAME:-NMIMS Shirpur}
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=/api
+      - NEXT_PUBLIC_APP_NAME=EMS
+      - NEXT_PUBLIC_COLLEGE_NAME=SVKM's NMIMS, Shirpur Campus
       - NEXT_TELEMETRY_DISABLED=1
-    volumes:
-      - ./Frontend:/app
-      - /app/node_modules
-      - /app/.next
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
     depends_on:
       - backend
     networks:
