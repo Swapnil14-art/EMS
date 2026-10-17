@@ -1656,10 +1656,15 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><FileText className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Event Poster & Budget</h2>
             <Alert type="info">
-              <div className="space-y-1 text-xs sm:text-sm">
-                <p>An event poster is optional but recommended. Participant docs and other files can be added later.</p>
-                <p className="text-xs text-[var(--text-secondary)] font-medium">
-                  💡 <strong>Recommended:</strong> 16:9 landscape ratio (e.g., 1920×1080 px). Images with different aspect ratios (such as vertical portraits) will be automatically cropped to fit the homepage slideshow.
+              <div className="space-y-1.5 text-xs sm:text-sm">
+                <p className="font-semibold text-[var(--text-primary)]">
+                  📱 Mobile-First Poster Recommendation
+                </p>
+                <p className="text-[var(--text-secondary)]">
+                  For optimal viewing on both mobile phones and desktop, we recommend a <strong>portrait aspect ratio of 4:5 or 3:4</strong> (e.g., <strong>1080 × 1350 px</strong> or <strong>1080 × 1440 px</strong>). Standard 16:9 landscape posters are also fully supported.
+                </p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  💡 <strong>Safe Area Tip:</strong> Keep essential content (event title, date, venue, and key logos) centered in the middle of the poster to ensure maximum readability across all screen sizes.
                 </p>
               </div>
             </Alert>
@@ -1670,8 +1675,8 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
               <Button type="button" variant="secondary" onClick={() => posterRef.current?.click()} icon={<FileText className="w-4 h-4" />}>
                 {existingPoster || posterFile ? 'Change Event Poster' : 'Upload Event Poster'}
               </Button>
-              <p className="text-xs text-[var(--text-muted)] max-w-md">
-                Recommended: <strong>16:9 Landscape</strong> (e.g., 1920×1080 px). Other ratios may be cropped to fit the homepage slider.
+              <p className="text-xs text-[var(--text-muted)] max-w-lg">
+                Recommended: <strong>4:5 Portrait (1080 × 1350 px)</strong> or <strong>3:4 (1080 × 1440 px)</strong> for mobile-first display. All standard image ratios supported.
               </p>
               {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] font-semibold">New poster: {posterFile.name}</span>}
               {!posterFile && existingPoster && (
