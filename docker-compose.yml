@@ -43,8 +43,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     networks:
       - ems_net
     extra_hosts:
@@ -70,64 +68,6 @@ services:
       retries: 5
     networks:
       - ems_net
-
-  # ── Redis ────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: ems_redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-    networks:
-      - ems_net
-
-  # ── Celery Worker ────────────────────────────────────────────────────────
-  celery_worker:
-    build: 
-      context: ./ems-backend
-    container_name: ems_celery_worker
-    restart: unless-stopped
-    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
-    env_file: ./ems-backend/.env
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://ems_user:ems_pass@db:5432/ems_db
-      - DATABASE_URL_SYNC=postgresql://ems_user:ems_pass@db:5432/ems_db
-    volumes:
-      - ./ems-backend/storage:/app/storage
-      - ./ems-backend:/app
-    depends_on:
-      - redis
-      - db
-    networks:
-      - ems_net
-    extra_hosts:
-      - "sandbox.smtp.mailtrap.io:3.86.141.192"
-
-  # ── Celery Beat ──────────────────────────────────────────────────────────
-  celery_beat:
-    build: 
-      context: ./ems-backend
-    container_name: ems_celery_beat
-    restart: unless-stopped
-    command: celery -A app.tasks.celery_app beat --loglevel=info
-    env_file: ./ems-backend/.env
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://ems_user:ems_pass@db:5432/ems_db
-      - DATABASE_URL_SYNC=postgresql://ems_user:ems_pass@db:5432/ems_db
-    volumes:
-      - ./ems-backend:/app
-    depends_on:
-      - redis
-      - db
-    networks:
-      - ems_net
-    extra_hosts:
-      - "sandbox.smtp.mailtrap.io:3.86.141.192"
 
   # ── Nginx API Gateway ────────────────────────────────────────────────────
   nginx:

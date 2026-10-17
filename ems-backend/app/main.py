@@ -18,8 +18,51 @@ from app.routers import (
     reports, rnd_reports, dashboard, admin,
     system, notifications, permissions, legal,
 )
+from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from app.database import AsyncSessionLocal
+from app.tasks.status_transitions import check_and_transition_events_async
 
 logger = logging.getLogger("ems.request")
+
+scheduler = AsyncIOScheduler()
+
+
+async def scheduled_status_check():
+    async with AsyncSessionLocal() as session:
+        try:
+            res = await check_and_transition_events_async(session)
+            if res.get("started", 0) > 0 or res.get("completed", 0) > 0:
+                logger.info(
+                    "APScheduler event status transitions: started=%d completed=%d",
+                    res["started"],
+                    res["completed"],
+                )
+        except Exception:
+            logger.exception("Error during scheduled event status transition check")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: register and start scheduler
+    scheduler.add_job(
+        scheduled_status_check,
+        "interval",
+        seconds=120,
+        id="event_status_transitions",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("APScheduler started (event status transitions every 120s)")
+    try:
+        yield
+    finally:
+        # Graceful shutdown
+        try:
+            scheduler.shutdown(wait=False)
+            logger.info("APScheduler shutdown successfully")
+        except Exception as e:
+            logger.warning("Error shutting down APScheduler: %s", e)
 
 
 def create_app() -> FastAPI:
@@ -28,6 +71,7 @@ def create_app() -> FastAPI:
         version="6.0.0",
         docs_url="/docs" if settings.DEBUG else None,
         redoc_url="/redoc" if settings.DEBUG else None,
+        lifespan=lifespan,
     )
 
     # Rate limiting

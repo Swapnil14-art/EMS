@@ -1,64 +1,84 @@
-from celery import shared_task
-from typing import List, Optional
+"""
+Email dispatching and audit logging tasks.
+Runs asynchronously in thread pool without Celery/Redis dependencies.
+"""
+import asyncio
+import functools
+import logging
 import smtplib
 import ssl
-import logging
-from email.mime.text import MIMEText
+import threading
 from email.mime.multipart import MIMEMultipart
-from app.config import settings
+from email.mime.text import MIMEText
+from typing import List, Optional
 
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name="app.tasks.email_tasks.send_email", bind=True, max_retries=3)
+def _run_in_background(target, *args, **kwargs):
+    """Execute callable in asyncio thread pool or daemon thread if no loop running."""
+    call = functools.partial(target, *args, **kwargs)
+    try:
+        loop = asyncio.get_running_loop()
+        loop.run_in_executor(None, call)
+    except RuntimeError:
+        threading.Thread(target=call, daemon=True).start()
+
+
 def send_email(
-    self,
     recipient: str,
     subject: str,
     body_html: str,
     event_id: Optional[int] = None,
     email_type: str = "general",
+    max_retries: int = 3,
 ):
-    """Send a single email. Retries up to 3 times on failure."""
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        if settings.SMTP_FROM_NAME:
-            msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM}>"
-        else:
-            msg["From"] = settings.SMTP_FROM
-        msg["To"] = recipient
-        msg.attach(MIMEText(body_html, "html"))
+    """Send a single email. Retries internally up to 3 times on transient failure."""
+    attempt = 0
+    while attempt < max_retries:
+        attempt += 1
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            if settings.SMTP_FROM_NAME:
+                msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM}>"
+            else:
+                msg["From"] = settings.SMTP_FROM
+            msg["To"] = recipient
+            msg.attach(MIMEText(body_html, "html"))
 
-        with smtplib.SMTP(
-            settings.SMTP_HOST,
-            settings.SMTP_PORT,
-            timeout=settings.SMTP_TIMEOUT_SECONDS,
-        ) as server:
-            server.ehlo()
-            if settings.SMTP_TLS:
-                server.starttls(context=ssl.create_default_context())
+            with smtplib.SMTP(
+                settings.SMTP_HOST,
+                settings.SMTP_PORT,
+                timeout=settings.SMTP_TIMEOUT_SECONDS,
+            ) as server:
                 server.ehlo()
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_FROM, recipient, msg.as_string())
+                if settings.SMTP_TLS:
+                    server.starttls(context=ssl.create_default_context())
+                    server.ehlo()
+                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                server.sendmail(settings.SMTP_FROM, recipient, msg.as_string())
 
-        _safe_log_email(recipient, subject, email_type, event_id, "sent")
+            _safe_log_email(recipient, subject, email_type, event_id, "sent")
+            return
 
-    except Exception as exc:
-        err_msg = str(exc)
-        if settings.SMTP_PASSWORD and settings.SMTP_PASSWORD in err_msg:
-            err_msg = err_msg.replace(settings.SMTP_PASSWORD, "******")
-        _safe_log_email(recipient, subject, email_type, event_id, "failed", err_msg)
-        # Authentication failures are permanent until SMTP configuration
-        # changes. Retrying them only creates duplicate log rows.
-        if isinstance(exc, smtplib.SMTPAuthenticationError):
-            logger.error("Email delivery authentication failed for type=%s recipient=%s", email_type, recipient)
-            raise
-        raise self.retry(exc=exc, countdown=60)
+        except Exception as exc:
+            err_msg = str(exc)
+            if settings.SMTP_PASSWORD and settings.SMTP_PASSWORD in err_msg:
+                err_msg = err_msg.replace(settings.SMTP_PASSWORD, "******")
+            _safe_log_email(recipient, subject, email_type, event_id, "failed", err_msg)
+
+            if isinstance(exc, smtplib.SMTPAuthenticationError):
+                logger.error("Email delivery authentication failed for type=%s recipient=%s", email_type, recipient)
+                return
+
+            if attempt >= max_retries:
+                logger.warning("Max email retries reached for %s: %s", recipient, err_msg)
+                return
 
 
-@shared_task(name="app.tasks.email_tasks.send_bulk_email")
 def send_bulk_email(
     recipients: List[str],
     subject: str,
@@ -66,9 +86,14 @@ def send_bulk_email(
     event_id: Optional[int] = None,
     email_type: str = "bulk",
 ):
-    """Dispatch individual send_email tasks for each recipient."""
+    """Dispatch individual emails for each recipient in background."""
     for recipient in recipients:
-        send_email.delay(recipient, subject, body_html, event_id, email_type)
+        send_email(recipient, subject, body_html, event_id, email_type)
+
+
+# Backward compatible .delay() dispatchers matching Celery task signatures
+send_email.delay = lambda *args, **kwargs: _run_in_background(send_email, *args, **kwargs)
+send_bulk_email.delay = lambda *args, **kwargs: _run_in_background(send_bulk_email, *args, **kwargs)
 
 
 def _log_email(
@@ -79,7 +104,7 @@ def _log_email(
     status: str,
     error: str = None,
 ):
-    """Log email to DB. Uses sync session."""
+    """Log email to DB using sync session."""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from app.models.email_notification import EmailNotification
@@ -101,7 +126,7 @@ def _log_email(
 
 
 def _safe_log_email(*args, **kwargs):
-    """Never retry a successfully delivered email solely because audit logging failed."""
+    """Never fail email sending solely because audit logging failed."""
     try:
         _log_email(*args, **kwargs)
     except Exception:
