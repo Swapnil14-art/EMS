@@ -67,7 +67,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   }, [current, go, events?.length]);
 
   if (!events?.length) return (
-    <div className="flex h-[480px] w-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 sm:h-[580px] lg:h-[620px]">
+    <div className="flex h-[540px] w-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 sm:h-[640px] md:h-[720px] lg:h-[780px] xl:h-[840px]">
       <div className="text-center text-[var(--btn-primary-text)]">
         <p className="font-display text-3xl font-bold opacity-60">No Featured Events</p>
         <p className="text-[rgb(var(--color-primary))]/20 mt-2">Check back soon for upcoming events</p>
@@ -79,14 +79,14 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   const bgGradient = PLACEHOLDER_COLORS[current % PLACEHOLDER_COLORS.length];
 
   return (
-    <div className="relative h-[480px] w-full overflow-hidden sm:h-[580px] lg:h-[620px]">
+    <div className="relative h-[540px] w-full overflow-hidden sm:h-[640px] md:h-[720px] lg:h-[780px] xl:h-[840px]">
       {/* Background image or fallback placeholder */}
       <div className={`absolute inset-0 ${!event.poster_url ? `bg-gradient-to-br ${bgGradient}` : 'bg-transparent'} transition-all duration-700`}>
         {event.poster_url && (
           <img
             src={event.poster_url}
             alt={event.title}
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+            className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
           />
         )}
       </div>

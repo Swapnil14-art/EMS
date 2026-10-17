@@ -10,6 +10,7 @@ interface EventCardProps {
   event: Event;
   variant?: 'default' | 'compact' | 'horizontal';
   showStatus?: boolean; 
+  imageHeightClass?: string;
 }
 
 const GRADIENT_FALLBACKS = [
@@ -26,7 +27,7 @@ function fallbackGradient(id: number) {
 }
 
 // Default card - for grids
-export function EventCard({ event, showStatus = true }: EventCardProps) {
+export function EventCard({ event, showStatus = true, imageHeightClass = 'h-52 sm:h-60 md:h-64' }: EventCardProps) {
   const timeStatus = getEventTimeStatus(event.start_datetime, event.end_datetime);
   const isOngoing = timeStatus === 'ongoing' && ['approved', 'ongoing'].includes(event.status);
   const isUpcoming = timeStatus === 'upcoming' && event.status === 'approved';
@@ -34,9 +35,9 @@ export function EventCard({ event, showStatus = true }: EventCardProps) {
   return (
     <Link href={`/events/${event.id}`} className="block group event-card card-hover overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
       {/* Image area */}
-      <div className="event-img-wrap relative h-40 overflow-hidden bg-gradient-to-br sm:h-48">
+      <div className={`event-img-wrap relative ${imageHeightClass} overflow-hidden bg-gradient-to-br`}>
         {event.poster_url ? (
-          <img src={event.poster_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
+          <img src={event.poster_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover object-center" />
         ) : (
           <div className={`w-full h-full bg-gradient-to-br ${fallbackGradient(event.id)} flex items-center justify-center`}>
             <span className="text-5xl opacity-60">{EVENT_TYPE_ICONS[event.event_type] || '📅'}</span>
@@ -143,10 +144,10 @@ export function EventCardCompact({ event }: { event: Event }) {
 }
 
 // Skeleton loaders
-export function EventCardSkeleton() {
+export function EventCardSkeleton({ imageHeightClass = 'h-52 sm:h-60 md:h-64' }: { imageHeightClass?: string }) {
   return (
     <div className="card overflow-hidden">
-      <div className="skeleton h-48 rounded-none" />
+      <div className={`skeleton ${imageHeightClass} rounded-none`} />
       <div className="p-4 space-y-3">
         <div className="skeleton h-5 rounded w-3/4" />
         <div className="skeleton h-3 rounded w-1/2" />

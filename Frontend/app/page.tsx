@@ -141,7 +141,7 @@ export default function LandingPage() {
       {/* Hero carousel - full width, below nav */}
       <div className="pt-16">
         {loading ? (
-          <div className="h-[480px] w-full skeleton sm:h-[580px] lg:h-[620px]" />
+          <div className="h-[540px] w-full skeleton sm:h-[640px] md:h-[720px] lg:h-[780px] xl:h-[840px]" />
         ) : (
           <HeroCarousel events={featuredEvents} />
         )}
@@ -160,10 +160,10 @@ export default function LandingPage() {
             />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {loading
-                ? Array.from({ length: 4 }).map((_, i) => <EventCardSkeleton key={i} />)
+                ? Array.from({ length: 4 }).map((_, i) => <EventCardSkeleton key={i} imageHeightClass="h-56 sm:h-64 md:h-72" />)
                 : ongoingEvents?.length === 0
                   ? <EmptySection message="No events happening right now" />
-                  : ongoingEvents?.map(e => <EventCard key={e.id} event={e} />)
+                  : ongoingEvents?.map(e => <EventCard key={e.id} event={e} imageHeightClass="h-56 sm:h-64 md:h-72" />)
               }
             </div>
           </section>
