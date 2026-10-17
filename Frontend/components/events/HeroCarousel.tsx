@@ -79,29 +79,51 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   const bgGradient = PLACEHOLDER_COLORS[current % PLACEHOLDER_COLORS.length];
 
   return (
-    <div className="relative h-[505px] max-h-[72vh] w-full overflow-hidden sm:h-[610px] lg:h-[655px]">
-      {/* Background image or fallback placeholder */}
-      <div className={`absolute inset-0 ${!event.poster_url ? `bg-gradient-to-br ${bgGradient}` : 'bg-transparent'} transition-all duration-700`}>
-        {event.poster_url && (
+    <div className="relative h-[505px] max-h-[72vh] w-full overflow-hidden bg-neutral-950 sm:h-[610px] lg:h-[655px]">
+      {/* Background layer: Duplicated blurred & darkened event poster */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {event.poster_url ? (
           <img
             src={event.poster_url}
-            alt={event.title}
-            className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
-            loading="eager"
-            decoding="async"
+            alt=""
+            aria-hidden="true"
+            className="w-full h-full object-cover object-center blur-2xl scale-110 brightness-[0.35] opacity-75 transition-all duration-700"
           />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${bgGradient} opacity-60 transition-all duration-700`} />
         )}
       </div>
 
-      {/* Subtle horizontal edge fade (left and right) with blackish gradient */}
+      {/* Dark gradient overlays: Left & right edge fades + top & bottom blending */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 z-[5] w-12 sm:w-24 md:w-32 lg:w-44 bg-gradient-to-r from-black/80 via-black/35 to-transparent transition-opacity duration-300"
+        className="pointer-events-none absolute inset-y-0 left-0 z-[3] w-20 sm:w-36 md:w-52 lg:w-72 bg-gradient-to-r from-black/90 via-black/50 to-transparent transition-opacity duration-300"
         aria-hidden="true"
       />
       <div
-        className="pointer-events-none absolute inset-y-0 right-0 z-[5] w-12 sm:w-24 md:w-32 lg:w-44 bg-gradient-to-l from-black/80 via-black/35 to-transparent transition-opacity duration-300"
+        className="pointer-events-none absolute inset-y-0 right-0 z-[3] w-20 sm:w-36 md:w-52 lg:w-72 bg-gradient-to-l from-black/90 via-black/50 to-transparent transition-opacity duration-300"
         aria-hidden="true"
       />
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-[3] h-16 sm:h-20 bg-gradient-to-b from-black/60 to-transparent"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-28 sm:h-36 bg-gradient-to-t from-black/85 via-black/40 to-transparent"
+        aria-hidden="true"
+      />
+
+      {/* Foreground main poster: object-contain, centered, zero cropping */}
+      {event.poster_url && (
+        <div className="absolute inset-0 z-[2] flex items-center justify-center pointer-events-none">
+          <img
+            src={event.poster_url}
+            alt={event.title}
+            className="w-full h-full object-contain object-center transition-opacity duration-700 drop-shadow-[0_10px_35px_rgba(0,0,0,0.7)]"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+      )}
 
       {/* Content */}
       <div className="relative z-10 h-full flex items-end">
