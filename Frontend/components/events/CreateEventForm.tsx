@@ -1656,22 +1656,30 @@ export default function CreateEventForm({ basePath, eventId }: { basePath: strin
           <div className="space-y-5 animate-fade-in">
             <h2 className="section-title flex items-center gap-2"><FileText className="w-5 h-5 text-[rgb(var(--color-primary))]" /> Event Poster & Budget</h2>
             <Alert type="info">
-              <span>An event poster is optional but recommended. Participant docs and other files can be added later.</span>
+              <div className="space-y-1 text-xs sm:text-sm">
+                <p>An event poster is optional but recommended. Participant docs and other files can be added later.</p>
+                <p className="text-xs text-[var(--text-secondary)] font-medium">
+                  💡 <strong>Recommended:</strong> 16:9 landscape ratio (e.g., 1920×1080 px). Images with different aspect ratios (such as vertical portraits) will be automatically cropped to fit the homepage slideshow.
+                </p>
+              </div>
             </Alert>
-            <div className={`p-4 bg-[var(--page-bg)] rounded-xl border-2 border-dashed border-[var(--card-border)] flex flex-col items-center justify-center text-center`}>
+            <div className={`p-5 bg-[var(--page-bg)] rounded-xl border-2 border-dashed border-[var(--card-border)] flex flex-col items-center justify-center text-center space-y-2`}>
               <input type="file" ref={posterRef} className="hidden" accept="image/*" onChange={(e) => {
                 if (e.target.files && e.target.files[0]) setPosterFile(e.target.files[0]);
               }} />
               <Button type="button" variant="secondary" onClick={() => posterRef.current?.click()} icon={<FileText className="w-4 h-4" />}>
                 {existingPoster || posterFile ? 'Change Event Poster' : 'Upload Event Poster'}
               </Button>
-              {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] mt-2 font-semibold">New poster: {posterFile.name}</span>}
+              <p className="text-xs text-[var(--text-muted)] max-w-md">
+                Recommended: <strong>16:9 Landscape</strong> (e.g., 1920×1080 px). Other ratios may be cropped to fit the homepage slider.
+              </p>
+              {posterFile && <span className="text-xs text-[rgb(var(--color-primary))] font-semibold">New poster: {posterFile.name}</span>}
               {!posterFile && existingPoster && (
-                <p className="text-xs text-[var(--status-success-text)] mt-2 font-semibold">
+                <p className="text-xs text-[var(--status-success-text)] font-semibold">
                   ✓ Current poster on file ({existingPoster.split('/').pop() || existingPoster}) — upload new only to replace
                 </p>
               )}
-              {!posterFile && !existingPoster && <p className="text-xs text-[var(--text-muted)] mt-2 font-semibold">No poster uploaded — default will be used if none is uploaded</p>}
+              {!posterFile && !existingPoster && <p className="text-xs text-[var(--text-muted)] font-semibold">No poster uploaded — default will be used if none is uploaded</p>}
             </div>
             {/* Detailed Budget Breakdown */}
             <div
