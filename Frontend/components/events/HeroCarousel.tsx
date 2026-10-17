@@ -160,37 +160,23 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
         }
       }}
     >
-      {/* Background layer: Duplicated blurred & ambient event poster */}
+      {/* Background layer: Duplicated blurred event poster in full vibrant colors */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {event.poster_url ? (
           <img
             src={event.poster_url}
             alt=""
             aria-hidden="true"
-            className="w-full h-full object-cover object-center blur-3xl sm:blur-[60px] scale-125 brightness-[0.6] opacity-90 transition-all duration-700"
+            className="w-full h-full object-cover object-center blur-2xl sm:blur-3xl scale-120 brightness-95 opacity-100 transition-all duration-700"
           />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${bgGradient} opacity-70 transition-all duration-700`} />
+          <div className={`w-full h-full bg-gradient-to-br ${bgGradient} transition-all duration-700`} />
         )}
-        {/* Soft contrast veil to make foreground poster pop while keeping background glow visible */}
-        <div className="absolute inset-0 bg-black/30" />
       </div>
 
-      {/* Subtle edge & bottom gradients to blend into container borders and maintain text readability */}
+      {/* Subtle bottom gradient only to ensure event text and buttons remain readable */}
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 z-[3] w-12 sm:w-24 md:w-36 bg-gradient-to-r from-black/75 to-transparent transition-opacity duration-300"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 z-[3] w-12 sm:w-24 md:w-36 bg-gradient-to-l from-black/75 to-transparent transition-opacity duration-300"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 z-[3] h-14 sm:h-20 bg-gradient-to-b from-black/50 to-transparent"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-24 sm:h-32 bg-gradient-to-t from-black/85 via-black/35 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-[3] h-28 sm:h-32 bg-gradient-to-t from-black/65 via-black/20 to-transparent"
         aria-hidden="true"
       />
 
