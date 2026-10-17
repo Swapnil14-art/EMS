@@ -141,7 +141,7 @@ export default function LandingPage() {
       {/* Hero carousel - full width, below nav */}
       <div className="pt-16">
         {loading ? (
-          <div className="h-[540px] w-full skeleton sm:h-[640px] md:h-[720px] lg:h-[780px] xl:h-[840px]" />
+          <div className="h-[505px] max-h-[72vh] w-full skeleton sm:h-[610px] lg:h-[655px]" />
         ) : (
           <HeroCarousel events={featuredEvents} />
         )}
