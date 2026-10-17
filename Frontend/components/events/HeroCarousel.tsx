@@ -103,7 +103,7 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
 
       {/* Content */}
       <div className="relative z-10 h-full flex items-end">
-        <div className="mx-auto w-full max-w-7xl px-4 pb-4 sm:px-6 sm:pb-6 lg:px-8 lg:pb-7">
+        <div className="w-full px-5 pb-4 sm:px-8 sm:pb-6 md:px-12 lg:px-16 xl:px-20 lg:pb-7">
           <div className={`max-w-2xl transition-all duration-500 ${isAnimating ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'}`}>
             <div className="mb-2 flex items-center gap-2 sm:mb-2.5 sm:gap-3">
               <StatusPill status={event.status} />
