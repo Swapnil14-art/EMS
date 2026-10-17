@@ -66,6 +66,61 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
     return () => clearInterval(t);
   }, [current, go, events?.length]);
 
+  // Drag & swipe state
+  const dragStartX = useRef(0);
+  const dragStartY = useRef(0);
+  const isDragging = useRef(false);
+  const hasDragged = useRef(false);
+  const draggedJustNow = useRef(false);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only respond to primary mouse button (left click) or touch
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (events?.length <= 1) return;
+    dragStartX.current = e.clientX;
+    dragStartY.current = e.clientY;
+    isDragging.current = true;
+    hasDragged.current = false;
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    const diffX = e.clientX - dragStartX.current;
+    const diffY = e.clientY - dragStartY.current;
+    if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+      hasDragged.current = true;
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+
+    const diffX = e.clientX - dragStartX.current;
+    const diffY = e.clientY - dragStartY.current;
+
+    if (hasDragged.current) {
+      draggedJustNow.current = true;
+      setTimeout(() => {
+        draggedJustNow.current = false;
+      }, 80);
+    }
+
+    const threshold = 45;
+    // Ensure horizontal swipe is dominant over vertical movement
+    if (Math.abs(diffX) >= threshold && Math.abs(diffX) > Math.abs(diffY)) {
+      if (diffX < 0) {
+        go(current + 1); // Dragged/swiped left -> next
+      } else {
+        go(current - 1); // Dragged/swiped right -> previous
+      }
+    }
+  };
+
+  const handlePointerCancel = () => {
+    isDragging.current = false;
+  };
+
   if (!events?.length) return (
     <div className="flex h-[505px] max-h-[72vh] w-full items-center justify-center bg-gradient-to-br from-primary to-primary/80 sm:h-[610px] lg:h-[655px]">
       <div className="text-center text-[var(--btn-primary-text)]">
@@ -79,7 +134,32 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   const bgGradient = PLACEHOLDER_COLORS[current % PLACEHOLDER_COLORS.length];
 
   return (
-    <div className="relative h-[505px] max-h-[72vh] w-full overflow-hidden bg-neutral-950 sm:h-[610px] lg:h-[655px]">
+    <div
+      className="relative h-[505px] max-h-[72vh] w-full overflow-hidden bg-neutral-950 sm:h-[610px] lg:h-[655px] cursor-grab active:cursor-grabbing select-none touch-pan-y"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
+      onClickCapture={(e) => {
+        if (draggedJustNow.current) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+      onDragStart={(e) => e.preventDefault()}
+      tabIndex={0}
+      role="region"
+      aria-label="Event Carousel"
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          go(current - 1);
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          go(current + 1);
+        }
+      }}
+    >
       {/* Background layer: Duplicated blurred & darkened event poster */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {event.poster_url ? (
