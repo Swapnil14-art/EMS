@@ -79,15 +79,14 @@ export default function HeroCarousel({ events }: HeroCarouselProps) {
   const bgGradient = PLACEHOLDER_COLORS[current % PLACEHOLDER_COLORS.length];
 
   return (
-    <div className="relative h-[505px] max-h-[72vh] w-full overflow-hidden bg-black sm:h-[610px] lg:h-[655px]">
+    <div className="relative h-[505px] max-h-[72vh] w-full overflow-hidden sm:h-[610px] lg:h-[655px]">
       {/* Background image or fallback placeholder */}
-      <div className={`absolute inset-0 ${!event.poster_url ? `bg-gradient-to-br ${bgGradient}` : 'bg-black'} transition-all duration-700`}>
+      <div className={`absolute inset-0 ${!event.poster_url ? `bg-gradient-to-br ${bgGradient}` : 'bg-transparent'} transition-all duration-700`}>
         {event.poster_url && (
           <img
             src={event.poster_url}
             alt={event.title}
-            className="absolute inset-0 w-full h-full object-cover object-center sm:object-[center_35%] transition-opacity duration-700 scale-[0.85]"
-            style={{ transform: 'scale(0.85)', transformOrigin: 'center center' }}
+            className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
             loading="eager"
             decoding="async"
           />
